@@ -1,0 +1,202 @@
+---
+title: "Integration Guide"
+description: "How to integrate CatchBack with your existing systems"
+---
+
+# Integration Guide
+
+CatchBack is designed to integrate seamlessly with your existing e-commerce infrastructure. This guide will walk you through the integration process and best practices.
+
+## Quick Start Integration
+
+### 1. Platform Connectors
+
+Choose your e-commerce platform for quick setup:
+
+<CardGroup cols={2}>
+  <Card
+    title="Shopify"
+    icon="shopify"
+    href="#shopify-setup"
+  >
+    Install our native Shopify app
+  </Card>
+  <Card
+    title="WooCommerce"
+    icon="wordpress"
+    href="#woocommerce-setup"
+  >
+    Add our WordPress plugin
+  </Card>
+  <Card
+    title="Magento"
+    icon="magento"
+    href="#magento-setup"
+  >
+    Install our Magento extension
+  </Card>
+  <Card
+    title="Custom API"
+    icon="code"
+    href="#api-integration"
+  >
+    Use our RESTful API
+  </Card>
+</CardGroup>
+
+### 2. API Integration
+
+For custom integrations, use our RESTful API:
+
+```bash
+# Authentication
+curl -X POST https://api.catchback.com/auth \
+  -H "Content-Type: application/json" \
+  -d '{"api_key": "your_api_key", "secret": "your_secret"}'
+```
+
+```javascript
+// Initialize return request
+const returnRequest = await fetch('https://api.catchback.com/returns', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ' + token,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    order_id: 'ORDER_123',
+    items: [
+      {
+        sku: 'ITEM_001',
+        quantity: 1,
+        reason: 'damaged'
+      }
+    ],
+    customer: {
+      email: 'customer@example.com',
+      name: 'John Doe'
+    }
+  })
+});
+```
+
+## Platform-Specific Setup
+
+### Shopify Setup {#shopify-setup}
+
+1. **Install the App**
+   - Visit the Shopify App Store
+   - Search for "CatchBack Returns"
+   - Click "Add app" and authorize permissions
+
+2. **Configure Settings**
+   - Set return policies and timeframes
+   - Configure notification preferences
+   - Customize the returns portal appearance
+
+3. **Test Integration**
+   - Create a test return to verify functionality
+   - Check webhook delivery and order updates
+
+### WooCommerce Setup {#woocommerce-setup}
+
+1. **Plugin Installation**
+   ```bash
+   # Download and install the plugin
+   wp plugin install catchback-returns --activate
+   ```
+
+2. **Configuration**
+   - Navigate to WooCommerce → CatchBack Settings
+   - Enter your API credentials
+   - Configure return policies
+
+3. **Widget Placement**
+   - Add the returns widget to your account page
+   - Customize the styling to match your theme
+
+### API Integration {#api-integration}
+
+#### Authentication
+```javascript
+const CatchBack = require('@catchback/api-client');
+
+const client = new CatchBack({
+  apiKey: process.env.CATCHBACK_API_KEY,
+  secret: process.env.CATCHBACK_SECRET,
+  environment: 'production' // or 'sandbox'
+});
+```
+
+#### Webhook Configuration
+Set up webhooks to receive real-time updates:
+
+```javascript
+// Webhook endpoint example
+app.post('/webhooks/catchback', (req, res) => {
+  const event = req.body;
+  
+  switch(event.type) {
+    case 'return.created':
+      handleReturnCreated(event.data);
+      break;
+    case 'return.approved':
+      handleReturnApproved(event.data);
+      break;
+    case 'return.completed':
+      handleReturnCompleted(event.data);
+      break;
+  }
+  
+  res.status(200).send('OK');
+});
+```
+
+## Integration Best Practices
+
+### Error Handling
+- Always implement retry logic for API calls
+- Handle rate limiting gracefully
+- Log errors for debugging and monitoring
+
+### Security
+- Store API credentials securely
+- Use HTTPS for all API communications
+- Validate webhook signatures
+
+### Performance
+- Cache frequently accessed data
+- Use pagination for large data sets
+- Implement proper timeout handling
+
+## Testing Your Integration
+
+### Sandbox Environment
+Use our sandbox environment for testing:
+- Full API functionality without real transactions
+- Test data reset capabilities
+- Debugging tools and logs
+
+### Test Scenarios
+1. **Basic Return Flow**
+   - Create return request
+   - Process approval/rejection
+   - Complete return
+
+2. **Edge Cases**
+   - Invalid product SKUs
+   - Expired return windows
+   - Partial returns
+
+3. **Webhook Delivery**
+   - Test all webhook event types
+   - Verify retry mechanisms
+   - Check signature validation
+
+## Support and Troubleshooting
+
+Need help with your integration?
+
+- **Documentation**: Check our [API Reference](/api-reference/introduction)
+- **Support**: Contact our [technical support team](/resources/support)
+- **Community**: Join our developer community forum

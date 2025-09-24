@@ -1,0 +1,202 @@
+---
+title: "Security & Compliance"
+description: "Learn about CatchBack's security measures and compliance standards"
+---
+
+# Security & Compliance
+
+At CatchBack, security isn't just a feature—it's the foundation of everything we do. We implement industry-leading security measures to protect your data and ensure compliance with global standards.
+
+## Security Framework
+
+### Data Protection
+
+**Encryption**
+- All data encrypted in transit using TLS 1.3
+- Data at rest encrypted using AES-256
+- End-to-end encryption for sensitive customer information
+
+**Access Controls**
+- Multi-factor authentication (MFA) required
+- Role-based access control (RBAC)
+- Principle of least privilege enforcement
+
+**Data Privacy**
+- GDPR compliance for European customers
+- CCPA compliance for California residents
+- Data minimization and purpose limitation
+
+### Infrastructure Security
+
+**Cloud Security**
+- AWS/Azure security best practices
+- Virtual Private Cloud (VPC) isolation
+- Web Application Firewall (WAF) protection
+
+**Network Security**
+- DDoS protection and mitigation
+- Intrusion detection and prevention
+- Regular penetration testing
+
+**Application Security**
+- Secure development lifecycle (SDLC)
+- Regular security code reviews
+- Automated vulnerability scanning
+
+## Compliance Standards
+
+### Certifications
+
+<CardGroup cols={2}>
+  <Card
+    title="SOC 2 Type II"
+    icon="shield-check"
+  >
+    Independently audited security controls
+  </Card>
+  <Card
+    title="PCI DSS Level 1"
+    icon="credit-card"
+  >
+    Highest level of payment card security
+  </Card>
+  <Card
+    title="ISO 27001"
+    icon="certificate"
+  >
+    International security management standard
+  </Card>
+  <Card
+    title="GDPR Compliant"
+    icon="balance-scale"
+  >
+    European data protection regulation
+  </Card>
+</CardGroup>
+
+### Regular Audits
+- Annual SOC 2 Type II audits
+- Quarterly PCI DSS assessments
+- Monthly internal security reviews
+- Continuous compliance monitoring
+
+## Data Handling
+
+### Data Collection
+We only collect data necessary for:
+- Processing returns and exchanges
+- Providing customer support
+- Improving our services
+- Meeting legal requirements
+
+### Data Storage
+- Secure, encrypted databases
+- Regular automated backups
+- Geographic data residency options
+- Configurable data retention policies
+
+### Data Sharing
+We never sell or share your data with third parties for marketing purposes. Data is only shared:
+- With your explicit consent
+- As required by law
+- With trusted service providers under strict contracts
+
+## Security Monitoring
+
+### 24/7 Security Operations Center
+- Real-time threat detection
+- Immediate incident response
+- Continuous security monitoring
+- Proactive threat hunting
+
+### Incident Response
+- Dedicated incident response team
+- Defined escalation procedures
+- Customer notification protocols
+- Post-incident analysis and improvement
+
+## Privacy Controls
+
+### Customer Rights
+Under GDPR and CCPA, customers have the right to:
+- Access their personal data
+- Correct inaccurate information
+- Delete their data (right to be forgotten)
+- Port their data to other services
+
+### Data Subject Requests
+We provide tools for handling data subject requests:
+- Automated data export functionality
+- Self-service privacy controls
+- 30-day maximum response time
+- Detailed audit trails
+
+## API Security
+
+### Authentication & Authorization
+```javascript
+// Secure API authentication
+const token = await CatchBack.authenticate({
+  apiKey: process.env.API_KEY,
+  secret: process.env.API_SECRET,
+  scopes: ['returns:read', 'returns:write']
+});
+```
+
+### Rate Limiting
+- Configurable rate limits per API key
+- Burst capacity for peak loads
+- Fair usage policies
+- DDoS protection
+
+### Webhook Security
+```javascript
+// Webhook signature verification
+const crypto = require('crypto');
+
+function verifyWebhookSignature(payload, signature, secret) {
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+  
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
+}
+```
+
+## Security Best Practices
+
+### For Merchants
+- Use strong, unique passwords
+- Enable two-factor authentication
+- Regularly review access permissions
+- Keep integration credentials secure
+- Monitor for suspicious activity
+
+### For Developers
+- Validate all webhook signatures
+- Use HTTPS for all communications
+- Store credentials securely
+- Implement proper error handling
+- Follow secure coding practices
+
+## Incident Reporting
+
+If you discover a security vulnerability:
+
+1. **Don't** disclose it publicly
+2. **Email** our security team: security@catchback.com
+3. **Include** detailed information about the vulnerability
+4. **Expect** acknowledgment within 24 hours
+
+We take all security reports seriously and will work with you to resolve any issues quickly and responsibly.
+
+## Questions?
+
+For security-related questions or concerns:
+- **Email**: security@catchback.com
+- **Support**: Contact our [security team](/resources/support)
+- **Documentation**: Review our [compliance documentation](/logistics-legal/compliance)
