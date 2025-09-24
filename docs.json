@@ -16,9 +16,17 @@
           {
             "group": "About CatchBack",
             "pages": [
-              "index",
               "about-catchback/overview",
               "about-catchback/mission"
+            ]
+          },
+          {
+            "group": "Product Line",
+            "pages": [
+              "about-catchback/transparent-packs",
+              "about-catchback/liquidity",
+              "about-catchback/vaulting",
+              "about-catchback/marketplace"
             ]
           },
           {
