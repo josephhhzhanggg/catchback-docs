@@ -33,9 +33,16 @@
             "group": "Product Line",
             "pages": [
               "about-catchback/transparent-packs",
-              "about-catchback/liquidity",
               "about-catchback/card-backed-loans",
               "about-catchback/marketplace"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "about-catchback/provably-fair",
+              "about-catchback/liquidity",
+              "about-catchback/vaulting"
             ]
           },
           {
@@ -43,8 +50,7 @@
             "pages": [
               "logistics-legal/compliance",
               "logistics-legal/terms",
-              "logistics-legal/privacy",
-              "about-catchback/vaulting"
+              "logistics-legal/privacy"
             ]
           },
           {
