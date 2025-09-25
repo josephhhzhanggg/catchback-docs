@@ -3,122 +3,270 @@ title: "Provably Fair"
 description: "Cryptographically secure randomness that you can verify for complete transparency in pack openings"
 ---
 
-# Provably Fair
-
 ## Cryptographically Secure • Independently Verifiable
 
 **Every pack opening uses provably fair technology that you can verify yourself.**
 
 CatchBack's provably fair system ensures that every pack opening is truly random and cannot be manipulated. Our cryptographic approach gives you mathematical proof that your pack results are fair and unbiased.
 
-## How Provably Fair Works
 
-### Cryptographic Randomness
-Our system uses blockchain-based random number generation combined with cryptographic hashing to ensure true randomness that can be independently verified.
+### Two-Stage Selection Process
 
-### Three-Step Verification Process
-
-<CardGroup cols={3}>
+<CardGroup cols={2}>
   <Card
-    title="1. Client Seed"
-    icon="user"
+    title="Stage 1: Bucket Selection"
+    icon="bucket"
   >
-    You provide a random string (client seed) that influences the outcome
+    LCG output determines which value bucket your card comes from based on optimized probabilities
   </Card>
   
   <Card
-    title="2. Server Seed"
-    icon="server"
+    title="Stage 2: Card Selection"
+    icon="cards"
   >
-    We generate a server seed and provide you with its hash before the pack opens
-  </Card>
-  
-  <Card
-    title="3. Verification"
-    icon="check-circle"
-  >
-    After opening, you can verify the results using both seeds and our open-source algorithm
+    Secondary calculation using your UUID determines which specific card within that bucket
   </Card>
 </CardGroup>
 
-## Complete Transparency
+This two-stage process ensures both fair bucket selection and random card distribution within each bucket.
 
-### Open Source Algorithm
-Our pack opening algorithm is completely open source, allowing anyone to:
-- Review the randomness generation code
-- Verify that no manipulation is possible
-- Reproduce pack results using the same seeds
-- Audit the fairness of any pack opening
+## Real-Time Optimization Algorithm
 
-### Real-Time Verification
-Every pack opening provides:
-- **Pre-reveal Hash**: Server seed hash shown before opening
-- **Complete Seeds**: Both client and server seeds revealed after opening
-- **Verification Tools**: Built-in tools to verify your pack results
-- **Audit Trail**: Permanent record of all randomness inputs and outputs
+Our system continuously monitors live market values and automatically sorts cards into value buckets (P0-P5). The system uses **[machine learning optimization](https://docs.scipy.org/doc/scipy/reference/optimize.html)** to ensure pack probabilities automatically adapt to market conditions while guaranteeing you never pay more than expected value.
 
-## Mathematical Proof of Fairness
+```python
+# --- PACK CONFIGURATIONS ---
+PACK_CONFIGS = {
+    'bronze': {
+        'bucket_ranges': [
+            {'min': 1, 'max': 5},
+            {'min': 5.01, 'max': 10},
+            {'min': 10.01, 'max': 20},
+            {'min': 20.01, 'max': 30},
+            {'min': 30.01, 'max': 50},
+            {'min': 50.01, 'max': 100},
+        ],
+        'default_probs': [X, X, X, X, X, X],
+    },
+    'silver': {
+        'bucket_ranges': [
+            {'min': 15.00, 'max': 25.00},
+            {'min': 25.01, 'max': 50.00},
+            {'min': 50.01, 'max': 100.00},
+            {'min': 100.01, 'max': 200.00},
+            {'min': 200.01, 'max': 400.00},
+            {'min': 400.01, 'max': 800.00},
+        ],
+        'default_probs': [X, X, X, X, X, X],
+    },
+    # OTHER PACK CONFIGURATIONS
+}
 
-### Cryptographic Hashing
-We use SHA-256 cryptographic hashing to ensure that:
-- Server seeds cannot be manipulated after being committed
-- Pack results are mathematically determined by the seeds
-- No external interference can affect the randomness
-- All results can be independently verified
+# --- GENERIC BUCKET ASSIGNMENT ---
+def assign_bucket(market_value, bucket_ranges):
+    for i, rng in enumerate(bucket_ranges):
+        if rng['min'] <= market_value <= rng['max']:
+            return f'bucket{i}'
+    return 'no_bucket'
 
-### Blockchain Integration
-Our randomness incorporates blockchain data to provide:
-- **Immutable Timestamps**: Permanent record of when packs were opened
-- **Decentralized Verification**: Anyone can verify results using blockchain data
-- **Tamper-Proof Records**: Impossible to alter pack opening history
-- **Public Auditability**: Complete transparency in our randomness sources
+# --- GENERIC BUCKET DATA FETCH ---
+def fetch_bucket_data_generic(pack_type):
+    print(f"Fetching cards for pack type: {pack_type}")
+    config = PACK_CONFIGS[pack_type]
+    bucket_ranges = config['bucket_ranges']
+    
+    # Fetch all cards available for this pack
+    response = supabase.table('REDACTED_TABLE_NAME') \
+        .select('REDACTED_SEARCH_PARAMETERS') \
+        .eq('REDACTED_FILTER', True) \
+        .execute()
+        
+    if not response.data:
+        print("No cards available for packs.")
+        return create_empty_bucket_data_generic(pack_type), {}, bucket_ranges
+        
+    cards = response.data
+    
+    # Assign cards to buckets
+    bucket_stats = {}
+    bucket_card_ids = {}
+    
+    for i in range(6):
+        bucket_stats[f'bucket{i}'] = {'values': [], 'count': 0, 'cards': []}
+        bucket_card_ids[f'P{i}'] = []
+        
+    bucket_stats['no_bucket'] = {'values': [], 'count': 0, 'cards': []}
+    bucket_card_ids['P_NO_BUCKET'] = []
+    
+    for card in cards:
+        value = card.get('market_value') or card.get('price') or 0.0
+        bucket = assign_bucket(value, bucket_ranges)
+        bucket_stats[bucket]['values'].append(float(value))
+        bucket_stats[bucket]['count'] += 1
+        bucket_stats[bucket]['cards'].append(card)
+        
+        if bucket == 'no_bucket':
+            bucket_card_ids['P_NO_BUCKET'].append(card['id'])
+        else:
+            idx = int(bucket.replace('bucket', ''))
+            bucket_card_ids[f'P{idx}'].append(card['id'])
 
-## Verification Tools
+def calculate_optimized_probabilities_generic(bucket_data, target_probs, bucket_ranges, target_ev):
+    """Calculate optimized probabilities using scipy"""
+    import numpy as np
+    from scipy.optimize import minimize
+    
+    avg_values = []
+    actual_values_used = []
+    
+    for i, p_bucket in enumerate(['P0', 'P1', 'P2', 'P3', 'P4', 'P5']):
+        bucket_avg = bucket_data[p_bucket]['average_value']
+        if bucket_avg > 0:
+            value_used = bucket_avg
+            actual_values_used.append(f"{value_used} (from {bucket_data[p_bucket]['num_cards']} cards)")
+        else:
+            rng = bucket_ranges[i]
+            value_used = (rng['min'] + rng['max']) / 2
+            actual_values_used.append(f"{value_used} (midpoint default)")
+        avg_values.append(value_used)
+    
+    avg_values = np.array(avg_values)
+    baseline_ev = np.dot(target_probs, avg_values)
+    
+    return optimized_probabilities
+```
 
-### Built-in Verifier
-Our platform includes a built-in verification tool that lets you:
-- Input your client seed and our server seed
-- Run the same algorithm that determined your pack results
-- Confirm that your actual results match the mathematical outcome
-- Verify that no manipulation occurred
+Below is the card selection algorithm that runs when you open a pack:
 
-### External Verification
-You can also verify pack results using:
-- Third-party verification tools
-- Your own implementation of our open-source algorithm
-- Independent auditing services
-- Community verification tools
+```javascript
+// 1. Fetch latest pack stats
+const { data: statsRows, error: statsError } = await serviceSupabase
+  .from('REDACTED_TABLE_NAME')
+  .select('*')
+  .eq('pack_type', 'silver')
+  .order('created_at', { ascending: false })
+  .limit(1);
+if (statsError || !statsRows || statsRows.length === 0)
+  return NextResponse.json({ error: 'No silver pack stats found' }, { status: 500 });
+const buckets = statsRows[0].data?.buckets || {};
 
-## Trust Through Transparency
+// 2. Get bucket keys and probabilities
+const bucketKeys = Object.keys(buckets).filter((k) => k.startsWith('P'));
+const bucketProbs = bucketKeys.map((k) => buckets[k].current_probability || 0);
 
-### No Trust Required
-Unlike traditional pack openings where you must trust the operator, our provably fair system requires no trust:
-- **Mathematical Proof**: Cryptographic verification replaces trust
-- **Open Source**: All code is publicly auditable
-- **Independent Verification**: Verify results without relying on us
-- **Community Oversight**: Public algorithm allows community auditing
+// Log bucket odds for this pull
+const bucketOddsDisplay = bucketKeys.map((key, i) => {
+  const bucketNum = key.replace('P', '');
+  const percentage = (bucketProbs[i] * 100).toFixed(1);
+  return `bucket${bucketNum}: ${percentage}%`;
+}).join(', ');
 
-### Industry-Leading Standards
-Our provably fair implementation follows industry best practices:
-- **Cryptographic Security**: Military-grade randomness generation
-- **Open Source Standards**: Publicly auditable algorithms
-- **Blockchain Integration**: Decentralized verification methods
-- **Academic Review**: Algorithm reviewed by cryptography experts
+// 3. Fetch all trading cards available for packs
+const { data: cardsData, error: cardsError } = await serviceSupabase
+  .from('REDACTED_TABLE_NAME')
+  .select('*')
+  .eq('REDACTED_FILTER', true);
+if (cardsError || !cardsData || cardsData.length === 0)
+  return NextResponse.json({ error: 'No cards available for Silver Pack' }, { status: 500 });
 
-## Getting Started with Verification
+// 4. Assign cards to buckets in-memory (matching logic from pack-stats endpoint)
+const assignCardToBucket = (card) => {
+  const value = card.market_value ?? card.price ?? 0;
+  for (const [bucketKey, bucketData] of Object.entries(buckets)) {
+    const data = bucketData;
+    if (bucketKey === 'P_NO_BUCKET') continue;
+    const min = data.card_min_value || 0;
+    const max = data.card_max_value || 0;
+    if (value >= min && value <= max) {
+      return bucketKey;
+    }
+  }
+  return 'P_NO_BUCKET';
+};
 
-### For Every Pack Opening
-1. **Set Your Client Seed**: Choose your own random string before opening
-2. **Note the Server Hash**: We show you the server seed hash before revealing results
-3. **Open Your Pack**: Experience the excitement of your customized pack
-4. **Verify Results**: Use our tools to mathematically confirm fairness
+// Group cards by bucket
+const cardsByBucket = {};
+bucketKeys.forEach((bucketKey) => { cardsByBucket[bucketKey] = []; });
+for (const card of cardsData) {
+  const bucket = assignCardToBucket(card);
+  if (cardsByBucket[bucket]) {
+    cardsByBucket[bucket].push(card);
+  }
+}
 
-### Advanced Users
-- **Download Verification Tools**: Access our open-source verification software
-- **Run Independent Checks**: Verify results using your own tools
-- **Audit Pack History**: Review the fairness of any historical pack opening
-- **Contribute to Community**: Help improve our open-source tools
+// 5. Generate UUIDs
+const transaction_uuid = uuidv4();
+const pack_state_uuid = uuidv4();
+
+// 6. Prepare PRNG
+const seed = parseInt(transaction_uuid.replace(/-/g, '').slice(0, 16), 16) % LCG_M;
+const rand = lcg(seed);
+
+// 7. Select bucket (weighted by probability)
+const selectedBucketIdx = weightedRandomIndex(bucketProbs, rand);
+const selectedBucket = bucketKeys[selectedBucketIdx];
+const cardsInBucket = cardsByBucket[selectedBucket] || [];
+if (cardsInBucket.length === 0) {
+  return NextResponse.json({ error: 'No cards available in bucket' }, { status: 500 });
+}
+
+// 8. Use first character of UUID to select card within bucket
+const firstChar = transaction_uuid.replace(/-/g, '').charAt(0);
+const hexValue = parseInt(firstChar, 16);
+const cardIdx = hexValue % cardsInBucket.length;
+const selectedCard = cardsInBucket[cardIdx];
+
+// 9. Store transaction
+const pack_card_ids = cardsInBucket.map((c) => c.id);
+const pack_market_values = cardsInBucket.map((c) => c.market_value);
+
+const transactionData = {
+  // REDACTED_DATA
+};
+
+const { data: insertedData, error: txError } = await serviceSupabase
+  .from('REDACTED_TABLE_NAME')
+  .insert(transactionData)
+  .select('id');
+
+if (txError) {
+  console.error('Transaction insertion failed:', {
+    error: txError,
+    code: txError.code,
+    message: txError.message,
+    details: txError.details,
+    hint: txError.hint
+  });
+  return NextResponse.json({ 
+    error: 'Failed to record transaction', 
+    details: txError,
+    debug_info: {
+      error_code: txError.code,
+      error_message: txError.message,
+      transaction_id: transaction_uuid
+    }
+  }, { status: 500 });
+} else {
+  console.log('Transaction inserted successfully:', {
+    transaction_id: transaction_uuid,
+    inserted_data: insertedData
+  });
+}
+```
+
+## Card Pulling Process
+
+### How Individual Cards Are Selected
+
+Once our optimization system has calculated the fair probabilities for each value bucket, the actual card selection process begins. When you click "Open Pack," our system generates a unique cryptographic seed using a UUID (Universally Unique Identifier). This isn't just any random number—it's created using industry-standard cryptographic functions that are impossible to predict or manipulate.
+
+This UUID becomes the foundation for a Linear Congruential Generator (LCG) using the same mathematical constants that Microsoft Visual C++ uses for randomness. We extract the first 16 characters from your transaction UUID, convert them to a numerical seed, and feed it into our LCG algorithm: `state = (A × state + C) mod M`. This ensures that given the same seed, the exact same result will always occur—making every pack opening completely auditable.
+
+### Permanent Audit Trail
+
+Every transaction is permanently recorded with its UUID seed, selected card, timestamp, and all calculation details. You can verify any pack opening by taking the UUID we provide, running it through our published algorithm, and confirming you got exactly the card you should have received. It's mathematical proof that your pack opening was fair, random, and cannot be manipulated by anyone—including us.
+
 
 ---
 
-*Provably fair technology represents the gold standard for online randomness, providing mathematical proof that every pack opening is fair, transparent, and verifiable.*
+*Provably fair technology provides mathematical proof that every pack opening is fair, transparent, and verifiable.*
