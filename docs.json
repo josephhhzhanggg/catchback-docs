@@ -2,6 +2,14 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "CatchBack Documentation",
+  "metadata": {
+    "title": "CatchBack Cards - Guaranteed 75% Buyback Trading Cards",
+    "description": "Buy trading cards with confidence. We guarantee to buy back at 75% market value, regardless of price changes.",
+    "og:title": "CatchBack Cards - Guaranteed 75% Buyback Trading Cards",
+    "og:description": "Buy trading cards with confidence. We guarantee to buy back at 75% market value, regardless of price changes.",
+    "twitter:title": "CatchBack Cards - Guaranteed 75% Buyback Trading Cards",
+    "twitter:description": "Buy trading cards with confidence. We guarantee to buy back at 75% market value, regardless of price changes."
+  },
   "colors": {
     "primary": "#16A34A",
     "light": "#07C983",
@@ -17,7 +25,8 @@
             "group": "About CatchBack",
             "pages": [
               "about-catchback/overview",
-              "about-catchback/mission"
+              "about-catchback/mission",
+              "about-catchback/pack-comparison"
             ]
           },
           {
@@ -51,9 +60,9 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "CatchBack Website",
+          "href": "https://catchbackcards.com",
+          "icon": "globe"
         },
         {
           "anchor": "Blog",
