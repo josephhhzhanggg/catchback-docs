@@ -1,31 +1,9 @@
 ---
 title: "Create Custom Packs"
-description: "Custom creation and open source pack system with complete transparency"
+description: "Create your own custom packs. Pick cards, odds, and risk level with complete transparency for pulls."
 ---
 
-# Create Custom Packs
-
-## Transparent Packs • Open Source
-
-**Create your own custom packs. Pick cards, odds, and risk level with complete transparency for pulls.**
-
 Transparent Packs revolutionize the traditional pack-opening experience by giving you full visibility into contents, odds, and expected values before you make any purchase decision.
-
-## What Makes Our Packs Transparent?
-
-### Complete Odds Disclosure
-Unlike traditional packs where odds are hidden or vague, every Transparent Pack shows:
-- **Exact pull rates** for every card or item
-- **Expected value calculations** based on current market prices
-- **Detailed breakdowns** of potential outcomes
-- **Risk/reward analysis** for each pack type
-
-### Open Source Methodology
-Our pack creation process is completely transparent:
-- **Public algorithms** for pack generation and odds calculation
-- **Verifiable randomness** using blockchain-based random number generation
-- **Auditable results** with full transaction history
-- **Community validation** of pack contents and odds
 
 ## Custom Pack Creation
 
@@ -63,71 +41,21 @@ Our pack creation process is completely transparent:
 
 ### Pack Building Process
 
-#### Step 1: Foundation Setup
-```
-Base Parameters
-├── Pack Price Range
-├── Number of Cards per Pack
-├── Target Expected Value
-└── Risk Tolerance Level
-```
+#### Step 1: Select Your Cards
+Choose the specific cards you want to appear in your pack from our authenticated database.
 
-#### Step 2: Card Pool Selection
-- Browse our authenticated card database
-- Filter by sport, set, player, condition, and price
-- Add cards to your pack pool with custom weights
-- Set minimum and maximum quantities per card
+#### Step 2: Set Your Odds
+Pick from random levels to different risk levels using our drag and drop interface. The price adjusts automatically as you modify the odds.
 
-#### Step 3: Odds Configuration
-- Define rarity tiers (Common, Uncommon, Rare, etc.)
-- Set pull rates for each tier
-- Configure special bonuses and guaranteed pulls
-- Balance expected value with excitement factor
+#### Step 3: Open Your Pack
+Once you're satisfied with your card selection and odds, open your pack and see what you get!
 
-#### Step 4: Validation and Launch
-- Automated validation of odds and expected values
-- Community review period for feedback
-- Final approval and launch to marketplace
-- Real-time performance tracking
+## What Makes Our Packs Transparent?
 
-## Types of Transparent Packs
-
-### Investment Grade Packs
-**Focus**: Stable returns with low volatility
-- Conservative odds favoring established cards
-- Predictable value ranges
-- Lower risk, consistent returns
-- Perfect for portfolio building
-
-### High-Roller Packs
-**Focus**: Maximum excitement with chase cards
-- Higher pack prices with premium cards
-- Significant upside potential
-- Higher risk, higher reward
-- Designed for thrill-seekers
-
-### Themed Collections
-**Focus**: Specific players, teams, or eras
-- Curated around particular themes
-- Educational and collectible value
-- Moderate risk levels
-- Perfect for targeted collecting
-
-### Community Packs
-**Focus**: Creator and community-driven content
-- Designed by community members
-- Unique themes and combinations
-- Variable risk levels
-- Democratized pack creation
-
-## Transparency Features
-
-### Real-Time Statistics
-Every pack provides live data including:
-- **Current expected value** based on real-time market prices
-- **Pull history** showing actual results from previous openings
-- **Success rates** for achieving different value thresholds
-- **Community ratings** and feedback
+### Complete Odds Disclosure
+Unlike traditional packs where odds are hidden or vague, every pack you buy or build and buy shows:
+- **Exact pull rates** for every possible card or item
+- **Real-time optimization system** that ensures fair pack pricing
 
 ### Verifiable Randomness
 <Tabs>
@@ -144,108 +72,117 @@ Every pack provides live data including:
   </Tab>
 </Tabs>
 
-### Expected Value Calculations
-Our transparent approach includes detailed EV breakdowns:
+### Real-Time Optimization System
 
-```javascript
-// Example Expected Value Calculation
-const packEV = {
-  baseCards: 0.75 * $5.00,      // 75% chance × $5 value
-  uncommons: 0.20 * $15.00,     // 20% chance × $15 value  
-  rares: 0.04 * $100.00,        // 4% chance × $100 value
-  chases: 0.01 * $1000.00,      // 1% chance × $1000 value
-  
-  totalEV: $3.75 + $3.00 + $4.00 + $10.00 // = $20.75
-};
+Our real-time optimization system continuously monitors live market values and automatically sorts cards into value buckets (P0-P5). A \$45 card in the P1 bucket (\$40-50) moves to P2 (\$50-100) if its price increases, ensuring probability tables always reflect current market reality.
+
+The system uses **[machine learning optimization](https://docs.scipy.org/doc/scipy/reference/optimize.html)** to minimize the difference between expected value and pack price. It heavily penalizes scenarios where expected value is less than price, then iteratively adjusts probabilities until optimal.
+
+Result: Pack probabilities automatically adapt to market conditions while guaranteeing you never pay more than expected value.
+
+Below is the algorithm code we use for pack probability calculations with changed variable names:
+
+```python
+# --- PACK CONFIGURATIONS ---
+PACK_CONFIGS = {
+    'bronze': {
+        'bucket_ranges': [
+            {'min': 1, 'max': 5},
+            {'min': 5.01, 'max': 10},
+            {'min': 10.01, 'max': 20},
+            {'min': 20.01, 'max': 30},
+            {'min': 30.01, 'max': 50},
+            {'min': 50.01, 'max': 100},
+        ],
+        'default_probs': [X, X, X, X, X, X],
+    },
+    'silver': {
+        'bucket_ranges': [
+            {'min': 15.00, 'max': 25.00},
+            {'min': 25.01, 'max': 50.00},
+            {'min': 50.01, 'max': 100.00},
+            {'min': 100.01, 'max': 200.00},
+            {'min': 200.01, 'max': 400.00},
+            {'min': 400.01, 'max': 800.00},
+        ],
+        'default_probs': [X, X, X, X, X, X],
+    },
+    # OTHER PACK CONFIGURATIONS
+}
+
+# --- GENERIC BUCKET ASSIGNMENT ---
+def assign_bucket(market_value, bucket_ranges):
+    for i, rng in enumerate(bucket_ranges):
+        if rng['min'] <= market_value <= rng['max']:
+            return f'bucket{i}'
+    return 'no_bucket'
+
+# --- GENERIC BUCKET DATA FETCH ---
+def fetch_bucket_data_generic(pack_type):
+    print(f"Fetching cards for pack type: {pack_type}")
+    config = PACK_CONFIGS[pack_type]
+    bucket_ranges = config['bucket_ranges']
+    
+    # Fetch all cards available for this pack
+    response = supabase.table('REDACTED_TABLE_NAME') \
+        .select('REDACTED_SEARCH_PARAMETERS') \
+        .eq('REDACTED_FILTER', True) \
+        .execute()
+        
+    if not response.data:
+        print("No cards available for packs.")
+        return create_empty_bucket_data_generic(pack_type), {}, bucket_ranges
+        
+    cards = response.data
+    
+    # Assign cards to buckets
+    bucket_stats = {}
+    bucket_card_ids = {}
+    
+    for i in range(6):
+        bucket_stats[f'bucket{i}'] = {'values': [], 'count': 0, 'cards': []}
+        bucket_card_ids[f'P{i}'] = []
+        
+    bucket_stats['no_bucket'] = {'values': [], 'count': 0, 'cards': []}
+    bucket_card_ids['P_NO_BUCKET'] = []
+    
+    for card in cards:
+        value = card.get('market_value') or card.get('price') or 0.0
+        bucket = assign_bucket(value, bucket_ranges)
+        bucket_stats[bucket]['values'].append(float(value))
+        bucket_stats[bucket]['count'] += 1
+        bucket_stats[bucket]['cards'].append(card)
+        
+        if bucket == 'no_bucket':
+            bucket_card_ids['P_NO_BUCKET'].append(card['id'])
+        else:
+            idx = int(bucket.replace('bucket', ''))
+            bucket_card_ids[f'P{idx}'].append(card['id'])
+
+def calculate_optimized_probabilities_generic(bucket_data, target_probs, bucket_ranges, target_ev):
+    """Calculate optimized probabilities using scipy"""
+    import numpy as np
+    from scipy.optimize import minimize
+    
+    avg_values = []
+    actual_values_used = []
+    
+    for i, p_bucket in enumerate(['P0', 'P1', 'P2', 'P3', 'P4', 'P5']):
+        bucket_avg = bucket_data[p_bucket]['average_value']
+        if bucket_avg > 0:
+            value_used = bucket_avg
+            actual_values_used.append(f"{value_used} (from {bucket_data[p_bucket]['num_cards']} cards)")
+        else:
+            rng = bucket_ranges[i]
+            value_used = (rng['min'] + rng['max']) / 2
+            actual_values_used.append(f"{value_used} (midpoint default)")
+        avg_values.append(value_used)
+    
+    avg_values = np.array(avg_values)
+    baseline_ev = np.dot(target_probs, avg_values)
+    
+    return optimized_probabilities
 ```
-
-## Pack Marketplace
-
-### Discover Packs
-- **Trending Packs**: Popular community creations
-- **New Releases**: Latest pack designs and themes
-- **Top Rated**: Highest community-rated packs
-- **My Collections**: Your purchased and created packs
-
-### Creator Economy
-- **Revenue Sharing**: Pack creators earn from sales
-- **Creator Tools**: Advanced pack design utilities
-- **Community Feedback**: Ratings and improvement suggestions
-- **Creator Verification**: Verified creator program for top designers
-
-## Pack Opening Experience
-
-### Pre-Opening Information
-Before you open any pack, you see:
-- Complete odds breakdown
-- Current expected value
-- Historical performance data
-- Community reviews and ratings
-
-### Live Opening Process
-- **Real-time randomization** with visible seed generation
-- **Animated reveals** with dramatic presentation
-- **Instant valuation** of pulled cards
-- **Social sharing** of results
-
-### Post-Opening Analysis
-- **Performance tracking** against expected value
-- **Collection integration** with automatic inventory updates
-- **Resale options** through our marketplace
-- **Analytics dashboard** showing your pack opening history
-
-## Getting Started with Transparent Packs
-
-### For Pack Buyers
-1. **Browse Available Packs**: Explore our transparent pack marketplace
-2. **Analyze Odds**: Review detailed statistics and expected values
-3. **Make Informed Decisions**: Purchase packs that match your risk tolerance
-4. **Track Performance**: Monitor your results and collection growth
-
-### For Pack Creators
-1. **Learn the Tools**: Master our pack creation interface
-2. **Design Your Pack**: Configure cards, odds, and themes
-3. **Community Review**: Submit for community feedback
-4. **Launch and Earn**: Publish your pack and earn from sales
-
-## Advanced Features
-
-### Pack Analytics
-<CardGroup cols={2}>
-  <Card
-    title="Performance Tracking"
-    icon="chart-line"
-  >
-    Monitor how your packs perform against expected values over time
-  </Card>
-  
-  <Card
-    title="ROI Calculator"
-    icon="calculator"
-  >
-    Calculate return on investment for different pack strategies
-  </Card>
-  
-  <Card
-    title="Risk Assessment"
-    icon="triangle-exclamation"
-  >
-    Understand the risk profile of any pack before purchasing
-  </Card>
-  
-  <Card
-    title="Market Integration"
-    icon="arrow-right-arrow-left"
-  >
-    Seamless integration with our marketplace for instant selling
-  </Card>
-</CardGroup>
-
-### Community Features
-- **Pack Reviews**: Rate and review packs after opening
-- **Creator Following**: Follow your favorite pack creators
-- **Discussion Forums**: Discuss strategies and share results
-- **Educational Content**: Learn about pack theory and strategy
 
 ## Start Creating Today
 
@@ -255,7 +192,7 @@ Ready to revolutionize your pack opening experience?
   <Card
     title="Explore Packs"
     icon="magnifying-glass"
-    href="/marketplace/packs"
+    href="https://catchbackcards.com/packs"
   >
     Browse our marketplace of transparent packs
   </Card>
@@ -263,12 +200,10 @@ Ready to revolutionize your pack opening experience?
   <Card
     title="Create Pack"
     icon="plus"
-    href="/create/pack"
+    href="https://catchbackcards.com/packs/custom"
   >
     Design your own custom transparent pack
   </Card>
 </CardGroup>
 
 ---
-
-*Transparent Packs are subject to our terms of service. Expected values are calculated based on current market conditions and may fluctuate. Pack opening involves risk and should be considered for entertainment purposes.*

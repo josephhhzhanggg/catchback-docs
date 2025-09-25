@@ -30,14 +30,6 @@
             ]
           },
           {
-            "group": "Technology",
-            "pages": [
-              "technology/platform",
-              "technology/integration",
-              "technology/security"
-            ]
-          },
-          {
             "group": "Logistics and Legal",
             "pages": [
               "logistics-legal/compliance",
@@ -48,29 +40,8 @@
           {
             "group": "Resources",
             "pages": [
-              "resources/getting-started",
               "resources/support",
               "resources/faq"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API reference",
-        "groups": [
-          {
-            "group": "API documentation",
-            "pages": [
-              "api-reference/introduction"
-            ]
-          },
-          {
-            "group": "Endpoint examples",
-            "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
             ]
           }
         ]
