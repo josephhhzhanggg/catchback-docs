@@ -2,6 +2,9 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "CatchBack Documentation",
+  "appearance": {
+    "default": "dark"
+  },
   "metadata": {
     "title": "CatchBack Cards - Guaranteed 75% Buyback Trading Cards",
     "description": "Buy trading cards with confidence. We guarantee to buy back at 75% market value, regardless of price changes.",
@@ -14,9 +17,6 @@
     "primary": "#16A34A",
     "light": "#07C983",
     "dark": "#15803D"
-  },
-  "theme": {
-    "default": "dark"
   },
   "favicon": "/favicon.svg",
   "navigation": {
@@ -46,7 +46,8 @@
             "pages": [
               "about-catchback/provably-fair",
               "about-catchback/liquidity",
-              "about-catchback/vaulting"
+              "about-catchback/vaulting",
+              "about-catchback/leaderboard"
             ]
           },
           {
