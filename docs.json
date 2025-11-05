@@ -54,7 +54,9 @@
             "group": "Resources",
             "pages": [
               "resources/support",
-              "resources/faq"
+              "resources/faq",
+              "logistics-legal/privacy",
+              "logistics-legal/terms"
             ]
           }
         ]
