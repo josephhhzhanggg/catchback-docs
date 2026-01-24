@@ -57,7 +57,8 @@
               "resources/faq",
               "logistics-legal/privacy",
               "logistics-legal/terms",
-              "logistics-legal/intellectual-property"
+              "logistics-legal/intellectual-property",
+              "logistics-legal/account-deletion"
             ]
           }
         ]
