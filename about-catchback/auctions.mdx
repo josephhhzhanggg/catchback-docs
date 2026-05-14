@@ -1,51 +1,80 @@
 ---
 title: "CatchBack Auctions"
-description: "Dutch style auctions for collectibles trading with real-time updates and gamified experience"
+description: "Live, declining-price auctions for trading cards — fast settlement, real-time price updates, and full seller control"
 ---
 
-We're revolutionizing the auction experience with Dutch style auctions that solve the problems of traditional auction platforms like eBay.
+CatchBack Auctions are a declining-price format. The seller sets a starting price and a reserve (floor) price, and the displayed price ticks down on a schedule until a buyer locks it in. The first buyer to click "Buy Now" wins at the current price.
 
-## The eBay Auction Problem
+## How an auction works
 
-An eBay issue was that collectors would need to wait several hours or days before securing a purchase, and their notification system was very slow. This created frustration and missed opportunities for both buyers and sellers.
+<Steps>
+  <Step title="Seller sets the parameters">
+    Starting price, reserve (the lowest price they'll accept), how much the price drops each step, and how often.
+  </Step>
 
-## Our Solution: Gamified Dutch Auctions
+  <Step title="The auction goes live">
+    The displayed price starts at the seller's starting price and decreases automatically on the schedule.
+  </Step>
 
-We're gamifying the experience to make purchasing cards fun. Our Dutch style auctions create excitement and urgency while providing real-time updates and instant notifications.
+  <Step title="Buyers watch in real time">
+    The price updates live for every viewer. No bidding wars, no sniping — what you see is what you'd pay.
+  </Step>
 
-## How It Works
+  <Step title="First buyer wins">
+    The first person to click "Buy Now" locks in the sale at that moment's price. Everyone else sees the listing close.
+  </Step>
 
-### For Buyers: Real-Time Experience
+  <Step title="The card transfers instantly">
+    Because the card is already vaulted, ownership transfers digitally. No shipping between seller and buyer.
+  </Step>
+</Steps>
 
-- **Filter & Search**: Find exactly what you're looking for with advanced filtering
-- **Live Price Updates**: See deals changing in real time as prices drop
-- **Snipe Protection**: If you don't buy the card, someone else right below you will snipe it
-- **Instant Notifications**: Get immediate alerts when prices hit your target
-- **Gamified Browsing**: Turn card hunting into an exciting, fast-paced experience
+## Why this format works
 
-### For Sellers: Complete Control
+### Speed
+Traditional auctions can take days. CatchBack Auctions resolve in minutes to hours, depending on how aggressively the seller priced it.
 
-- **Starting Price**: Set your initial asking price
-- **End Price**: Define your minimum acceptable price
-- **Timing Control**: Choose auction duration and schedule
-- **Drop Speed**: Control how fast prices decrease
-- **Real-Time Analytics**: Monitor bidding activity and engagement
-- **Flexible Parameters**: Customize every aspect of your auction
+### Fair pricing
+The price reduction is transparent and on a public schedule. There's no hidden bidding, no anti-sniping logic, no last-second drama — just a clear declining curve everyone sees.
 
-## Why Dutch Auctions Work Better
+### No bidding wars
+Buyers don't compete by escalating bids. They compete by deciding when to commit. If you wait too long, someone else gets it at a lower price.
 
-### Speed & Efficiency
+### Reserve protection
+The price never falls below the seller's reserve. If no buyer commits before the reserve is hit, the seller can re-list or take the card off the market — no obligation to sell below their floor.
 
-Unlike traditional auctions that can take days, Dutch auctions provide immediate results. Prices drop in real-time, creating urgency and excitement.
+## For sellers
 
-### Fair Pricing
+You configure every aspect of the auction when you list:
 
-The transparent price reduction system ensures fair market pricing without the manipulation possible in traditional bidding systems.
+- **Starting price** — your initial ask
+- **Reserve price** — the lowest you'll accept (the auction stops dropping when it hits this)
+- **Price decrement** — how much the price drops per step
+- **Decrement interval** — how often the price drops (e.g., every 5 minutes)
+- **Max decrements** — total number of drops before the auction ends
 
-### Better User Experience
+Want a fast sale? Drop the price aggressively. Want top dollar? Start high and step down slowly. The card stays in your vault throughout — listed, not removed — so if your auction doesn't sell at reserve, the card returns to your collection unchanged.
 
-Real-time updates and instant notifications eliminate the waiting and uncertainty of traditional auction platforms.
+You receive proceeds in CatchCoins by default, with the option to set up a connected payout account for direct fiat payouts.
 
-### Gamification
+## For buyers
 
-The fast-paced, real-time nature turns card purchasing into an engaging, game-like experience that keeps users coming back.
+- **Real-time prices.** The displayed price is the actual current price. Click Buy Now and you pay that.
+- **First click wins.** If two people click within the same second, the first valid request wins. The second gets a "listing no longer available" message and is not charged.
+- **No bidding history to track.** There are no bids in the traditional sense. There's a price, and there's "Buy Now" — that's it.
+- **Pay with anything.** USD, CatchCoins, or Store Credit — all accepted.
+
+## Browsing auctions
+
+The Auctions tab in the [marketplace](/about-catchback/marketplace) shows every active CatchBack Auction with its current price ticking down live. Filter by game, price range, rarity, or grade. Sort by ending soonest, lowest price, or biggest discount from market value.
+
+Some auctions on the marketplace are listed by **other collectors**; some are listed by **CatchBack itself**, drawn from vault inventory acquired through CatchBack offers. The buying experience is identical regardless of seller.
+
+## What auctions are good for
+
+- **Selling fast** when you don't want to wait for a fixed-price buyer
+- **Finding the right price** when you don't know what a card is worth
+- **Creating urgency** for time-sensitive collections (move multiple cards in one session)
+- **Hunting deals** as a buyer who's patient enough to watch the ticker
+
+For everything else — predictable, no-pressure sales — fixed-price [Marketplace Listings](/about-catchback/marketplace) are the simpler choice.
