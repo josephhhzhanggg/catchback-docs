@@ -60,6 +60,7 @@
               "logistics-legal/privacy",
               "logistics-legal/terms",
               "logistics-legal/intellectual-property",
+              "logistics-legal/compliance",
               "logistics-legal/account-deletion"
             ]
           }
@@ -72,11 +73,6 @@
           "anchor": "CatchBack Website",
           "href": "https://catchbackcards.com",
           "icon": "globe"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
         }
       ]
     }
@@ -89,13 +85,13 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "href": "mailto:catchbackcards@gmail.com"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Launch App",
+      "href": "https://catchbackcards.com"
     }
   },
   "contextual": {
@@ -112,9 +108,10 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "x": "https://x.com/catchback_cards",
+      "instagram": "https://www.instagram.com/catchback_cards/",
+      "discord": "https://discord.gg/6WjMbRgPMq",
+      "tiktok": "https://www.tiktok.com/@catchback_cards"
     }
   }
 }
