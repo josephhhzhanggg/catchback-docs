@@ -1,0 +1,92 @@
+---
+title: "The card object"
+description: "One card shape, returned by every endpoint that returns a card."
+---
+
+The card catalog, a pack's pool, the cards you pull, and your vault all return the same card object. Fields a card doesn't have are `null`; fields that only apply to one catalog (sports, watches) appear only on cards from that catalog.
+
+<ResponseExample>
+```json Card
+{
+  "id": "0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e",
+  "category": "pokemon",
+  "name": "Charizard ex",
+  "set": "Pokemon Sv3 En-Obsidian Flames",
+  "year": "2023",
+  "number": "223",
+  "variant": "Special Illustration Rare",
+  "rarity": "Special Illustration Rare",
+  "card_type": "Pokemon",
+  "language": "english",
+  "slab_label": "2023 Obsidian Flames Charizard ex",
+  "grading_company": "PSA",
+  "grading_rank": 10,
+  "cert_number": "84512377",
+  "market_value": 410,
+  "price": 410,
+  "market_value_last_updated": "2026-10-05T17:04:11Z",
+  "front_image": "https://...",
+  "back_image": "https://...",
+  "render_image": "https://...",
+  "image_url": "https://..."
+}
+```
+</ResponseExample>
+
+## Identity
+
+<ResponseField name="id" type="string">The card's id. Use it for sell-back and listings.</ResponseField>
+<ResponseField name="category" type="string">`pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.</ResponseField>
+<ResponseField name="name" type="string">Card name.</ResponseField>
+<ResponseField name="set" type="string">Set name.</ResponseField>
+<ResponseField name="year" type="string">Release year.</ResponseField>
+<ResponseField name="number" type="string">Card number within the set.</ResponseField>
+<ResponseField name="variant" type="string">Print variant. Not on sports cards.</ResponseField>
+<ResponseField name="rarity" type="string">Printed rarity (e.g. "Rare Holo"). Not on sports cards.</ResponseField>
+<ResponseField name="card_type" type="string">Card type. Not on sports cards.</ResponseField>
+<ResponseField name="language" type="string">Card language.</ResponseField>
+
+## Slab
+
+<ResponseField name="slab_label" type="string">The text on the grading label.</ResponseField>
+<ResponseField name="grading_company" type="string">`PSA`, `CGC`, `BGS` and so on.</ResponseField>
+<ResponseField name="grading_rank" type="number">The grade. Half grades are real numbers (`9.5`). `10.5` is CGC Pristine 10.</ResponseField>
+<ResponseField name="cert_number" type="string">The grading company's certificate number, to verify the slab on their site.</ResponseField>
+<ResponseField name="card_condition" type="string">Raw-card condition, where recorded.</ResponseField>
+
+## Value
+
+<ResponseField name="market_value" type="number">Our current market valuation in USD. It drives pack odds and buyback offers.</ResponseField>
+<ResponseField name="price" type="number">The shop sale price in USD.</ResponseField>
+<ResponseField name="market_value_last_updated" type="string">When `market_value` was last refreshed (ISO 8601).</ResponseField>
+
+## Images
+
+<ResponseField name="front_image" type="string">Scan of the front of the slab.</ResponseField>
+<ResponseField name="back_image" type="string">Scan of the back of the slab.</ResponseField>
+<ResponseField name="render_image" type="string">The slab on our display pedestal, as our app shows it.</ResponseField>
+<ResponseField name="image_url" type="string">Same as `render_image`, kept for older integrations.</ResponseField>
+
+<Note>
+  Scans can be several MB each. Cache them and resize on your side; don't hotlink full-size images in list views.
+</Note>
+
+## Sports cards only
+
+<ResponseField name="sport" type="string" />
+<ResponseField name="player_name" type="string" />
+<ResponseField name="team" type="string" />
+<ResponseField name="manufacturer" type="string" />
+<ResponseField name="parallel" type="string" />
+<ResponseField name="is_rookie" type="boolean" />
+<ResponseField name="is_autograph" type="boolean" />
+<ResponseField name="is_memorabilia" type="boolean" />
+<ResponseField name="serial_numbered" type="string">Serial numbering, e.g. `/99`.</ResponseField>
+
+## Watches only
+
+<ResponseField name="brand" type="string" />
+<ResponseField name="reference_number" type="string">The manufacturer's model reference.</ResponseField>
+<ResponseField name="condition" type="string" />
+<ResponseField name="size" type="string" />
+<ResponseField name="video_url" type="string">A 360° video of the watch.</ResponseField>

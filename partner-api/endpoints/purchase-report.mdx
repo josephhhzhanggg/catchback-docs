@@ -1,0 +1,67 @@
+---
+title: "Purchase report"
+api: "GET /api/partner/v1/pulls"
+description: "Completed pack purchases in a time window, for revenue-share reporting and attribution."
+---
+
+Scope: `read:pulls` · REST only, not an MCP tool
+
+Every completed pack purchase in a window, priced the same way our own revenue reporting is, so your totals reconcile with ours. Purchases with an `amount` of 0 (comped packs) and our own internal accounts are excluded.
+
+It returns nothing about what was pulled and nothing about the buyer beyond an opaque id: no cards, no email, username, phone, address or balance. That is permanent for this scope.
+
+<ParamField query="since" type="string">ISO 8601, inclusive. Defaults to `until` minus 7 days.</ParamField>
+<ParamField query="until" type="string">ISO 8601, inclusive. Defaults to now.</ParamField>
+<ParamField query="page" type="integer" default="1">1-based.</ParamField>
+<ParamField query="per_page" type="integer" default="500">1–1000.</ParamField>
+
+The window is capped at **31 days**, and a malformed or inverted window is a `400`. There is no "all of history" mode, so pull a long report a month at a time.
+
+<Tip>
+  For a monthly report, pin both `since` and `until` in the past. The `until = now` default moves between your page requests. Purchases are only ever added, so a closed window pages consistently.
+</Tip>
+
+## Response
+
+<ResponseField name="since" type="string" />
+<ResponseField name="until" type="string" />
+<ResponseField name="page" type="integer" />
+<ResponseField name="per_page" type="integer" />
+<ResponseField name="total" type="integer" />
+<ResponseField name="pulls" type="object[]">
+  <Expandable title="purchase">
+    <ResponseField name="user_id" type="string">The buyer's opaque, stable CatchBack id. Join on it.</ResponseField>
+    <ResponseField name="created_at" type="string">When the pack was bought (UTC).</ResponseField>
+    <ResponseField name="amount" type="number">Sale price in USD.</ResponseField>
+    <ResponseField name="source" type="string">The catalog: `pokemon`, `onepiece`, `sports`, `riftbound`, `custom`, `loose` or `steph`.</ResponseField>
+    <ResponseField name="pack_type" type="string">The tier or named pack.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/pulls?since=2026-08-01T00:00:00Z&until=2026-08-31T23:59:59Z" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "since": "2026-08-01T00:00:00.000Z",
+  "until": "2026-08-31T23:59:59.000Z",
+  "page": 1,
+  "per_page": 500,
+  "total": 1842,
+  "pulls": [
+    {
+      "user_id": "9f1c7a2e-3b44-4c8e-9d21-0e5b7a6c1f30",
+      "created_at": "2026-08-01T04:12:09.481Z",
+      "amount": 25,
+      "source": "pokemon",
+      "pack_type": "bronze"
+    }
+  ]
+}
+```
+</ResponseExample>

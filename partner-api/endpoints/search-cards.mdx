@@ -1,0 +1,62 @@
+---
+title: "Search shop cards"
+api: "GET /api/partner/v1/catalog/cards"
+description: "Every card currently for sale in the CatchBack shop, paginated."
+---
+
+Scope: `read:catalog` · MCP tool: `search_cards`
+
+The purchasable inventory: the same pool our storefront and pack openings draw from. Paginate by incrementing `page` until you've fetched `total` cards. Ordering is stable (`id` ascending) within a sync, but the set changes between syncs, because the inventory is [point-in-time](/partner-api/errors-and-limits#inventory-is-point-in-time).
+
+<ParamField query="category" type="string" default="pokemon">
+  `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
+</ParamField>
+<ParamField query="page" type="integer" default="1">1-based.</ParamField>
+<ParamField query="per_page" type="integer" default="500">1–1000.</ParamField>
+
+## Response
+
+<ResponseField name="category" type="string" />
+<ResponseField name="page" type="integer" />
+<ResponseField name="per_page" type="integer" />
+<ResponseField name="total" type="integer" />
+<ResponseField name="cards" type="object[]">
+  [Card objects](/partner-api/card-object), each with `sale_status`, the pool the card sits in.
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/catalog/cards?category=pokemon&page=1&per_page=100" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "category": "pokemon",
+  "page": 1,
+  "per_page": 100,
+  "total": 5210,
+  "cards": [
+    {
+      "id": "0e94dc61-…",
+      "category": "pokemon",
+      "name": "Greavard",
+      "set": "Pokemon Svi En-Scarlet & Violet",
+      "grading_company": "PSA",
+      "grading_rank": 9,
+      "slab_label": "2023 Scarlet & Violet Greavard",
+      "cert_number": "84512377",
+      "market_value": 38.43,
+      "price": 38.43,
+      "sale_status": "available in shop",
+      "front_image": "https://…",
+      "back_image": "https://…",
+      "render_image": "https://…",
+      "image_url": "https://…"
+    }
+  ]
+}
+```
+</ResponseExample>

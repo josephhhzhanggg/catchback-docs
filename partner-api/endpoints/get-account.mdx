@@ -1,0 +1,48 @@
+---
+title: "Get account"
+api: "GET /api/partner/v1/account"
+description: "Your balance, and where you stand against your purchase limits."
+---
+
+Scope: `read:account` · MCP tool: `get_balance`
+
+Enough to plan your next purchase without hitting a `429`.
+
+## Response
+
+<ResponseField name="username" type="string" />
+<ResponseField name="balance" type="number">CatchCoins balance in USD.</ResponseField>
+<ResponseField name="limits" type="object">
+  <Expandable title="limits">
+    <ResponseField name="packs_today" type="integer">Packs opened this UTC day.</ResponseField>
+    <ResponseField name="max_packs_per_day" type="integer" />
+    <ResponseField name="packs_left_today" type="integer" />
+    <ResponseField name="resets_at" type="string">Next midnight UTC.</ResponseField>
+    <ResponseField name="min_seconds_between_purchases" type="integer" />
+    <ResponseField name="next_purchase_at" type="string">The earliest your next purchase is allowed.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v1/account \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "username": "acme-cards",
+  "balance": 189953.5,
+  "limits": {
+    "packs_today": 4,
+    "max_packs_per_day": 100,
+    "packs_left_today": 96,
+    "resets_at": "2026-09-30T00:00:00.000Z",
+    "min_seconds_between_purchases": 60,
+    "next_purchase_at": "2026-09-29T20:24:12.000Z"
+  }
+}
+```
+</ResponseExample>

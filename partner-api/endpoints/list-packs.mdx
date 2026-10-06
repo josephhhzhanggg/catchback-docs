@@ -1,0 +1,62 @@
+---
+title: "List packs"
+api: "GET /api/partner/v1/catalog/packs"
+description: "Exactly the packs you can buy, at the price you'll be charged."
+---
+
+Scope: `read:catalog` · MCP tool: `list_packs`
+
+Every pack this endpoint returns is one [Buy packs](/partner-api/endpoints/buy-packs) will sell you, at the listed `price`. Packs you can never buy are left out. A pack that is only out of stock right now stays in with `available: false` and a `reason`.
+
+<ParamField query="category" type="string" default="pokemon">
+  `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
+</ParamField>
+
+## Response
+
+<ResponseField name="category" type="string" />
+<ResponseField name="packs" type="object[]">
+  <Expandable title="pack">
+    <ResponseField name="pack_type" type="string">The id to send to Buy packs and Get a pack's pool.</ResponseField>
+    <ResponseField name="name" type="string" />
+    <ResponseField name="price" type="number">Price per pack in USD. This is what you're charged.</ResponseField>
+    <ResponseField name="available" type="boolean">Whether the pack can be opened right now.</ResponseField>
+    <ResponseField name="reason" type="string">Why it can't, when `available` is false.</ResponseField>
+    <ResponseField name="max_quantity" type="integer">Most packs you can open in one request.</ResponseField>
+    <ResponseField name="risk_levels" type="string[]">The [risk levels](/about-catchback/risk-levels) the pack opens at.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/catalog/packs?category=pokemon" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "category": "pokemon",
+  "packs": [
+    {
+      "pack_type": "bronze",
+      "name": "Bronze Pack",
+      "price": 25,
+      "available": true,
+      "max_quantity": 10,
+      "risk_levels": ["chill", "standard", "aggressive"]
+    },
+    {
+      "pack_type": "starter",
+      "name": "Starter Pack",
+      "price": 8,
+      "available": false,
+      "reason": "Starter pack temporarily out of stock",
+      "max_quantity": 1,
+      "risk_levels": ["chill", "standard", "aggressive"]
+    }
+  ]
+}
+```
+</ResponseExample>

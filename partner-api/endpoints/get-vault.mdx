@@ -1,0 +1,80 @@
+---
+title: "Get vault"
+api: "GET /api/partner/v1/vault"
+description: "The cards you hold, each with the pull it came from and its CatchBack offer right now."
+---
+
+Scope: `read:account` · MCP tool: `get_vault`
+
+Cards in your vault or listed on the marketplace. Cards that have shipped are not included.
+
+<ParamField query="category" type="string" default="pokemon">
+  `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
+</ParamField>
+<ParamField query="page" type="integer" default="1">1-based.</ParamField>
+<ParamField query="per_page" type="integer" default="100">1–200.</ParamField>
+
+## Response
+
+<ResponseField name="category" type="string" />
+<ResponseField name="page" type="integer" />
+<ResponseField name="per_page" type="integer" />
+<ResponseField name="total" type="integer" />
+<ResponseField name="cards" type="object[]">
+  <Expandable title="held card">
+    <ResponseField name="card_id" type="string" />
+    <ResponseField name="pull_id" type="string | null">The pull the card came from. [Sell back](/partner-api/endpoints/sell-back) needs it.</ResponseField>
+    <ResponseField name="pulled_at" type="string | null" />
+    <ResponseField name="item" type="object">A [card object](/partner-api/card-object).</ResponseField>
+    <ResponseField name="value" type="number">Current market value.</ResponseField>
+    <ResponseField name="listed" type="boolean">Listed on the marketplace.</ResponseField>
+    <ResponseField name="catchback" type="object | null">
+      The sell-back offer right now: `amount`, `rate`, `basis_value` (the value the offer is based on) and `locked_value_until`. `null` while the card is listed. Delist it first.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<Note>
+  For 7 days after you acquire a card, its offer is based on its value when you acquired it, fixed whether the market moves up or down (`locked_value_until`). After that it follows the current market value. See [Liquidity](/about-catchback/liquidity).
+</Note>
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/vault?category=pokemon&page=1&per_page=100" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "category": "pokemon",
+  "page": 1,
+  "per_page": 100,
+  "total": 1,
+  "cards": [
+    {
+      "card_id": "0e94dc61-…",
+      "pull_id": "d9504d3f-…",
+      "pulled_at": "2026-09-29T19:56:28Z",
+      "item": {
+        "id": "0e94dc61-…",
+        "category": "pokemon",
+        "name": "Greavard",
+        "grading_company": "PSA",
+        "grading_rank": 9,
+        "cert_number": "84512377",
+        "market_value": 38.43,
+        "front_image": "https://…",
+        "back_image": "https://…",
+        "render_image": "https://…",
+        "image_url": "https://…"
+      },
+      "value": 38.43,
+      "listed": false,
+      "catchback": { "amount": 30.74, "rate": 0.8, "basis_value": 38.43, "locked_value_until": "2026-10-06T19:56:28Z" }
+    }
+  ]
+}
+```
+</ResponseExample>

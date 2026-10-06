@@ -1,0 +1,38 @@
+---
+title: "Authentication"
+description: "API keys, scopes, and keeping your key safe."
+---
+
+Every request sends your API key as a bearer token:
+
+```http
+Authorization: Bearer cb_live_...
+```
+
+A missing, malformed, disabled or unknown key is a `401`.
+
+## Scopes
+
+Each key carries a set of scopes, and every endpoint requires exactly one. Calling an endpoint your key has no scope for is a `403`. We grant scopes per partner; ask us if you need one you don't have.
+
+| Scope | Lets you | Moves money |
+|---|---|---|
+| `read:catalog` | See the packs you can buy, what each pack can pull, and the cards for sale in the shop | No |
+| `read:account` | See your balance, limits and the cards you hold | No |
+| `rip:packs` | Open packs with your CatchCoins | **Yes** |
+| `sell:cards` | Sell cards back to CatchBack for CatchCoins | **Yes** |
+| `write:listings` | List held cards on the marketplace, and take listings down | No |
+| `read:pulls` | Revenue-share report of completed pack purchases | No |
+
+Account actions (`read:account`, `rip:packs`, `sell:cards`, `write:listings`) also need the key to be linked to a CatchBack account. An unlinked key gets a `403` on them.
+
+## Keeping your key safe
+
+<Warning>
+  A key with `rip:packs` or `sell:cards` can spend your balance. Treat it like a bank credential.
+</Warning>
+
+- Keep it **server-side only**. Never put it in browser, mobile or other client code.
+- Store it in a secret manager, not in source control.
+- Rotate it when someone with access leaves your team.
+- If it leaks, tell us immediately at [catchbackcards@gmail.com](mailto:catchbackcards@gmail.com). Keys are revoked individually, within minutes, without affecting your other keys.

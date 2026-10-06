@@ -1,0 +1,33 @@
+---
+title: "List a card"
+api: "POST /api/partner/v1/listings"
+description: "Put a card you hold up for sale on the CatchBack marketplace at a fixed price."
+---
+
+Scope: `write:listings` · MCP tool: `list_card`
+
+Runs the same listing rules as our app: you must hold the card, the price must be above the marketplace minimum and at most 2x the card's market value, and the title is the card's name. A listed card can't be sold back until you [delist it](/partner-api/endpoints/delist-card).
+
+<ParamField body="card_id" type="string" required>A `card_id` from [Get vault](/partner-api/endpoints/get-vault).</ParamField>
+<ParamField body="price" type="number" required>Asking price in USD.</ParamField>
+
+## Response
+
+<ResponseField name="listing_id" type="string" />
+<ResponseField name="card_id" type="string" />
+<ResponseField name="price" type="number" />
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v1/listings \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "card_id": "0e94dc61-…", "price": 45 }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{ "listing_id": "5f1c…", "card_id": "0e94dc61-…", "price": 45 }
+```
+</ResponseExample>

@@ -1,0 +1,29 @@
+---
+title: "Delist a card"
+api: "DELETE /api/partner/v1/listings"
+description: "Take a marketplace listing down. The card returns to your vault."
+---
+
+Scope: `write:listings` · MCP tool: `delist_card`
+
+<ParamField body="card_id" type="string" required>The listed card's `card_id`.</ParamField>
+
+## Response
+
+<ResponseField name="card_id" type="string" />
+<ResponseField name="delisted" type="boolean" />
+
+<RequestExample>
+```bash cURL
+curl -X DELETE https://catchbackcards.com/api/partner/v1/listings \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "card_id": "0e94dc61-…" }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{ "card_id": "0e94dc61-…", "delisted": true }
+```
+</ResponseExample>

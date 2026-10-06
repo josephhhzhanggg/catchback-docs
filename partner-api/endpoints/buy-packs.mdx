@@ -1,0 +1,131 @@
+---
+title: "Buy packs"
+api: "POST /api/partner/v1/packs/purchase"
+description: "Open packs with your CatchCoins and get every hit back, with its CatchBack offer."
+---
+
+Scope: `rip:packs` · MCP tool: `buy_packs`
+
+Opens packs with your account's CatchCoins at list price, through the same checkout as our app. No promo codes, add-ons or bonus balance apply. The cards land in your vault.
+
+**All or nothing:** if any pack in the request fails to open, the whole order is refunded and none of its pulls stand.
+
+<Warning>
+  This endpoint spends money. Always send an `Idempotency-Key`, and reuse it when retrying the same order. See [Idempotency](/partner-api/errors-and-limits#idempotency-retrying-a-purchase-safely).
+</Warning>
+
+<ParamField header="Idempotency-Key" type="string" required>
+  Your order id: 8–128 characters of `A-Za-z0-9_-`. Retrying with the same key returns the original result instead of charging again.
+</ParamField>
+<ParamField body="pack_type" type="string" required>
+  A `pack_type` from [List packs](/partner-api/endpoints/list-packs).
+</ParamField>
+<ParamField body="category" type="string" default="pokemon">
+  `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
+</ParamField>
+<ParamField body="quantity" type="integer" default="1">
+  1–10, up to the pack's `max_quantity`.
+</ParamField>
+<ParamField body="risk_level" type="string" default="standard">
+  `chill`, `standard` or `aggressive` (shown as Chill, Standard and Hot in the app), from the pack's `risk_levels`. See [Risk levels](/about-catchback/risk-levels).
+</ParamField>
+
+## Response
+
+<ResponseField name="checkout_id" type="string" />
+<ResponseField name="pack_type" type="string" />
+<ResponseField name="quantity" type="integer" />
+<ResponseField name="total_charged" type="number">USD charged for the whole order.</ResponseField>
+<ResponseField name="remaining_balance" type="number">Your CatchCoins balance after the order.</ResponseField>
+<ResponseField name="summary" type="object">
+  `total_value` of everything pulled, `catchback_now_total` (what selling all of it back right now would pay), and `best_pull`.
+</ResponseField>
+<ResponseField name="pulls" type="object[]">
+  <Expandable title="pull">
+    <ResponseField name="pull_id" type="string">Keep this. [Sell back](/partner-api/endpoints/sell-back) needs it.</ResponseField>
+    <ResponseField name="kind" type="string">`card`, or `sealed_pack` for a consolation pull.</ResponseField>
+    <ResponseField name="item" type="object">A [card object](/partner-api/card-object). A sealed pack is `{ id, name, set, category, image_url }`.</ResponseField>
+    <ResponseField name="value" type="number">Market value at the moment of the pull.</ResponseField>
+    <ResponseField name="hit" type="object">
+      `rarity_tier`, the `bucket` (band) it came from and that band's `bucket_odds`, `is_chase` and `chase_label`.
+    </ResponseField>
+    <ResponseField name="catchback" type="object | null">
+      What we'll pay to buy it back: `amount` and `rate` now (90% for the first 5 minutes), `valid_until`, and `after`, the offer once the fresh window ends (80% of the value at pull). `null` for sealed packs. The [sell-back](/partner-api/endpoints/sell-back) response is the authoritative amount.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="idempotent_replay" type="boolean">Present and `true` when this is a stored result returned for a retry.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | | Missing `Idempotency-Key`, a bad parameter, not enough balance, or the pack can't be bought in multiples |
+| `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running. Retry shortly with the same key |
+| `422` | `IDEMPOTENCY_KEY_REUSED` | This key was already used for a different order |
+| `429` | `RATE_LIMITED` | Too soon after your last purchase. Wait `retry_after_seconds` |
+| `429` | `DAILY_LIMIT_REACHED` | Your daily pack ceiling would be exceeded. Resets at `resets_at` |
+| `500` | | A pack failed to open. The whole order was refunded |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v1/packs/purchase \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Idempotency-Key: order-1042" \
+  -H "Content-Type: application/json" \
+  -d '{ "pack_type": "bronze", "category": "pokemon", "quantity": 2, "risk_level": "standard" }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "checkout_id": "c8baa66a-…",
+  "pack_type": "bronze",
+  "quantity": 2,
+  "total_charged": 50,
+  "remaining_balance": 189935,
+  "summary": {
+    "total_value": 32.62,
+    "catchback_now_total": 29.36,
+    "best_pull": { "pull_id": "fe04349b-…", "name": "Tyrunt", "value": 20.62 }
+  },
+  "pulls": [
+    {
+      "pull_id": "fe04349b-…",
+      "kind": "card",
+      "item": {
+        "id": "2b814ce0-…",
+        "category": "pokemon",
+        "name": "Tyrunt",
+        "set": "Pokemon Japanese M3-Nullifying Zero",
+        "grading_company": "PSA",
+        "grading_rank": 10,
+        "cert_number": "84512377",
+        "market_value": 20.62,
+        "front_image": "https://…",
+        "back_image": "https://…",
+        "render_image": "https://…",
+        "image_url": "https://…"
+      },
+      "value": 20.62,
+      "hit": { "rarity_tier": "starter", "bucket": "P0", "bucket_odds": 0.72, "is_chase": false, "chase_label": null },
+      "catchback": {
+        "amount": 18.56,
+        "rate": 0.9,
+        "valid_until": "2026-09-29T20:24:55Z",
+        "after": { "amount": 16.5, "rate": 0.8, "valid_until": "2026-10-06T20:19:55Z" }
+      }
+    }
+  ]
+}
+```
+
+```json 429
+{
+  "error": "Rate limited: one purchase per key every 60 seconds.",
+  "code": "RATE_LIMITED",
+  "retry_after_seconds": 43
+}
+```
+</ResponseExample>
