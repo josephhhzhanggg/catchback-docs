@@ -1,0 +1,53 @@
+---
+title: "Errors, retries and limits"
+description: "Error format, safe retries with idempotency keys, purchase limits, and how fresh our data is."
+---
+
+## Errors
+
+Error bodies are JSON with a human-readable `error`, and a machine-readable `code` where you might branch on it:
+
+```json
+{ "error": "Rate limited: one purchase per key every 60 seconds.", "code": "RATE_LIMITED", "retry_after_seconds": 43 }
+```
+
+| Status | Meaning |
+|---|---|
+| `400` | A bad parameter. The message says which |
+| `401` | Missing, malformed, disabled or unknown API key |
+| `403` | Your key lacks the scope, or the action needs a linked account |
+| `404` | The thing you asked for doesn't exist for your key (e.g. a pack you can't buy) |
+| `409` | `IDEMPOTENCY_IN_PROGRESS`: an order with this key is still running |
+| `422` | `IDEMPOTENCY_KEY_REUSED`: this key was used for a different order |
+| `429` | `RATE_LIMITED` or `DAILY_LIMIT_REACHED` |
+| `500` | Our fault. Safe to retry with backoff |
+
+## Idempotency: retrying a purchase safely
+
+Every [pack purchase](/partner-api/endpoints/buy-packs) requires an `Idempotency-Key` header: 8–128 characters of `A-Za-z0-9_-`. Use your own order id. It is what makes a retry after a timeout or network error safe.
+
+| You retry with… | You get |
+|---|---|
+| The same key, and the order finished | The original response again, with `"idempotent_replay": true`. Nothing is charged twice |
+| The same key, while the order is still running | `409 IDEMPOTENCY_IN_PROGRESS`. Retry shortly with the same key |
+| The same key, but a different body | `422 IDEMPOTENCY_KEY_REUSED` |
+| The same key, after the order failed | It runs again. A failed order refunds itself and releases the key |
+
+<Tip>
+  Generate one key per order, and reuse it on every attempt of that order. Make a new one only after a success.
+</Tip>
+
+## Purchase limits
+
+Purchases are limited per key to protect the shared pack inventory:
+
+- **Speed:** one purchase request per minute by default (each request can open several packs). Too soon is a `429 RATE_LIMITED` with a `Retry-After` header and `retry_after_seconds`.
+- **Daily ceiling:** 100 packs per UTC day by default. Going over is a `429 DAILY_LIMIT_REACHED` with `limit`, `used` and `resets_at` (next midnight UTC).
+
+A retry of an order you already sent never counts against either limit, so you can always find out what happened. A purchase that fails gives its slot back. Both limits are set per partner; talk to us if yours don't fit your volume. [`GET /account`](/partner-api/endpoints/get-account) tells you where you stand before you buy.
+
+Reads, sell-backs and listings are not rate-limited, but keys are monitored. A full catalog sync a few times an hour is fine; polling every few seconds is not.
+
+## Inventory is point-in-time
+
+Every card in our inventory is shared: a pack opening or shop sale anywhere on CatchBack can take a card at any moment, and new cards arrive continuously. Treat every catalog and pool response as a cache that is allowed to be stale. Never assume a card you saw earlier is still available; act on what the write endpoints tell you.

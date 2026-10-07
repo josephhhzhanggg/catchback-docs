@@ -1,0 +1,54 @@
+---
+title: "MCP server"
+description: "Give an AI agent the Partner API as tools."
+---
+
+If your integration is an AI agent, connect it to our [Model Context Protocol](https://modelcontextprotocol.io) server instead of writing HTTP calls. Every tool calls the same REST endpoint documented here, with your key, so scopes, idempotency and purchase limits apply exactly the same way.
+
+- **URL:** `https://catchbackcards.com/api/mcp`
+- **Transport:** Streamable HTTP, stateless, JSON responses
+- **Auth:** the same `Authorization: Bearer cb_live_...` header
+
+The agent only sees the tools your key has scopes for.
+
+## Connect
+
+<Tabs>
+  <Tab title="Claude Code">
+    ```bash
+    claude mcp add --transport http catchback https://catchbackcards.com/api/mcp \
+      --header "Authorization: Bearer cb_live_..."
+    ```
+  </Tab>
+  <Tab title="JSON config">
+    ```json
+    {
+      "mcpServers": {
+        "catchback": {
+          "type": "http",
+          "url": "https://catchbackcards.com/api/mcp",
+          "headers": { "Authorization": "Bearer cb_live_..." }
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Tools
+
+| Tool | Endpoint | Scope |
+|---|---|---|
+| `list_packs` | [List packs](/partner-api/endpoints/list-packs) | `read:catalog` |
+| `get_pack_pool` | [Get a pack's pool](/partner-api/endpoints/get-pack-pool) | `read:catalog` |
+| `search_cards` | [Search shop cards](/partner-api/endpoints/search-cards) | `read:catalog` |
+| `buy_packs` | [Buy packs](/partner-api/endpoints/buy-packs) | `rip:packs` |
+| `get_balance` | [Get account](/partner-api/endpoints/get-account) | `read:account` |
+| `get_vault` | [Get vault](/partner-api/endpoints/get-vault) | `read:account` |
+| `sell_back_cards` | [Sell back cards](/partner-api/endpoints/sell-back) | `sell:cards` |
+| `list_card` | [List a card](/partner-api/endpoints/list-card) | `write:listings` |
+| `delist_card` | [Delist a card](/partner-api/endpoints/delist-card) | `write:listings` |
+
+`buy_packs` takes an `order_id` argument, which is sent as the `Idempotency-Key`. Have your agent generate one per order and reuse it when retrying that order. A retry under a new `order_id` is a new order and opens a second set of packs.
+
+An error comes back as a tool result with `isError: true` and the HTTP status in the text, so the agent can read it and react.

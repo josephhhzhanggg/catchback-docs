@@ -1,0 +1,64 @@
+---
+title: "Partner API"
+description: "Build on CatchBack's graded-card inventory: browse packs and cards, open packs, and manage what you pull."
+---
+
+The Partner API lets companies, bots and AI agents work with CatchBack programmatically. A partner is a normal CatchBack account with an API key linked to it, so every action runs through the same code and the same rules as our own app.
+
+<CardGroup cols={2}>
+  <Card title="Browse inventory" icon="magnifying-glass" href="/partner-api/endpoints/list-packs">
+    The packs you can buy, every card each pack can pull, and the cards for sale in the shop.
+  </Card>
+  <Card title="Open packs" icon="box-open" href="/partner-api/endpoints/buy-packs">
+    Open packs with your CatchCoins balance and get every hit back with its CatchBack offer.
+  </Card>
+  <Card title="Manage what you pull" icon="vault" href="/partner-api/endpoints/get-vault">
+    Hold cards in your vault, sell them back to us, or list them on the marketplace.
+  </Card>
+  <Card title="Connect an AI agent" icon="robot" href="/partner-api/mcp">
+    The same actions as MCP tools, with the same key.
+  </Card>
+</CardGroup>
+
+## Basics
+
+- **Base URL:** `https://catchbackcards.com`. All endpoints live under `/api/partner/v1/`.
+- **Auth:** every request sends your key as a bearer token. See [Authentication](/partner-api/authentication).
+- **Format:** JSON in and out, UTF-8. Money is in **US dollars** as numbers (not cents). Your CatchCoins balance is also in dollars.
+- **Versioning:** breaking changes ship under a new version prefix. A `v1` response may gain new fields at any time, so build your parser to ignore fields it doesn't know.
+
+## How a partner account works
+
+1. **You get an account and a key.** We create your API key with the scopes you need and link it to your CatchBack account.
+2. **You fund it.** You pre-fund the account with CatchCoins (we credit it when your wire lands). Purchases spend only that balance, at the same list price as everyone else.
+3. **Pulls land in your vault.** Every card you pull is held by CatchBack in your account. From there you can keep it, [sell it back](/partner-api/endpoints/sell-back) at our guaranteed rates, or [list it](/partner-api/endpoints/list-card) on the marketplace.
+
+<Note>
+  Interested in becoming a partner? Email [catchbackcards@gmail.com](mailto:catchbackcards@gmail.com).
+</Note>
+
+## Quick start
+
+<Steps>
+  <Step title="See what you can buy">
+    ```bash
+    curl https://catchbackcards.com/api/partner/v1/catalog/packs?category=pokemon \
+      -H "Authorization: Bearer $CATCHBACK_KEY"
+    ```
+  </Step>
+  <Step title="Look inside a pack">
+    ```bash
+    curl "https://catchbackcards.com/api/partner/v1/catalog/packs/pool?pack_type=bronze&category=pokemon" \
+      -H "Authorization: Bearer $CATCHBACK_KEY"
+    ```
+  </Step>
+  <Step title="Open one">
+    ```bash
+    curl -X POST https://catchbackcards.com/api/partner/v1/packs/purchase \
+      -H "Authorization: Bearer $CATCHBACK_KEY" \
+      -H "Idempotency-Key: order-0001" \
+      -H "Content-Type: application/json" \
+      -d '{ "pack_type": "bronze", "category": "pokemon", "quantity": 1 }'
+    ```
+  </Step>
+</Steps>

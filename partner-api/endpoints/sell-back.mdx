@@ -1,0 +1,59 @@
+---
+title: "Sell back cards"
+api: "POST /api/partner/v1/cards/sell-back"
+description: "Sell pulled cards back to CatchBack for CatchCoins, at the same rates as every customer."
+---
+
+Scope: `sell:cards` · MCP tool: `sell_back_cards`
+
+Pays the same rate a customer gets: the pull's fresh rate (90%) within 5 minutes of the pull, then 80% of the value at pull for 7 days, then 80% of market value. See [Liquidity](/about-catchback/liquidity).
+
+Items run in order, and one failing doesn't stop the rest. A pull pays out only once: selling it again returns `already_sold` with the earlier sale, so a retry is always safe. Cards only; sealed packs from consolation pulls can't be sold back through the API yet. Sell-back is not rate-limited.
+
+<ParamField body="items" type="object[]" required>
+  1–10 cards, each `{ card_id, pull_id }`: the item `id` and `pull_id` from [Buy packs](/partner-api/endpoints/buy-packs), or `card_id` and `pull_id` from [Get vault](/partner-api/endpoints/get-vault). A listed card must be delisted first.
+</ParamField>
+
+## Response
+
+<ResponseField name="total_paid" type="number">USD credited across all items.</ResponseField>
+<ResponseField name="remaining_balance" type="number" />
+<ResponseField name="results" type="object[]">
+  <Expandable title="result">
+    <ResponseField name="card_id" type="string" />
+    <ResponseField name="pull_id" type="string" />
+    <ResponseField name="status" type="string">`sold`, `already_sold` (paid earlier; the earlier sale is returned), or `failed` (with `error`).</ResponseField>
+    <ResponseField name="transaction_id" type="string" />
+    <ResponseField name="payout_amount" type="number" />
+    <ResponseField name="payout_rate" type="number" />
+    <ResponseField name="error" type="string">Why it failed, when `status` is `failed`.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v1/cards/sell-back \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "items": [{ "card_id": "bee48cce-…", "pull_id": "873deb80-…" }] }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "total_paid": 16.2,
+  "remaining_balance": 189937,
+  "results": [
+    {
+      "card_id": "bee48cce-…",
+      "pull_id": "873deb80-…",
+      "status": "sold",
+      "transaction_id": "93727497-…",
+      "payout_amount": 16.2,
+      "payout_rate": 0.9
+    }
+  ]
+}
+```
+</ResponseExample>

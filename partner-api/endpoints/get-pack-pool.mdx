@@ -1,0 +1,100 @@
+---
+title: "Get a pack's pool"
+api: "GET /api/partner/v1/catalog/packs/pool"
+description: "Everything a pack can pull right now: its value bands, their odds, and every hittable card."
+---
+
+Scope: `read:catalog` · MCP tool: `get_pack_pool`
+
+A pack is a set of **value bands** (e.g. \$5–\$20, \$20–\$50). Opening a pack picks a band by its odds, then a card from that band. This endpoint returns the bands, their odds at the risk level you ask for, the chase card if one is set, and every card a pull can produce right now. It is the same data behind the odds panel and "possible hits" on our pack pages.
+
+A band at 0% odds (out of stock, or zeroed by the risk level) is still listed, but its cards are not, since a pull can't produce them. The pool is [point-in-time](/partner-api/errors-and-limits#inventory-is-point-in-time): any opening on CatchBack can take a card from it.
+
+<ParamField query="pack_type" type="string" required>
+  A `pack_type` from [List packs](/partner-api/endpoints/list-packs). A pack you can't buy is a `404`.
+</ParamField>
+<ParamField query="category" type="string" default="pokemon">
+  `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
+</ParamField>
+<ParamField query="risk_level" type="string" default="standard">
+  `chill`, `standard` or `aggressive` (Hot in the app). Odds change with the risk level, and so can which cards are hittable.
+</ParamField>
+
+## Response
+
+<ResponseField name="pack_type" type="string" />
+<ResponseField name="name" type="string" />
+<ResponseField name="category" type="string" />
+<ResponseField name="risk_level" type="string" />
+<ResponseField name="price" type="number">Price per pack in USD.</ResponseField>
+<ResponseField name="available" type="boolean" />
+<ResponseField name="expected_value" type="number">Expected value of one pack in USD at this risk level.</ResponseField>
+<ResponseField name="bands" type="object[]">
+  <Expandable title="band">
+    <ResponseField name="bucket_id" type="string">Band id. Each card's `bucket_id` points here.</ResponseField>
+    <ResponseField name="label" type="string">Display range, e.g. `$5-$20`.</ResponseField>
+    <ResponseField name="min_value" type="number" />
+    <ResponseField name="max_value" type="number" />
+    <ResponseField name="odds" type="number">Probability of landing in this band, 0–1.</ResponseField>
+    <ResponseField name="is_consolation" type="boolean">A consolation outcome (a sealed pack rather than a card).</ResponseField>
+    <ResponseField name="hittable_cards" type="integer">How many cards in `cards` belong to this band.</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="chase" type="object | null">
+  A hand-picked card hittable at fixed odds on top of the bands, or `null`.
+  <Expandable title="chase">
+    <ResponseField name="card" type="object">A [card object](/partner-api/card-object).</ResponseField>
+    <ResponseField name="probability" type="number" />
+    <ResponseField name="odds_label" type="string">e.g. `1 in 5,000`.</ResponseField>
+    <ResponseField name="label" type="string" />
+    <ResponseField name="ends_at" type="string | null" />
+  </Expandable>
+</ResponseField>
+<ResponseField name="total_cards" type="integer" />
+<ResponseField name="cards" type="object[]">
+  Every hittable card, highest value first: a [card object](/partner-api/card-object) plus `bucket_id`.
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/catalog/packs/pool?pack_type=bronze&category=pokemon&risk_level=standard" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "pack_type": "bronze",
+  "name": "Bronze Pack",
+  "category": "pokemon",
+  "risk_level": "standard",
+  "price": 25,
+  "available": true,
+  "expected_value": 24.1,
+  "bands": [
+    { "bucket_id": "P1", "label": "$5-$20", "min_value": 5, "max_value": 20, "odds": 0.72, "is_consolation": false, "hittable_cards": 412 },
+    { "bucket_id": "P2", "label": "$20-$50", "min_value": 20, "max_value": 50, "odds": 0.2, "is_consolation": false, "hittable_cards": 188 }
+  ],
+  "chase": null,
+  "total_cards": 1043,
+  "cards": [
+    {
+      "id": "0e94dc61-…",
+      "category": "pokemon",
+      "name": "Charizard ex",
+      "set": "Pokemon Sv3 En-Obsidian Flames",
+      "grading_company": "PSA",
+      "grading_rank": 10,
+      "cert_number": "84512377",
+      "market_value": 410,
+      "front_image": "https://…",
+      "back_image": "https://…",
+      "render_image": "https://…",
+      "image_url": "https://…",
+      "bucket_id": "P5"
+    }
+  ]
+}
+```
+</ResponseExample>
