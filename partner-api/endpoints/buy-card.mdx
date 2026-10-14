@@ -1,0 +1,88 @@
+---
+title: "Buy a card"
+api: "POST /api/partner/v1/cards/purchase"
+description: "Buy one card from the shop or a fixed-price user listing with your CatchCoins."
+---
+
+Scope: `buy:cards` · MCP tool: `buy_card` · **Moves money**
+
+Charges the card's price plus a $1 buyer fee, from your cash CatchCoins balance only (no promo codes, bonus balance or card payments). The card lands in your [vault](/partner-api/endpoints/get-vault), where you can hold it, [list it](/partner-api/endpoints/list-card) or [sell it back](/partner-api/endpoints/sell-back). Find cards with [Search cards](/partner-api/endpoints/search-cards).
+
+<ParamField header="Idempotency-Key" type="string" required>
+  Your order id, 8–128 characters of `A-Za-z0-9_-`. Reuse it to retry the same order safely. See [Idempotency](/partner-api/errors-and-limits#idempotency-retrying-a-purchase-safely).
+</ParamField>
+<ParamField body="card_id" type="string" required>`card_id` from [Search cards](/partner-api/endpoints/search-cards).</ParamField>
+<ParamField body="max_price" type="number" required>
+  The most you'll pay for the card in dollars, before the fee. Usually the `price` the search showed. If the price is now higher, nothing is charged and you get `409 PRICE_CHANGED` with the new `price`.
+</ParamField>
+
+## Response
+
+<ResponseField name="checkout_id" type="string">Our id for the order.</ResponseField>
+<ResponseField name="transaction_id" type="string">The sale. It is the `purchase_id` that [Get vault](/partner-api/endpoints/get-vault) and [Sell back](/partner-api/endpoints/sell-back) use for this card.</ResponseField>
+<ResponseField name="card_id" type="string" />
+<ResponseField name="source" type="string">`shop` or `listing`.</ResponseField>
+<ResponseField name="listing_id" type="string | null" />
+<ResponseField name="price" type="number">Charged for the card.</ResponseField>
+<ResponseField name="fee" type="number" />
+<ResponseField name="total_charged" type="number">`price` + `fee`.</ResponseField>
+<ResponseField name="remaining_balance" type="number" />
+<ResponseField name="item" type="object">A [card object](/partner-api/card-object).</ResponseField>
+<ResponseField name="idempotent_replay" type="boolean">Present and `true` when this is a stored response to a retried order. Nothing was charged again.</ResponseField>
+<ResponseField name="needs_review" type="boolean">
+  Present and `true` when the sale went through but our bookkeeping needs a manual check. The card is yours; don't retry under a new order id. We're alerted automatically.
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | | Missing `Idempotency-Key`, a bad `card_id`, no `max_price`, or not enough balance |
+| `404` | | No such card |
+| `409` | `PRICE_CHANGED` | The price is above your `max_price`. The response has the current `price` |
+| `409` | `CARD_NO_LONGER_AVAILABLE` | Sold, pulled from a pack, or delisted. Search again |
+| `409` | `OWN_LISTING` | The card is your own listing |
+| `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running |
+| `422` | `IDEMPOTENCY_KEY_REUSED` | This key was used for a different order |
+| `429` | `DAILY_CARD_LIMIT_REACHED` | Your daily card or spend cap. See [Card limits](/partner-api/errors-and-limits#card-limits) |
+
+<Note>
+  For 7 days after you buy a card, its sell-back offer is based on the lower of the price you paid and its market value when you bought it. See [Liquidity](/about-catchback/liquidity).
+</Note>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v1/cards/purchase \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Idempotency-Key: order-2077" \
+  -H "Content-Type: application/json" \
+  -d '{ "card_id": "0e94dc61-…", "max_price": 1450 }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "checkout_id": "5d1c…",
+  "transaction_id": "a17e…",
+  "card_id": "0e94dc61-…",
+  "source": "shop",
+  "listing_id": null,
+  "price": 1450,
+  "fee": 1,
+  "total_charged": 1451,
+  "remaining_balance": 48549,
+  "item": { "id": "0e94dc61-…", "name": "Charizard ex", "grading_company": "PSA", "grading_rank": 10 }
+}
+```
+
+```json 409
+{
+  "error": "The price changed to $1500.00 since you looked. Check the new price and try again.",
+  "code": "PRICE_CHANGED",
+  "card_id": "0e94dc61-…",
+  "price": 1500,
+  "max_price": 1450
+}
+```
+</ResponseExample>

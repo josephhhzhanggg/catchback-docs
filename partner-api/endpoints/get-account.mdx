@@ -1,12 +1,12 @@
 ---
 title: "Get account"
 api: "GET /api/partner/v1/account"
-description: "Your balance, and where you stand against your purchase limits."
+description: "Your balance, and where you stand against your pack and card limits."
 ---
 
 Scope: `read:account` · MCP tool: `get_balance`
 
-Enough to plan your next purchase without hitting a `429`.
+Enough to plan your next pack or card purchase without hitting a `429`. See [Purchase limits](/partner-api/errors-and-limits#purchase-limits).
 
 ## Response
 
@@ -19,7 +19,19 @@ Enough to plan your next purchase without hitting a `429`.
     <ResponseField name="packs_left_today" type="integer" />
     <ResponseField name="resets_at" type="string">Next midnight UTC.</ResponseField>
     <ResponseField name="min_seconds_between_purchases" type="integer" />
-    <ResponseField name="next_purchase_at" type="string">The earliest your next purchase is allowed.</ResponseField>
+    <ResponseField name="next_purchase_at" type="string">The earliest your next pack purchase is allowed.</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="card_limits" type="object">
+  Your daily caps on [card buys](/partner-api/endpoints/buy-card). An order still running counts at its `max_price` + $1, the same way the cap counts it. The usage fields are `null` if we couldn't read them.
+  <Expandable title="card_limits">
+    <ResponseField name="cards_today" type="integer | null">Cards bought this UTC day.</ResponseField>
+    <ResponseField name="max_cards_per_day" type="integer" />
+    <ResponseField name="cards_left_today" type="integer | null" />
+    <ResponseField name="spend_today" type="number | null">USD spent on cards this UTC day, fees included.</ResponseField>
+    <ResponseField name="max_card_spend_per_day" type="number" />
+    <ResponseField name="spend_left_today" type="number | null" />
+    <ResponseField name="resets_at" type="string">Next midnight UTC.</ResponseField>
   </Expandable>
 </ResponseField>
 
@@ -42,6 +54,15 @@ curl https://catchbackcards.com/api/partner/v1/account \
     "resets_at": "2026-09-30T00:00:00.000Z",
     "min_seconds_between_purchases": 60,
     "next_purchase_at": "2026-09-29T20:24:12.000Z"
+  },
+  "card_limits": {
+    "cards_today": 3,
+    "max_cards_per_day": 25,
+    "cards_left_today": 22,
+    "spend_today": 4353,
+    "max_card_spend_per_day": 50000,
+    "spend_left_today": 45647,
+    "resets_at": "2026-09-30T00:00:00.000Z"
   }
 }
 ```

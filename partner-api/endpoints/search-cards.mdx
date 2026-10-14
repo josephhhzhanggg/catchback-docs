@@ -1,32 +1,48 @@
 ---
-title: "Search shop cards"
-api: "GET /api/partner/v1/catalog/cards"
-description: "Every card currently for sale in the CatchBack shop, paginated."
+title: "Search cards"
+api: "GET /api/partner/v1/marketplace/listings"
+description: "Every card you can buy right now: shop stock and fixed-price user listings, filtered by name, grade and price."
 ---
 
 Scope: `read:catalog` · MCP tool: `search_cards`
 
-The purchasable inventory: the same pool our storefront and pack openings draw from. Paginate by incrementing `page` until you've fetched `total` cards. Ordering is stable (`id` ascending) within a sync, but the set changes between syncs, because the inventory is [point-in-time](/partner-api/errors-and-limits#inventory-is-point-in-time).
+Each result is buyable with [Buy a card](/partner-api/endpoints/buy-card) unless someone else takes it first. `price` is exactly what the buy charges for the card, and `total_cost` adds the $1 buyer fee. Dutch auctions and your own listings are left out. Results are [point-in-time](/partner-api/errors-and-limits#inventory-is-point-in-time).
 
 <ParamField query="category" type="string" default="pokemon">
   `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
 </ParamField>
-<ParamField query="page" type="integer" default="1">1-based.</ParamField>
-<ParamField query="per_page" type="integer" default="500">1–1000.</ParamField>
+<ParamField query="q" type="string">Text in the card name, slab label or set, e.g. `charizard`. 2–60 characters.</ParamField>
+<ParamField query="grading_company" type="string">e.g. `PSA`, `BGS`, `CGC`.</ParamField>
+<ParamField query="min_grade" type="number" />
+<ParamField query="max_grade" type="number" />
+<ParamField query="min_price" type="number">Dollars.</ParamField>
+<ParamField query="max_price" type="number">Dollars.</ParamField>
+<ParamField query="source" type="string" default="all">`all`, `shop` (CatchBack stock) or `listing` (another user's fixed-price listing).</ParamField>
+<ParamField query="sort" type="string" default="price_asc">`price_asc` or `price_desc`.</ParamField>
+<ParamField query="page" type="integer" default="1">1–20.</ParamField>
+<ParamField query="per_page" type="integer" default="50">1–100.</ParamField>
 
 ## Response
 
 <ResponseField name="category" type="string" />
 <ResponseField name="page" type="integer" />
 <ResponseField name="per_page" type="integer" />
-<ResponseField name="total" type="integer" />
-<ResponseField name="cards" type="object[]">
-  [Card objects](/partner-api/card-object), each with `sale_status`, the pool the card sits in.
+<ResponseField name="has_more" type="boolean">Whether another page exists.</ResponseField>
+<ResponseField name="results" type="object[]">
+  <Expandable title="result">
+    <ResponseField name="card_id" type="string">Pass to [Buy a card](/partner-api/endpoints/buy-card).</ResponseField>
+    <ResponseField name="source" type="string">`shop` or `listing`.</ResponseField>
+    <ResponseField name="listing_id" type="string | null">The user listing, when `source` is `listing`.</ResponseField>
+    <ResponseField name="price" type="number">What the buy charges for the card. Send it as `max_price`.</ResponseField>
+    <ResponseField name="fee" type="number">Buyer fee, $1.</ResponseField>
+    <ResponseField name="total_cost" type="number">`price` + `fee`.</ResponseField>
+    <ResponseField name="item" type="object">A [card object](/partner-api/card-object).</ResponseField>
+  </Expandable>
 </ResponseField>
 
 <RequestExample>
 ```bash cURL
-curl "https://catchbackcards.com/api/partner/v1/catalog/cards?category=pokemon&page=1&per_page=100" \
+curl "https://catchbackcards.com/api/partner/v1/marketplace/listings?category=pokemon&q=charizard&grading_company=PSA&min_grade=9&max_price=5000" \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 </RequestExample>
@@ -36,25 +52,26 @@ curl "https://catchbackcards.com/api/partner/v1/catalog/cards?category=pokemon&p
 {
   "category": "pokemon",
   "page": 1,
-  "per_page": 100,
-  "total": 5210,
-  "cards": [
+  "per_page": 50,
+  "has_more": false,
+  "results": [
     {
-      "id": "0e94dc61-…",
-      "category": "pokemon",
-      "name": "Greavard",
-      "set": "Pokemon Svi En-Scarlet & Violet",
-      "grading_company": "PSA",
-      "grading_rank": 9,
-      "slab_label": "2023 Scarlet & Violet Greavard",
-      "cert_number": "84512377",
-      "market_value": 38.43,
-      "price": 38.43,
-      "sale_status": "available in shop",
-      "front_image": "https://…",
-      "back_image": "https://…",
-      "render_image": "https://…",
-      "image_url": "https://…"
+      "card_id": "0e94dc61-…",
+      "source": "shop",
+      "listing_id": null,
+      "price": 1450,
+      "fee": 1,
+      "total_cost": 1451,
+      "item": {
+        "id": "0e94dc61-…",
+        "category": "pokemon",
+        "name": "Charizard ex",
+        "grading_company": "PSA",
+        "grading_rank": 10,
+        "market_value": 1450,
+        "front_image": "https://…",
+        "render_image": "https://…"
+      }
     }
   ]
 }

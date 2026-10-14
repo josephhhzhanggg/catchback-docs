@@ -85,18 +85,21 @@
             "pages": [
               "partner-api/endpoints/list-packs",
               "partner-api/endpoints/get-pack-pool",
-              "partner-api/endpoints/search-cards"
+              "partner-api/endpoints/search-cards",
+              "partner-api/endpoints/card-catalog"
             ]
           },
           {
-            "group": "Packs",
+            "group": "Buying",
             "pages": [
-              "partner-api/endpoints/buy-packs"
+              "partner-api/endpoints/buy-packs",
+              "partner-api/endpoints/buy-card"
             ]
           },
           {
             "group": "Account & vault",
             "pages": [
+              "partner-api/endpoints/get-me",
               "partner-api/endpoints/get-account",
               "partner-api/endpoints/get-vault",
               "partner-api/endpoints/sell-back",

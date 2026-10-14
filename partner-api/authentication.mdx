@@ -13,18 +13,19 @@ A missing, malformed, disabled or unknown key is a `401`.
 
 ## Scopes
 
-Each key carries a set of scopes, and every endpoint requires exactly one. Calling an endpoint your key has no scope for is a `403`. We grant scopes per partner; ask us if you need one you don't have.
+Each key carries a set of scopes, and every endpoint except [Who am I](/partner-api/endpoints/get-me) requires exactly one. Calling an endpoint your key has no scope for is a `403`. We grant scopes per partner; ask us if you need one you don't have.
 
 | Scope | Lets you | Moves money |
 |---|---|---|
-| `read:catalog` | See the packs you can buy, what each pack can pull, and the cards for sale in the shop | No |
+| `read:catalog` | See the packs you can buy, what each pack can pull, and every card for sale (shop and user listings) | No |
 | `read:account` | See your balance, limits and the cards you hold | No |
 | `rip:packs` | Open packs with your CatchCoins | **Yes** |
+| `buy:cards` | Buy cards from the shop and user listings with your CatchCoins | **Yes** |
 | `sell:cards` | Sell cards back to CatchBack for CatchCoins | **Yes** |
 | `write:listings` | List held cards on the marketplace, and take listings down | No |
 | `read:pulls` | Revenue-share report of completed pack purchases | No |
 
-Account actions (`read:account`, `rip:packs`, `sell:cards`, `write:listings`) also need the key to be linked to a CatchBack account. An unlinked key gets a `403` on them.
+Account actions (`read:account`, `rip:packs`, `buy:cards`, `sell:cards`, `write:listings`) also need the key to be linked to a CatchBack account. An unlinked key gets a `403` on them. [Who am I](/partner-api/endpoints/get-me) shows whether your key is linked, and to which account.
 
 ## Keeping your key safe
 

@@ -1,12 +1,12 @@
 ---
 title: "Get vault"
 api: "GET /api/partner/v1/vault"
-description: "The cards you hold, each with the pull it came from and its CatchBack offer right now."
+description: "The cards you hold, each with how you got it and its CatchBack offer right now."
 ---
 
 Scope: `read:account` · MCP tool: `get_vault`
 
-Cards in your vault or listed on the marketplace. Cards that have shipped are not included.
+Cards in your vault or listed on the marketplace. Cards that have shipped are not included. Each card names its latest acquisition: a pull (`pull_id`) or a buy (`purchase_id`). The other is `null`, and [Sell back](/partner-api/endpoints/sell-back) takes whichever is set.
 
 <ParamField query="category" type="string" default="pokemon">
   `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
@@ -23,8 +23,10 @@ Cards in your vault or listed on the marketplace. Cards that have shipped are no
 <ResponseField name="cards" type="object[]">
   <Expandable title="held card">
     <ResponseField name="card_id" type="string" />
-    <ResponseField name="pull_id" type="string | null">The pull the card came from. [Sell back](/partner-api/endpoints/sell-back) needs it.</ResponseField>
+    <ResponseField name="pull_id" type="string | null">The pull the card came from, if your latest acquisition was a pack pull.</ResponseField>
     <ResponseField name="pulled_at" type="string | null" />
+    <ResponseField name="purchase_id" type="string | null">The sale, if your latest acquisition was a [card buy](/partner-api/endpoints/buy-card). It is that buy's `transaction_id`.</ResponseField>
+    <ResponseField name="purchased_at" type="string | null" />
     <ResponseField name="item" type="object">A [card object](/partner-api/card-object).</ResponseField>
     <ResponseField name="value" type="number">Current market value.</ResponseField>
     <ResponseField name="listed" type="boolean">Listed on the marketplace.</ResponseField>
@@ -57,6 +59,8 @@ curl "https://catchbackcards.com/api/partner/v1/vault?category=pokemon&page=1&pe
       "card_id": "0e94dc61-…",
       "pull_id": "d9504d3f-…",
       "pulled_at": "2026-09-29T19:56:28Z",
+      "purchase_id": null,
+      "purchased_at": null,
       "item": {
         "id": "0e94dc61-…",
         "category": "pokemon",
