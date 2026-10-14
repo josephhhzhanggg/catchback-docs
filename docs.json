@@ -74,6 +74,7 @@
             "group": "Get started",
             "pages": [
               "partner-api/introduction",
+              "partner-api/how-it-works",
               "partner-api/authentication",
               "partner-api/errors-and-limits",
               "partner-api/card-object",
