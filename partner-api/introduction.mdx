@@ -1,18 +1,21 @@
 ---
 title: "Partner API"
-description: "Build on CatchBack's graded-card inventory: browse packs and cards, open packs, and manage what you pull."
+description: "Build on CatchBack's graded-card inventory: browse packs and cards, open packs, buy cards, and manage what you hold."
 ---
 
 The Partner API lets companies, bots and AI agents work with CatchBack programmatically. A partner is a normal CatchBack account with an API key linked to it, so every action runs through the same code and the same rules as our own app.
 
 <CardGroup cols={2}>
   <Card title="Browse inventory" icon="magnifying-glass" href="/partner-api/endpoints/list-packs">
-    The packs you can buy, every card each pack can pull, and the cards for sale in the shop.
+    The packs you can buy, every card each pack can pull, and every card for sale.
   </Card>
   <Card title="Open packs" icon="box-open" href="/partner-api/endpoints/buy-packs">
     Open packs with your CatchCoins balance and get every hit back with its CatchBack offer.
   </Card>
-  <Card title="Manage what you pull" icon="vault" href="/partner-api/endpoints/get-vault">
+  <Card title="Buy cards" icon="cart-shopping" href="/partner-api/endpoints/buy-card">
+    Buy graded cards from the shop or user listings, with a price guard.
+  </Card>
+  <Card title="Manage what you hold" icon="vault" href="/partner-api/endpoints/get-vault">
     Hold cards in your vault, sell them back to us, or list them on the marketplace.
   </Card>
   <Card title="Connect an AI agent" icon="robot" href="/partner-api/mcp">
@@ -31,7 +34,9 @@ The Partner API lets companies, bots and AI agents work with CatchBack programma
 
 1. **You get an account and a key.** We create your API key with the scopes you need and link it to your CatchBack account.
 2. **You fund it.** You pre-fund the account with CatchCoins (we credit it when your wire lands). Purchases spend only that balance, at the same list price as everyone else.
-3. **Pulls land in your vault.** Every card you pull is held by CatchBack in your account. From there you can keep it, [sell it back](/partner-api/endpoints/sell-back) at our guaranteed rates, or [list it](/partner-api/endpoints/list-card) on the marketplace.
+3. **Cards land in your vault.** Every card you pull or buy is held by CatchBack in your account. From there you can keep it, [sell it back](/partner-api/endpoints/sell-back) at our guaranteed rates, or [list it](/partner-api/endpoints/list-card) on the marketplace.
+
+The whole flow, step by step: [How it works](/partner-api/how-it-works).
 
 <Note>
   Interested in becoming a partner? Email [catchbackcards@gmail.com](mailto:catchbackcards@gmail.com).

@@ -17,14 +17,14 @@ Error bodies are JSON with a human-readable `error`, and a machine-readable `cod
 | `401` | Missing, malformed, disabled or unknown API key |
 | `403` | Your key lacks the scope, or the action needs a linked account |
 | `404` | The thing you asked for doesn't exist for your key (e.g. a pack you can't buy) |
-| `409` | `IDEMPOTENCY_IN_PROGRESS`: an order with this key is still running |
+| `409` | `IDEMPOTENCY_IN_PROGRESS`: an order with this key is still running. Card buys also use `PRICE_CHANGED`, `CARD_NO_LONGER_AVAILABLE` and `OWN_LISTING` |
 | `422` | `IDEMPOTENCY_KEY_REUSED`: this key was used for a different order |
-| `429` | `RATE_LIMITED` or `DAILY_LIMIT_REACHED` |
+| `429` | `RATE_LIMITED`, `DAILY_LIMIT_REACHED` or `DAILY_CARD_LIMIT_REACHED` |
 | `500` | Our fault. Safe to retry with backoff |
 
 ## Idempotency: retrying a purchase safely
 
-Every [pack purchase](/partner-api/endpoints/buy-packs) requires an `Idempotency-Key` header: 8–128 characters of `A-Za-z0-9_-`. Use your own order id. It is what makes a retry after a timeout or network error safe.
+Every [pack purchase](/partner-api/endpoints/buy-packs) and [card purchase](/partner-api/endpoints/buy-card) requires an `Idempotency-Key` header: 8–128 characters of `A-Za-z0-9_-`. Use your own order id. It is what makes a retry after a timeout or network error safe.
 
 | You retry with… | You get |
 |---|---|
@@ -39,12 +39,21 @@ Every [pack purchase](/partner-api/endpoints/buy-packs) requires an `Idempotency
 
 ## Purchase limits
 
-Purchases are limited per key to protect the shared pack inventory:
+Pack purchases are limited per key to protect the shared pack inventory:
 
 - **Speed:** one purchase request per minute by default (each request can open several packs). Too soon is a `429 RATE_LIMITED` with a `Retry-After` header and `retry_after_seconds`.
 - **Daily ceiling:** 100 packs per UTC day by default. Going over is a `429 DAILY_LIMIT_REACHED` with `limit`, `used` and `resets_at` (next midnight UTC).
 
 A retry of an order you already sent never counts against either limit, so you can always find out what happened. A purchase that fails gives its slot back. Both limits are set per partner; talk to us if yours don't fit your volume. [`GET /account`](/partner-api/endpoints/get-account) tells you where you stand before you buy.
+
+### Card limits
+
+Card buys have no per-minute limit, but each key has daily caps, counted per UTC day across the shop and user listings together:
+
+- **Cards:** 25 per day by default.
+- **Spend:** $50,000 per day by default.
+
+Going over either is a `429 DAILY_CARD_LIMIT_REACHED` with `cards_used`, `max_cards_per_day`, `spend_used`, `max_card_spend_per_day` and `resets_at`. An order still running counts at its `max_price` + $1, so parallel orders can't all slip under the cap. A refused order charges nothing. Both caps are set per partner, and [`GET /account`](/partner-api/endpoints/get-account) shows where you stand (`card_limits`).
 
 Reads, sell-backs and listings are not rate-limited, but keys are monitored. A full catalog sync a few times an hour is fine; polling every few seconds is not.
 

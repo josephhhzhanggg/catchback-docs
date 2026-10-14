@@ -1,0 +1,56 @@
+---
+title: "Who am I"
+api: "GET /api/partner/v1/me"
+description: "Which key you're using, its scopes, and the CatchBack account it acts as."
+---
+
+Scope: none (any valid key) · MCP tool: `whoami`
+
+Use it to check which CatchBack account your key is linked to. Quote `account.id` when you fund the account or contact us. An unlinked key gets `linked: false` here; the account endpoints return `403` for it.
+
+## Response
+
+<ResponseField name="key" type="object">
+  <Expandable title="key">
+    <ResponseField name="name" type="string">The key's name.</ResponseField>
+    <ResponseField name="scopes" type="string[]">What the key can do. See [Scopes](/partner-api/authentication#scopes).</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="linked" type="boolean">Whether the key acts as a CatchBack account.</ResponseField>
+<ResponseField name="account" type="object | null">
+  `null` when `linked` is `false`.
+  <Expandable title="account">
+    <ResponseField name="id" type="string">Your account's id.</ResponseField>
+    <ResponseField name="username" type="string" />
+    <ResponseField name="profile_url" type="string">Your public profile on CatchBack.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v1/me \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "key": { "name": "acme", "scopes": ["read:catalog", "read:account", "rip:packs"] },
+  "linked": true,
+  "account": {
+    "id": "6f1c2a9e-3b4d-4c7a-9e21-5d8f0b7a1c34",
+    "username": "acme-cards",
+    "profile_url": "https://catchbackcards.com/user/acme-cards"
+  }
+}
+```
+
+```json 200 (unlinked key)
+{
+  "key": { "name": "acme", "scopes": ["read:catalog"] },
+  "linked": false,
+  "account": null
+}
+```
+</ResponseExample>
