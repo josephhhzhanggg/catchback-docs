@@ -1,7 +1,7 @@
 ---
 title: "Get a pack's pool"
 api: "GET /api/partner/v1/catalog/packs/pool"
-description: "Everything a pack can pull right now: its value bands, their odds, and every hittable card."
+description: "Everything a pack can pull right now: its value bands, their odds, and every hittable card or sealed product."
 ---
 
 Scope: `read:catalog` · MCP tool: `get_pack_pool`
@@ -10,6 +10,15 @@ A pack is a set of **value bands** (e.g. \$5–\$20, \$20–\$50). Opening a pac
 
 A band at 0% odds (out of stock, or zeroed by the risk level) is still listed, but its cards are not, since a pull can't produce them. The pool is [point-in-time](/partner-api/errors-and-limits#inventory-is-point-in-time): any opening on CatchBack can take a card from it.
 
+## Slab packs and sealed packs
+
+Most packs pay out graded cards (slabs). The Starter pack and the sealed mystery packs pay out **sealed products** instead (loose booster packs, bundles and the like). `kind` tells you which you have:
+
+- **`kind: "slab"`**: the bands are value ranges, and `cards` lists every hittable card.
+- **`kind: "sealed"`**: every in-stock product is its own band, `products` lists them with their odds, and `cards` is empty. The odds are the ones the real draw uses: when a product sells out, its share is spread evenly over what is still in stock. `chase` is always `null`.
+
+A sold-out pack still returns `200` with `available: false`, not an error; its pool may be empty.
+
 <ParamField query="pack_type" type="string" required>
   A `pack_type` from [List packs](/partner-api/endpoints/list-packs). A pack you can't buy is a `404`.
 </ParamField>
@@ -17,7 +26,7 @@ A band at 0% odds (out of stock, or zeroed by the risk level) is still listed, b
   `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
 </ParamField>
 <ParamField query="risk_level" type="string" default="standard">
-  `chill`, `standard` or `aggressive` (Hot in the app). Odds change with the risk level, and so can which cards are hittable.
+  `chill`, `standard` or `aggressive` (Hot in the app). Odds change with the risk level, and so can which cards are hittable. Use one of the pack's `risk_levels` from [List packs](/partner-api/endpoints/list-packs); any other is a `400`. The Starter pack opens at `standard` only.
 </ParamField>
 
 ## Response
@@ -28,16 +37,18 @@ A band at 0% odds (out of stock, or zeroed by the risk level) is still listed, b
 <ResponseField name="risk_level" type="string" />
 <ResponseField name="price" type="number">Price per pack in USD.</ResponseField>
 <ResponseField name="available" type="boolean" />
-<ResponseField name="expected_value" type="number">Expected value of one pack in USD at this risk level.</ResponseField>
+<ResponseField name="reason" type="string">Why the pack is unavailable. Only present when a sold-out pack's pool is empty; [List packs](/partner-api/endpoints/list-packs) gives the reason for any unavailable pack.</ResponseField>
+<ResponseField name="kind" type="string">`slab` (pays out graded cards) or `sealed` (pays out sealed products).</ResponseField>
+<ResponseField name="expected_value" type="number | null">Expected value of one pack in USD at this risk level. `null` when there is no pool to value.</ResponseField>
 <ResponseField name="bands" type="object[]">
   <Expandable title="band">
     <ResponseField name="bucket_id" type="string">Band id. Each card's `bucket_id` points here.</ResponseField>
-    <ResponseField name="label" type="string">Display range, e.g. `$5-$20`.</ResponseField>
+    <ResponseField name="label" type="string">Display range, e.g. `$5-$20`. For a sealed pack, the product's name.</ResponseField>
     <ResponseField name="min_value" type="number" />
     <ResponseField name="max_value" type="number" />
     <ResponseField name="odds" type="number">Probability of landing in this band, 0–1.</ResponseField>
     <ResponseField name="is_consolation" type="boolean">A consolation outcome (a sealed pack rather than a card).</ResponseField>
-    <ResponseField name="hittable_cards" type="integer">How many cards in `cards` belong to this band.</ResponseField>
+    <ResponseField name="hittable_cards" type="integer">How many cards in `cards` belong to this band. Always `0` for a sealed pack.</ResponseField>
   </Expandable>
 </ResponseField>
 <ResponseField name="chase" type="object | null">
@@ -52,7 +63,24 @@ A band at 0% odds (out of stock, or zeroed by the risk level) is still listed, b
 </ResponseField>
 <ResponseField name="total_cards" type="integer" />
 <ResponseField name="cards" type="object[]">
-  Every hittable card, highest value first: a [card object](/partner-api/card-object) plus `bucket_id`.
+  Every hittable card, highest value first: a [card object](/partner-api/card-object) plus `bucket_id`. Empty for a sealed pack.
+</ResponseField>
+<ResponseField name="total_products" type="integer">Sealed packs only. How many products are in `products`.</ResponseField>
+<ResponseField name="products" type="object[]">
+  Sealed packs only. Every in-stock product, highest value first.
+  <Expandable title="product">
+    <ResponseField name="id" type="string" />
+    <ResponseField name="bucket_id" type="string">This product's band in `bands`.</ResponseField>
+    <ResponseField name="name" type="string | null" />
+    <ResponseField name="set" type="string | null" />
+    <ResponseField name="product_type" type="string | null">e.g. `loose_pack`, `booster_bundle`.</ResponseField>
+    <ResponseField name="language" type="string | null" />
+    <ResponseField name="year" type="number | null" />
+    <ResponseField name="image" type="string | null" />
+    <ResponseField name="market_value" type="number">USD.</ResponseField>
+    <ResponseField name="in_stock" type="integer">Units we hold right now.</ResponseField>
+    <ResponseField name="odds" type="number">Probability of pulling this product, 0–1.</ResponseField>
+  </Expandable>
 </ResponseField>
 
 <RequestExample>
@@ -63,7 +91,7 @@ curl "https://catchbackcards.com/api/partner/v1/catalog/packs/pool?pack_type=bro
 </RequestExample>
 
 <ResponseExample>
-```json 200
+```json 200 (slab)
 {
   "pack_type": "bronze",
   "name": "Bronze Pack",
@@ -71,6 +99,7 @@ curl "https://catchbackcards.com/api/partner/v1/catalog/packs/pool?pack_type=bro
   "risk_level": "standard",
   "price": 25,
   "available": true,
+  "kind": "slab",
   "expected_value": 24.1,
   "bands": [
     { "bucket_id": "P1", "label": "$5-$20", "min_value": 5, "max_value": 20, "odds": 0.72, "is_consolation": false, "hittable_cards": 412 },
@@ -93,6 +122,42 @@ curl "https://catchbackcards.com/api/partner/v1/catalog/packs/pool?pack_type=bro
       "render_image": "https://…",
       "image_url": "https://…",
       "bucket_id": "P5"
+    }
+  ]
+}
+```
+
+```json 200 (sealed)
+{
+  "pack_type": "starter",
+  "name": "Starter Pack",
+  "category": "pokemon",
+  "risk_level": "standard",
+  "price": 8,
+  "available": true,
+  "kind": "sealed",
+  "expected_value": 7.4,
+  "bands": [
+    { "bucket_id": "sku_812", "label": "Surging Sparks Booster Pack", "min_value": 9.5, "max_value": 9.5, "odds": 0.3, "is_consolation": false, "hittable_cards": 0 },
+    { "bucket_id": "sku_640", "label": "Stellar Crown Booster Pack", "min_value": 6.2, "max_value": 6.2, "odds": 0.7, "is_consolation": false, "hittable_cards": 0 }
+  ],
+  "chase": null,
+  "total_cards": 0,
+  "cards": [],
+  "total_products": 2,
+  "products": [
+    {
+      "id": "812",
+      "bucket_id": "sku_812",
+      "name": "Surging Sparks Booster Pack",
+      "set": "Surging Sparks",
+      "product_type": "loose_pack",
+      "language": "English",
+      "year": 2024,
+      "image": "https://…",
+      "market_value": 9.5,
+      "in_stock": 140,
+      "odds": 0.3
     }
   ]
 }
