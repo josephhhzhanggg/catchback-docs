@@ -1,0 +1,82 @@
+---
+title: "Rate limits"
+description: "Every limit on the Partner API, per endpoint: how often, how many per day, how many per request, and what you get back when you hit one."
+---
+
+The limits protect the inventory that every CatchBack customer shares. They are counted per API key, and a day is a UTC day, from midnight to midnight UTC. Each limit below is a default that we set per key: [contact us](mailto:catchbackcards@gmail.com) if yours don't fit your volume.
+
+## Per endpoint
+
+| Endpoint | Limit (default) | When you go over |
+|---|---|---|
+| [Buy packs](/partner-api/endpoints/buy-packs) | One request per 60 seconds | `429 RATE_LIMITED`, with a `Retry-After` header |
+| [Buy packs](/partner-api/endpoints/buy-packs) | 100 packs per UTC day | `429 DAILY_LIMIT_REACHED` |
+| [Buy packs](/partner-api/endpoints/buy-packs) | Up to 10 packs per request, or the pack's `max_quantity` if that is lower | `400` |
+| [Buy a card](/partner-api/endpoints/buy-card) | 25 cards per UTC day | `429 DAILY_CARD_LIMIT_REACHED` |
+| [Buy a card](/partner-api/endpoints/buy-card) | $50,000 of spend per UTC day, the $1 fees included | `429 DAILY_CARD_LIMIT_REACHED` |
+| [Sell back cards](/partner-api/endpoints/sell-back) | Up to 10 items per request | `400` |
+| [List a card](/partner-api/endpoints/list-card), [Delist a card](/partner-api/endpoints/delist-card) | No rate limit | |
+| Every read endpoint | No rate limit; page sizes are capped (see [Pagination](/partner-api/pagination)) | |
+
+Card buys have no per-minute limit, and sell-backs aren't rate-limited. Reads aren't either, but keys are monitored: a full catalog sync a few times an hour is fine; polling every few seconds is not.
+
+## Pack purchases
+
+- **Speed:** one purchase request per key every 60 seconds. One request can open several packs, so a bot that wants five packs sends one request with `quantity: 5`, not five requests.
+- **Daily ceiling:** 100 packs per UTC day, counting completed orders. A request is refused whole if it would take you over: with 97 used, a request for 5 is a `429` even though 3 would fit.
+- **Per request:** 1–10 packs of one type. [List packs](/partner-api/endpoints/list-packs) gives each pack's `max_quantity`: `1` for the Starter, sealed mystery packs and community packs, and `5` for watch packs. More than that is a `400`.
+
+The daily ceiling is checked first, then the speed limit. A refused request charges nothing and doesn't use up your slot for the minute. A purchase that fails after it starts hands the slot back too, so a fixable error doesn't cost you a minute. A retry of an order you already sent (the same `Idempotency-Key`) skips both checks: you can always find out what your first attempt did.
+
+```json 429 RATE_LIMITED
+{
+  "error": "Rate limited: one purchase per key every 60 seconds.",
+  "code": "RATE_LIMITED",
+  "retry_after_seconds": 43
+}
+```
+
+```json 429 DAILY_LIMIT_REACHED
+{
+  "error": "Daily limit reached: 100 packs per day (98 used).",
+  "code": "DAILY_LIMIT_REACHED",
+  "limit": 100,
+  "used": 98,
+  "resets_at": "2026-10-29T00:00:00.000Z"
+}
+```
+
+## Card purchases
+
+- **Cards:** 25 per UTC day.
+- **Spend:** $50,000 per UTC day: each card's price plus its $1 buyer fee.
+
+Both count the shop and user listings together. A finished order counts what it charged. An order that is still running counts at its `max_price` + $1, so parallel orders can't all pass the check and overshoot the cap. A refused order charges nothing and frees its order id, so you can send it again after `resets_at`.
+
+```json 429 DAILY_CARD_LIMIT_REACHED
+{
+  "error": "Daily card limit reached: 25 cards / $50000 per day.",
+  "code": "DAILY_CARD_LIMIT_REACHED",
+  "cards_used": 25,
+  "max_cards_per_day": 25,
+  "spend_used": 18240.5,
+  "max_card_spend_per_day": 50000,
+  "resets_at": "2026-10-29T00:00:00.000Z"
+}
+```
+
+## Which 429s send Retry-After
+
+| Code | `Retry-After` header | When to try again |
+|---|---|---|
+| `RATE_LIMITED` | Yes, the same number of seconds as `retry_after_seconds` | After that many seconds |
+| `DAILY_LIMIT_REACHED` | No | After `resets_at`, the next midnight UTC |
+| `DAILY_CARD_LIMIT_REACHED` | No | After `resets_at`, the next midnight UTC |
+
+## When we can't count
+
+If we can't read your usage for today, a purchase is refused with a `503` and nothing is charged: the limit checks fail closed rather than let an order through uncounted. Retry with backoff, with the same order id.
+
+## Check where you stand
+
+[Get account](/partner-api/endpoints/get-account) returns your pack usage (`limits`, including `next_purchase_at`, the earliest your next pack purchase is allowed) and your card usage (`card_limits`), so a bot can plan its next purchase without hitting a `429`.

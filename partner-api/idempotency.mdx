@@ -1,0 +1,94 @@
+---
+title: "Idempotency"
+description: "Order ids make every purchase safe to retry: how to choose one, what a retry returns, and what happens to an order that was interrupted."
+---
+
+[Buy packs](/partner-api/endpoints/buy-packs) and [Buy a card](/partner-api/endpoints/buy-card) spend your balance, so each one requires an `Idempotency-Key` header: your own id for the order. We record it before anything is charged, and from then on that order is charged at most once, however many times you send it.
+
+<Warning>
+  Generate one order id per order and reuse it on every attempt of that order. A new id is a new order: a second set of packs, or a second card.
+</Warning>
+
+## The order id
+
+- **Header:** `Idempotency-Key`. Through the [MCP server](/partner-api/mcp), the `buy_packs` and `buy_card` tools take it as `order_id`.
+- **Format:** 8–128 characters of `A-Z`, `a-z`, `0-9`, `_` and `-`. A UUID works. A missing header is a `400` (`"Idempotency-Key header is required"`), and so is one in the wrong format.
+- **Scope:** unique per CatchBack account, across pack and card orders together. Every API key linked to the same account shares the same ids, and an id used for a pack order can't be reused for a card order (`422 IDEMPOTENCY_KEY_REUSED`).
+- **Lifetime:** an id doesn't expire. A finished order keeps returning its original response to that id.
+
+## What a retry returns
+
+| You send an order id that… | You get | Charged? |
+|---|---|---|
+| Is new | The order runs | Once |
+| Belongs to an order that finished | The stored response, with its original status, plus `"idempotent_replay": true` | No, not again |
+| Belongs to an order that is still running | `409 IDEMPOTENCY_IN_PROGRESS`, with the order's `checkout_id` and `started_at`. Resend shortly | No, not again |
+| Belongs to an attempt that failed just as you sent this one | `409 IDEMPOTENCY_RETRY`. Resend it | No |
+| Belongs to an order that failed earlier | The order runs again: a failed order refunds itself and frees its id | Once, if it succeeds this time |
+| Was used for a different body | `422 IDEMPOTENCY_KEY_REUSED`. Use a new id for a different order | No |
+
+Only a new order is checked against your [rate limits](/partner-api/rate-limits): a replay or an in-progress answer never counts against them, so you can always find out what your first attempt did.
+
+```json 409 IDEMPOTENCY_IN_PROGRESS
+{
+  "error": "A purchase with this idempotency key is still in progress.",
+  "code": "IDEMPOTENCY_IN_PROGRESS",
+  "checkout_id": "c8baa66a-4f1e-4a70-9a3c-2b6d1e9f0a11",
+  "started_at": "2026-10-28T20:19:55.120934+00:00"
+}
+```
+
+## What counts as the same order
+
+A retry must send the same body as the first attempt. We compare the fields that define the order, after filling in their defaults, so leaving out a default and sending it explicitly are the same order:
+
+| Endpoint | The order is |
+|---|---|
+| Buy packs | `pack_type`, `category` (default `pokemon`), `quantity` (default `1`) and `risk_level` (default `standard`) |
+| Buy a card | `card_id` and `max_price` |
+
+Anything else is a different order, and reusing the id for it is a `422`.
+
+## Timeouts and interrupted orders
+
+A purchase can take up to 60 seconds, so set your client's timeout above that. If a request times out or the connection drops, you can't tell whether it went through: resend the same order id. You get the finished order, or `409 IDEMPOTENCY_IN_PROGRESS` while it is still running.
+
+If a request is cut off on our side after the charge (a timeout, a crash, a deploy), the order stays in progress until we close it from our own records. We check every 5 minutes for orders that have been running for more than 5, so it usually takes about 10 minutes. From then on, your resend returns a shorter body than the original, marked `"reconciled": true`:
+
+<CodeGroup>
+```json Pack order
+{
+  "checkout_id": "c8baa66a-4f1e-4a70-9a3c-2b6d1e9f0a11",
+  "pack_type": "bronze",
+  "quantity": 2,
+  "total_charged": 50,
+  "pull_ids": ["fe04349b-…", "1d7c0a52-…"],
+  "reconciled": true,
+  "message": "This order completed but its response was lost. The items are in your vault.",
+  "idempotent_replay": true
+}
+```
+
+```json Card order
+{
+  "checkout_id": "5d1c…",
+  "transaction_id": "a17e…",
+  "card_id": "0e94dc61-…",
+  "source": "shop",
+  "listing_id": null,
+  "price": 1450,
+  "total_charged": 1451,
+  "reconciled": true,
+  "message": "This order completed but its response was lost. The card is in your vault.",
+  "idempotent_replay": true
+}
+```
+</CodeGroup>
+
+A reconciled pack order has no `pulls`, no `summary` and no `remaining_balance`. Its `pull_ids` are the `pull_id`s of the pulls, and the cards are already in your vault: read them, with their CatchBack offers, from [Get vault](/partner-api/endpoints/get-vault). A reconciled card order has no `fee`, `remaining_balance` or `item`.
+
+If an order still answers `409` after 30 minutes, we couldn't prove from our records that it went through. Contact us with the order id and the `checkout_id`.
+
+## Card buys that need review
+
+A card buy can return `"needs_review": true`. On a `200` the card is yours and only our bookkeeping needs a check. On an error, you were charged and the order didn't finish cleanly, so it stays in progress and we're alerted to settle it by hand. Either way, don't retry under a new order id. Details: [Errors](/partner-api/errors-and-limits#when-a-card-buy-needs-review).

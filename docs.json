@@ -74,11 +74,20 @@
             "group": "Get started",
             "pages": [
               "partner-api/introduction",
+              "partner-api/quickstart",
               "partner-api/how-it-works",
               "partner-api/authentication",
-              "partner-api/errors-and-limits",
-              "partner-api/card-object",
               "partner-api/mcp"
+            ]
+          },
+          {
+            "group": "Core concepts",
+            "pages": [
+              "partner-api/errors-and-limits",
+              "partner-api/rate-limits",
+              "partner-api/idempotency",
+              "partner-api/pagination",
+              "partner-api/card-object"
             ]
           },
           {
@@ -112,6 +121,12 @@
             "group": "Reporting",
             "pages": [
               "partner-api/endpoints/purchase-report"
+            ]
+          },
+          {
+            "group": "Updates",
+            "pages": [
+              "partner-api/changelog"
             ]
           }
         ]

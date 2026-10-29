@@ -8,7 +8,7 @@ Scope: `sell:cards` · MCP tool: `sell_back_cards`
 
 Pays the same rate a customer gets. A pulled card: the pull's fresh rate (90%) within 5 minutes of the pull, then 80% of the value at pull for 7 days, then 80% of market value. A [bought card](/partner-api/endpoints/buy-card): 80% of the lower of the price you paid and its market value at purchase for 7 days, then 80% of market value. See [Liquidity](/about-catchback/liquidity).
 
-Items run in order, and one failing doesn't stop the rest. A pull or purchase pays out only once: selling it again returns `already_sold` with the earlier sale, so a retry is always safe. Cards only; sealed packs from consolation pulls can't be sold back through the API yet. Sell-back is not rate-limited.
+Items run in order, and one failing doesn't stop the rest. A pull or purchase pays out only once: selling it again returns `already_sold` with the earlier sale, so a retry is always safe. Cards only; sealed packs from consolation pulls can't be sold back through the API yet. A luxury goods item (category `goods`) sells back only within 5 minutes of its pull. Sell-back is not rate-limited.
 
 <ParamField body="items" type="object[]" required>
   1–10 cards, each `{ card_id, pull_id }` for a pulled card or `{ card_id, purchase_id }` for a bought one (exactly one of the two). Take them from [Get vault](/partner-api/endpoints/get-vault), from the pulls in [Buy packs](/partner-api/endpoints/buy-packs) (item `id` and `pull_id`), or from [Buy a card](/partner-api/endpoints/buy-card) (`card_id` and `transaction_id` as `purchase_id`). A listed card must be delisted first.
@@ -16,20 +16,41 @@ Items run in order, and one failing doesn't stop the rest. A pull or purchase pa
 
 ## Response
 
-<ResponseField name="total_paid" type="number">USD credited across all items.</ResponseField>
-<ResponseField name="remaining_balance" type="number" />
+<ResponseField name="total_paid" type="number">USD credited by this request: the `sold` items only. An `already_sold` item was paid earlier and isn't counted again.</ResponseField>
+<ResponseField name="remaining_balance" type="number | null">Your CatchCoins balance after the request, or `null` if we couldn't read it.</ResponseField>
 <ResponseField name="results" type="object[]">
+  One per item, in the order you sent them.
   <Expandable title="result">
     <ResponseField name="card_id" type="string" />
     <ResponseField name="pull_id" type="string">Echoed when you sent one.</ResponseField>
     <ResponseField name="purchase_id" type="string">Echoed when you sent one.</ResponseField>
     <ResponseField name="status" type="string">`sold`, `already_sold` (paid earlier; the earlier sale is returned), or `failed` (with `error`).</ResponseField>
-    <ResponseField name="transaction_id" type="string" />
-    <ResponseField name="payout_amount" type="number" />
-    <ResponseField name="payout_rate" type="number" />
-    <ResponseField name="error" type="string">Why it failed, when `status` is `failed`.</ResponseField>
+    <ResponseField name="transaction_id" type="string">The sell-back. For `already_sold`, the earlier one. Not on `failed`.</ResponseField>
+    <ResponseField name="payout_amount" type="number">What the sell-back paid. For `already_sold`, what the earlier one paid. Not on `failed`.</ResponseField>
+    <ResponseField name="payout_rate" type="number">The rate it paid at. Only on `sold`.</ResponseField>
+    <ResponseField name="error" type="string">Why it failed. Only on `failed`.</ResponseField>
+    <ResponseField name="code" type="string">A machine-readable reason, on some `failed` items. See the table below.</ResponseField>
   </Expandable>
 </ResponseField>
+
+## Errors
+
+The whole request is refused when:
+
+| Status | When |
+|---|---|
+| `400` | The body isn't JSON, `items` is missing, empty or longer than 10, an item lacks a UUID `card_id` or doesn't have exactly one of `pull_id` and `purchase_id`, or the same card is listed twice |
+| `403` | The key lacks `sell:cards` or isn't linked to an account, or the account is unavailable |
+
+Otherwise the response is a `200`, and each item that couldn't be sold comes back with `status: "failed"`, an `error`, and sometimes a `code`:
+
+| Code | When |
+|---|---|
+| `CARD_LISTED_ON_MARKETPLACE` | The card is listed. [Delist it](/partner-api/endpoints/delist-card) first |
+| `GOODS_SELLBACK_WINDOW_CLOSED` | A luxury goods item, more than 5 minutes after its pull |
+| `CARD_IN_BATTLE` | The card is held by a pack battle that hasn't finished |
+
+A `failed` item without a `code` explains itself in `error`, e.g. a `purchase_id` that isn't a purchase of this card by your account, or a card that has shipped. Read `error` for anything you don't branch on.
 
 <RequestExample>
 ```bash cURL
@@ -53,6 +74,29 @@ curl -X POST https://catchbackcards.com/api/partner/v1/cards/sell-back \
       "transaction_id": "93727497-…",
       "payout_amount": 16.2,
       "payout_rate": 0.9
+    }
+  ]
+}
+```
+
+```json 200 (retry and a failure)
+{
+  "total_paid": 0,
+  "remaining_balance": 189937,
+  "results": [
+    {
+      "card_id": "bee48cce-…",
+      "pull_id": "873deb80-…",
+      "status": "already_sold",
+      "transaction_id": "93727497-…",
+      "payout_amount": 16.2
+    },
+    {
+      "card_id": "0e94dc61-…",
+      "purchase_id": "a17e…",
+      "status": "failed",
+      "error": "Remove this card from the marketplace before using CatchBack.",
+      "code": "CARD_LISTED_ON_MARKETPLACE"
     }
   ]
 }

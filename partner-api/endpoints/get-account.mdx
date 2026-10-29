@@ -6,20 +6,20 @@ description: "Your balance, and where you stand against your pack and card limit
 
 Scope: `read:account` · MCP tool: `get_balance`
 
-Enough to plan your next pack or card purchase without hitting a `429`. See [Purchase limits](/partner-api/errors-and-limits#purchase-limits).
+Enough to plan your next pack or card purchase without hitting a `429`. See [Rate limits](/partner-api/rate-limits).
 
 ## Response
 
-<ResponseField name="username" type="string" />
+<ResponseField name="username" type="string | null" />
 <ResponseField name="balance" type="number">CatchCoins balance in USD.</ResponseField>
 <ResponseField name="limits" type="object">
   <Expandable title="limits">
-    <ResponseField name="packs_today" type="integer">Packs opened this UTC day.</ResponseField>
+    <ResponseField name="packs_today" type="integer | null">Packs opened this UTC day. `null` if we couldn't count them.</ResponseField>
     <ResponseField name="max_packs_per_day" type="integer" />
-    <ResponseField name="packs_left_today" type="integer" />
+    <ResponseField name="packs_left_today" type="integer | null">`null` when `packs_today` is.</ResponseField>
     <ResponseField name="resets_at" type="string">Next midnight UTC.</ResponseField>
     <ResponseField name="min_seconds_between_purchases" type="integer" />
-    <ResponseField name="next_purchase_at" type="string">The earliest your next pack purchase is allowed.</ResponseField>
+    <ResponseField name="next_purchase_at" type="string">The earliest your next pack purchase is allowed. Now, if you can buy already.</ResponseField>
   </Expandable>
 </ResponseField>
 <ResponseField name="card_limits" type="object">

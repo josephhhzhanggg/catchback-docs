@@ -1,0 +1,149 @@
+---
+title: "Quickstart"
+description: "From a new API key to opening a pack and selling a pull back, end to end, with cURL."
+---
+
+This walk-through takes a new key from its first call to opening one pack and selling a card from it back to CatchBack. Every command runs as-is in bash or zsh; the last steps use [`jq`](https://jqlang.org) to read the purchase response.
+
+<Warning>
+  There's no sandbox: steps 5 and 6 spend and credit real CatchCoins on your account. Use a cheap pack the first time.
+</Warning>
+
+## Before you start
+
+You need a CatchBack account with a funded CatchCoins balance and an API key linked to it, with at least the `read:catalog`, `read:account`, `rip:packs` and `sell:cards` [scopes](/partner-api/authentication#scopes). We create the key and credit your balance when your wire lands. To get set up, or to talk funding, pricing or revenue share, [contact us](mailto:catchbackcards@gmail.com).
+
+Keep the key in an environment variable, never in code:
+
+```bash
+export CATCHBACK_KEY="cb_live_..."
+export CB="https://catchbackcards.com/api/partner/v1"
+```
+
+<Steps>
+  <Step title="Check which account your key acts as">
+    [Who am I](/partner-api/endpoints/get-me) works with any valid key.
+
+    ```bash
+    curl "$CB/me" -H "Authorization: Bearer $CATCHBACK_KEY"
+    ```
+
+    You want `"linked": true` and the scopes above in `key.scopes`. Quote `account.id` whenever you contact us.
+
+    ```json
+    {
+      "key": {
+        "name": "acme",
+        "scopes": ["read:catalog", "read:account", "rip:packs", "sell:cards"]
+      },
+      "linked": true,
+      "account": {
+        "id": "6f1c2a9e-3b4d-4c7a-9e21-5d8f0b7a1c34",
+        "username": "acme-cards",
+        "profile_url": "https://catchbackcards.com/user/acme-cards"
+      }
+    }
+    ```
+  </Step>
+  <Step title="Check your balance and limits">
+    [Get account](/partner-api/endpoints/get-account) shows your balance, how many packs you can still open today, and `next_purchase_at`, the earliest you can buy.
+
+    ```bash
+    curl "$CB/account" -H "Authorization: Bearer $CATCHBACK_KEY"
+    ```
+  </Step>
+  <Step title="Pick a pack">
+    [List packs](/partner-api/endpoints/list-packs) returns exactly the packs you can buy, cheapest first, at the price you'll be charged.
+
+    ```bash
+    curl "$CB/catalog/packs?category=pokemon" \
+      -H "Authorization: Bearer $CATCHBACK_KEY"
+    ```
+
+    Note a `pack_type` with `"available": true`. This guide uses `bronze`.
+  </Step>
+  <Step title="Look inside it (optional)">
+    [Get a pack's pool](/partner-api/endpoints/get-pack-pool) shows the value bands, their odds at your risk level, and every card a pull can produce right now.
+
+    ```bash
+    curl "$CB/catalog/packs/pool?pack_type=bronze&category=pokemon&risk_level=standard" \
+      -H "Authorization: Bearer $CATCHBACK_KEY"
+    ```
+  </Step>
+  <Step title="Open the pack">
+    [Buy packs](/partner-api/endpoints/buy-packs) needs an `Idempotency-Key`: your own id for this order. Make one per order, and keep it until you have a response, because it's what makes a retry safe.
+
+    ```bash
+    ORDER_ID="order-$(uuidgen)"
+
+    curl -X POST "$CB/packs/purchase" \
+      -H "Authorization: Bearer $CATCHBACK_KEY" \
+      -H "Idempotency-Key: $ORDER_ID" \
+      -H "Content-Type: application/json" \
+      -d '{ "pack_type": "bronze", "category": "pokemon", "quantity": 1 }' \
+      -o order.json
+
+    jq . order.json
+    ```
+
+    The pack is charged at list price and every pull is already in your vault. Each entry in `pulls` has its `pull_id`, the card as `item`, its `value`, and its CatchBack offer: `catchback.amount` if you sell it back before `catchback.valid_until` (5 minutes after the pull), and `catchback.after` once that window closes.
+
+    If the request times out or fails with a `5xx`, run the same `curl` again with the same `$ORDER_ID`. If the order went through you get it back; if it didn't, it runs again. Either way it's never charged twice. A `429 RATE_LIMITED` tells you how many seconds to wait. See [Idempotency](/partner-api/idempotency) and [Rate limits](/partner-api/rate-limits).
+  </Step>
+  <Step title="Sell the pull back">
+    To take the fresh rate, sell within 5 minutes of the pull. [Sell back cards](/partner-api/endpoints/sell-back) takes the card's id and its `pull_id`, both from the purchase response:
+
+    ```bash
+    ITEMS=$(jq -c '[.pulls[] | select(.kind == "card") | { card_id: .item.id, pull_id }][:1]' order.json)
+
+    curl -X POST "$CB/cards/sell-back" \
+      -H "Authorization: Bearer $CATCHBACK_KEY" \
+      -H "Content-Type: application/json" \
+      -d "{ \"items\": $ITEMS }"
+    ```
+
+    Each item comes back `sold`, with `payout_amount` and `payout_rate`, and `total_paid` is credited to your balance. Selling the same pull again returns `already_sold` with the earlier sale, so this call is safe to retry. If your pull was a sealed pack (`"kind": "sealed_pack"`), `ITEMS` is empty: sealed packs can't be sold back through the API.
+
+    ```json
+    {
+      "total_paid": 16.2,
+      "remaining_balance": 189937,
+      "results": [
+        {
+          "card_id": "bee48cce-…",
+          "pull_id": "873deb80-…",
+          "status": "sold",
+          "transaction_id": "93727497-…",
+          "payout_amount": 16.2,
+          "payout_rate": 0.9
+        }
+      ]
+    }
+    ```
+  </Step>
+  <Step title="See what you hold">
+    [Get vault](/partner-api/endpoints/get-vault) lists the cards you still hold, each with its sell-back offer right now.
+
+    ```bash
+    curl "$CB/vault?category=pokemon" \
+      -H "Authorization: Bearer $CATCHBACK_KEY"
+    ```
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Buy a card" icon="cart-shopping" href="/partner-api/endpoints/buy-card">
+    Search the shop and user listings, then buy one card with a price guard.
+  </Card>
+  <Card title="How it works" icon="diagram-project" href="/partner-api/how-it-works">
+    The whole lifecycle, and what each sell-back pays.
+  </Card>
+  <Card title="Errors" icon="triangle-exclamation" href="/partner-api/errors-and-limits">
+    Every status and error code, and what to do about it.
+  </Card>
+  <Card title="Connect an AI agent" icon="robot" href="/partner-api/mcp">
+    The same flow as MCP tools, with the same key.
+  </Card>
+</CardGroup>

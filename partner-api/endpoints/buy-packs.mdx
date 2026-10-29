@@ -11,11 +11,11 @@ Opens packs with your account's CatchCoins at list price, through the same check
 **All or nothing:** if any pack in the request fails to open, the whole order is refunded and none of its pulls stand.
 
 <Warning>
-  This endpoint spends money. Always send an `Idempotency-Key`, and reuse it when retrying the same order. See [Idempotency](/partner-api/errors-and-limits#idempotency-retrying-a-purchase-safely).
+  This endpoint spends money. Always send an `Idempotency-Key`, and reuse it when retrying the same order. See [Idempotency](/partner-api/idempotency).
 </Warning>
 
 <ParamField header="Idempotency-Key" type="string" required>
-  Your order id: 8–128 characters of `A-Za-z0-9_-`. Retrying with the same key returns the original result instead of charging again.
+  Your order id: 8–128 characters of `A-Za-z0-9_-`, unique per account across pack and card orders. Retrying with the same key returns the original result instead of charging again.
 </ParamField>
 <ParamField body="pack_type" type="string" required>
   A `pack_type` from [List packs](/partner-api/endpoints/list-packs).
@@ -24,7 +24,7 @@ Opens packs with your account's CatchCoins at list price, through the same check
   `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
 </ParamField>
 <ParamField body="quantity" type="integer" default="1">
-  1–10, up to the pack's `max_quantity`.
+  1–10, up to the pack's `max_quantity`. See [Rate limits](/partner-api/rate-limits#pack-purchases).
 </ParamField>
 <ParamField body="risk_level" type="string" default="standard">
   `chill`, `standard` or `aggressive` (shown as Chill, Standard and Hot in the app), from the pack's `risk_levels`. See [Risk levels](/about-catchback/risk-levels).
@@ -42,10 +42,10 @@ Opens packs with your account's CatchCoins at list price, through the same check
 </ResponseField>
 <ResponseField name="pulls" type="object[]">
   <Expandable title="pull">
-    <ResponseField name="pull_id" type="string">Keep this. [Sell back](/partner-api/endpoints/sell-back) needs it.</ResponseField>
+    <ResponseField name="pull_id" type="string">Keep this. [Sell back](/partner-api/endpoints/sell-back) needs it. It is the pull's `transaction_uuid` ([what that is](/partner-api/card-object#pull-and-purchase-ids)).</ResponseField>
     <ResponseField name="kind" type="string">`card`, or `sealed_pack` for a consolation pull.</ResponseField>
     <ResponseField name="item" type="object">A [card object](/partner-api/card-object). A sealed pack is `{ id, name, set, category, image_url }`.</ResponseField>
-    <ResponseField name="value" type="number">Market value at the moment of the pull.</ResponseField>
+    <ResponseField name="value" type="number | null">Market value at the moment of the pull. `null` when we have no value for the pull.</ResponseField>
     <ResponseField name="hit" type="object">
       `rarity_tier`, the `bucket` (band) it came from and that band's `bucket_odds`, `is_chase` and `chase_label`.
     </ResponseField>
@@ -60,12 +60,16 @@ Opens packs with your account's CatchCoins at list price, through the same check
 
 | Status | Code | When |
 |---|---|---|
-| `400` | | Missing `Idempotency-Key`, a bad parameter, not enough balance, or the pack can't be bought in multiples |
+| `400` | | Missing or malformed `Idempotency-Key`, a bad parameter, not enough balance, or the pack can't be bought in multiples |
+| `403` | | The key lacks `rip:packs`, isn't linked to an account, or the account is unavailable |
+| `403` | `FEATURE_RESTRICTED` | Opening packs is switched off for your account (`capability: "open_packs"`). Contact us |
 | `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running. Retry shortly with the same key |
+| `409` | `IDEMPOTENCY_RETRY` | An earlier attempt with this key failed just as this one arrived. Retry with the same key |
 | `422` | `IDEMPOTENCY_KEY_REUSED` | This key was already used for a different order |
-| `429` | `RATE_LIMITED` | Too soon after your last purchase. Wait `retry_after_seconds` |
+| `429` | `RATE_LIMITED` | Too soon after your last purchase. Wait `retry_after_seconds` (also the `Retry-After` header) |
 | `429` | `DAILY_LIMIT_REACHED` | Your daily pack ceiling would be exceeded. Resets at `resets_at` |
 | `500` | | A pack failed to open. The whole order was refunded |
+| `503` | | We couldn't count today's packs, record the order or take the payment. Nothing was charged; retry with the same key |
 
 <RequestExample>
 ```bash cURL

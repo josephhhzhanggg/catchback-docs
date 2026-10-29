@@ -6,16 +6,33 @@ description: "Put a card you hold up for sale on the CatchBack marketplace at a 
 
 Scope: `write:listings` · MCP tool: `list_card`
 
-Runs the same listing rules as our app: you must hold the card, the price must be above the marketplace minimum and at most 2x the card's market value, and the title is the card's name. A listed card can't be sold back until you [delist it](/partner-api/endpoints/delist-card).
+Runs the same listing rules as our app: you must hold the card, the price must be at least $5 and at most the larger of $5 and 2× the card's market value, and the title is the card's name. A card with no market value has no upper cap. A listed card can't be sold back until you [delist it](/partner-api/endpoints/delist-card).
 
-<ParamField body="card_id" type="string" required>A `card_id` from [Get vault](/partner-api/endpoints/get-vault).</ParamField>
-<ParamField body="price" type="number" required>Asking price in USD.</ParamField>
+<ParamField body="card_id" type="string" required>A `card_id` from [Get vault](/partner-api/endpoints/get-vault). A UUID.</ParamField>
+<ParamField body="price" type="number" required>
+  Asking price in USD: at least `5`, and at most `max(5, 2 × market_value)`, with the cap rounded to the cent. A card worth $40 can be listed from $5 to $80; a card worth $1, at $5 only.
+</ParamField>
 
 ## Response
 
 <ResponseField name="listing_id" type="string" />
 <ResponseField name="card_id" type="string" />
 <ResponseField name="price" type="number" />
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | | `card_id` isn't a UUID, or `price` isn't a positive number |
+| `400` | | You don't hold the card, or it's already listed |
+| `400` | | The price is below $5 (`"Listings must be priced at least $5"`) or above the cap (the message gives this card's maximum) |
+| `400` | | The card can't be listed: it has shipped, it's archived, it's an energy card, or it's a luxury goods item or raw single (those sell back or ship only) |
+| `400` | `CARD_ON_PACK_HOLD` | The card came from a pack that holds its cards: sell it back or ship it |
+| `403` | | The key lacks `write:listings` or isn't linked to an account |
+| `403` | `FEATURE_RESTRICTED` | The marketplace is switched off for your account (`capability: "marketplace"`). Contact us |
+| `404` | | The card isn't in your account |
+| `409` | | The card changed while we were listing it. Read your vault and try again |
+| `500` | | We couldn't create the listing. Retry with backoff |
 
 <RequestExample>
 ```bash cURL
@@ -29,5 +46,9 @@ curl -X POST https://catchbackcards.com/api/partner/v1/listings \
 <ResponseExample>
 ```json 200
 { "listing_id": "5f1c…", "card_id": "0e94dc61-…", "price": 45 }
+```
+
+```json 400
+{ "error": "Listings can't exceed 200% of market value — max $76.86 for this card" }
 ```
 </ResponseExample>

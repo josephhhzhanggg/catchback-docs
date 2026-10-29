@@ -1,41 +1,75 @@
 ---
 title: "Errors, retries and limits"
-description: "Error format, safe retries with idempotency keys, purchase limits, and how fresh our data is."
+description: "Error format, every error code, safe retries with idempotency keys, purchase limits, and how fresh our data is."
 ---
 
 ## Errors
 
-Error bodies are JSON with a human-readable `error`, and a machine-readable `code` where you might branch on it:
+Error bodies are JSON with a human-readable `error`, and a machine-readable `code` where you might branch on it. Some errors add fields that tell you what to do next:
 
 ```json
 { "error": "Rate limited: one purchase per key every 60 seconds.", "code": "RATE_LIMITED", "retry_after_seconds": 43 }
 ```
 
+Branch on the status and the `code`. The `error` text is for people and can change.
+
 | Status | Meaning |
 |---|---|
-| `400` | A bad parameter. The message says which |
+| `400` | A bad parameter or body, a missing or malformed `Idempotency-Key`, not enough balance, or something the endpoint won't do (a pack that can't be bought in multiples, a listing price out of range). The `error` says which |
 | `401` | Missing, malformed, disabled or unknown API key |
-| `403` | Your key lacks the scope, or the action needs a linked account |
-| `404` | The thing you asked for doesn't exist for your key (e.g. a pack you can't buy) |
-| `409` | `IDEMPOTENCY_IN_PROGRESS`: an order with this key is still running. Card buys also use `PRICE_CHANGED`, `CARD_NO_LONGER_AVAILABLE` and `OWN_LISTING` |
-| `422` | `IDEMPOTENCY_KEY_REUSED`: this key was used for a different order |
-| `429` | `RATE_LIMITED`, `DAILY_LIMIT_REACHED` or `DAILY_CARD_LIMIT_REACHED` |
-| `500` | Our fault. Safe to retry with backoff |
+| `403` | Your key lacks the endpoint's scope, the action needs a linked account, the account is unavailable, or `FEATURE_RESTRICTED` (below). A request from a region CatchBack doesn't serve can also get a `403`, with `"error": "Access denied"` |
+| `404` | The thing you asked for doesn't exist for your key (e.g. a pack you can't buy, or a card that doesn't exist) |
+| `409` | A conflict: an order that is still running (`IDEMPOTENCY_IN_PROGRESS`, `IDEMPOTENCY_RETRY`), or a card that changed since you looked (`PRICE_CHANGED`, `CARD_NO_LONGER_AVAILABLE`, `CARD_MOVED_TO_AUCTION`, `OWN_LISTING`) |
+| `422` | `IDEMPOTENCY_KEY_REUSED`: this order id was already used for a different order |
+| `429` | Over a limit: `RATE_LIMITED`, `DAILY_LIMIT_REACHED` or `DAILY_CARD_LIMIT_REACHED`. See [Rate limits](/partner-api/rate-limits) |
+| `500` | Our fault. Retry with backoff; for a purchase, resend the same order id, which can never charge the order twice |
+| `503` | We couldn't count your usage against a limit, record your order, or take the payment, so we refused before charging anything (the limit checks fail closed). Retry with backoff, with the same order id |
+
+### Error codes
+
+| Code | Status | Endpoints | What it means |
+|---|---|---|---|
+| `FEATURE_RESTRICTED` | `403` | [Buy packs](/partner-api/endpoints/buy-packs), [Buy a card](/partner-api/endpoints/buy-card), [List a card](/partner-api/endpoints/list-card) | We've switched this action off for your account. `capability` says which: `open_packs` or `marketplace`. Contact us |
+| `IDEMPOTENCY_IN_PROGRESS` | `409` | Buy packs, Buy a card | An order with this id is still running. The body has its `checkout_id` and `started_at`. Resend the same id shortly |
+| `IDEMPOTENCY_RETRY` | `409` | Buy packs, Buy a card | An earlier attempt with this id failed just as this one arrived, and freed the id. Resend the same id |
+| `IDEMPOTENCY_KEY_REUSED` | `422` | Buy packs, Buy a card | This id was already used for a different order. Use a new id |
+| `PRICE_CHANGED` | `409` | Buy a card | The card's price is now above your `max_price`. The body has the current `price`. Nothing was charged |
+| `CARD_NO_LONGER_AVAILABLE` | `409` | Buy a card | Sold, pulled from a pack, delisted, shipped or otherwise gone. Search again |
+| `CARD_MOVED_TO_AUCTION` | `409` | Buy a card | The card is now in an auction and no longer sold at a fixed price. The body has `listing_id` and `listing_type` |
+| `OWN_LISTING` | `409` | Buy a card | The card is your own listing |
+| `RATE_LIMITED` | `429` | Buy packs | Too soon after your last pack purchase. Wait `retry_after_seconds`, also sent as a `Retry-After` header |
+| `DAILY_LIMIT_REACHED` | `429` | Buy packs | Your daily pack ceiling. The body has `limit`, `used` and `resets_at` |
+| `DAILY_CARD_LIMIT_REACHED` | `429` | Buy a card | Your daily card or spend cap. The body has `cards_used`, `max_cards_per_day`, `spend_used`, `max_card_spend_per_day` and `resets_at` |
+| `CARD_ON_PACK_HOLD` | `400` | List a card | The card came from a pack that holds its cards: it can be sold back or shipped, not listed |
+
+[Sell back cards](/partner-api/endpoints/sell-back) answers `200` even when some items fail. Each failed item in `results` has `status: "failed"`, an `error`, and a `code` when there is one, e.g. `CARD_LISTED_ON_MARKETPLACE` (delist it first), `GOODS_SELLBACK_WINDOW_CLOSED` (a luxury goods item sells back only within 5 minutes of its pull) or `CARD_IN_BATTLE`.
+
+### When a card buy needs review
+
+[Buy a card](/partner-api/endpoints/buy-card) can add `"needs_review": true` to its body:
+
+- **On a `200`:** the sale went through and the card is yours, but our bookkeeping needs a manual check. Don't retry under a new order id.
+- **On an error:** you were charged and the order didn't finish cleanly: either the card is yours but the sale couldn't be fully recorded, or the refund didn't go through (the body also says `refund_pending`). The order stays open, so resends return `409 IDEMPOTENCY_IN_PROGRESS`, and we're alerted to settle it by hand. Quote the `checkout_id` if you contact us.
 
 ## Idempotency: retrying a purchase safely
 
 Every [pack purchase](/partner-api/endpoints/buy-packs) and [card purchase](/partner-api/endpoints/buy-card) requires an `Idempotency-Key` header: 8–128 characters of `A-Za-z0-9_-`. Use your own order id. It is what makes a retry after a timeout or network error safe.
 
+Idempotency keys are unique per CatchBack account, across pack and card orders together: an id you used for a pack order can't be reused for a card order, and every API key linked to the same account draws from the same set.
+
 | You retry with… | You get |
 |---|---|
 | The same key, and the order finished | The original response again, with `"idempotent_replay": true`. Nothing is charged twice |
 | The same key, while the order is still running | `409 IDEMPOTENCY_IN_PROGRESS`. Retry shortly with the same key |
+| The same key, just as an earlier attempt failed | `409 IDEMPOTENCY_RETRY`. Retry with the same key |
 | The same key, but a different body | `422 IDEMPOTENCY_KEY_REUSED` |
 | The same key, after the order failed | It runs again. A failed order refunds itself and releases the key |
 
 <Tip>
   Generate one key per order, and reuse it on every attempt of that order. Make a new one only after a success.
 </Tip>
+
+The full rules, including what an interrupted order returns: [Idempotency](/partner-api/idempotency).
 
 ## Purchase limits
 
@@ -44,7 +78,7 @@ Pack purchases are limited per key to protect the shared pack inventory:
 - **Speed:** one purchase request per minute by default (each request can open several packs). Too soon is a `429 RATE_LIMITED` with a `Retry-After` header and `retry_after_seconds`.
 - **Daily ceiling:** 100 packs per UTC day by default. Going over is a `429 DAILY_LIMIT_REACHED` with `limit`, `used` and `resets_at` (next midnight UTC).
 
-A retry of an order you already sent never counts against either limit, so you can always find out what happened. A purchase that fails gives its slot back. Both limits are set per partner; talk to us if yours don't fit your volume. [`GET /account`](/partner-api/endpoints/get-account) tells you where you stand before you buy.
+A retry of an order you already sent never counts against either limit, so you can always find out what happened. A purchase that fails gives its slot back. If we can't count today's packs, the purchase is a `503` and nothing is charged. Both limits are set per partner; talk to us if yours don't fit your volume. [`GET /account`](/partner-api/endpoints/get-account) tells you where you stand before you buy. Every limit, per endpoint: [Rate limits](/partner-api/rate-limits).
 
 ### Card limits
 
@@ -53,7 +87,7 @@ Card buys have no per-minute limit, but each key has daily caps, counted per UTC
 - **Cards:** 25 per day by default.
 - **Spend:** $50,000 per day by default.
 
-Going over either is a `429 DAILY_CARD_LIMIT_REACHED` with `cards_used`, `max_cards_per_day`, `spend_used`, `max_card_spend_per_day` and `resets_at`. An order still running counts at its `max_price` + $1, so parallel orders can't all slip under the cap. A refused order charges nothing. Both caps are set per partner, and [`GET /account`](/partner-api/endpoints/get-account) shows where you stand (`card_limits`).
+Going over either is a `429 DAILY_CARD_LIMIT_REACHED` with `cards_used`, `max_cards_per_day`, `spend_used`, `max_card_spend_per_day` and `resets_at`. An order still running counts at its `max_price` + $1, so parallel orders can't all slip under the cap. A refused order charges nothing, and if we can't count today's orders the buy is a `503`. Both caps are set per partner, and [`GET /account`](/partner-api/endpoints/get-account) shows where you stand (`card_limits`).
 
 Reads, sell-backs and listings are not rate-limited, but keys are monitored. A full catalog sync a few times an hour is fine; polling every few seconds is not.
 

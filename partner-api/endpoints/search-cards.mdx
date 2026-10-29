@@ -11,23 +11,31 @@ Each result is buyable with [Buy a card](/partner-api/endpoints/buy-card) unless
 <ParamField query="category" type="string" default="pokemon">
   `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
 </ParamField>
-<ParamField query="q" type="string">Text in the card name, slab label or set, e.g. `charizard`. 2–60 characters.</ParamField>
-<ParamField query="grading_company" type="string">e.g. `PSA`, `BGS`, `CGC`.</ParamField>
+<ParamField query="q" type="string">
+  Text in the card name, slab label or set, e.g. `charizard`. 2–60 characters, each a letter, a digit, a space, or one of `'` `&` `.` `-`. Anything else is a `400`.
+</ParamField>
+<ParamField query="grading_company" type="string">
+  2–10 letters, e.g. `PSA`, `BGS`, `CGC`. Matched without regard to case.
+</ParamField>
 <ParamField query="min_grade" type="number" />
 <ParamField query="max_grade" type="number" />
 <ParamField query="min_price" type="number">Dollars.</ParamField>
 <ParamField query="max_price" type="number">Dollars.</ParamField>
 <ParamField query="source" type="string" default="all">`all`, `shop` (CatchBack stock) or `listing` (another user's fixed-price listing).</ParamField>
-<ParamField query="sort" type="string" default="price_asc">`price_asc` or `price_desc`.</ParamField>
-<ParamField query="page" type="integer" default="1">1–20.</ParamField>
-<ParamField query="per_page" type="integer" default="50">1–100.</ParamField>
+<ParamField query="sort" type="string" default="price_asc">`price_asc` or `price_desc`. Equal prices are ordered by `card_id`.</ParamField>
+<ParamField query="page" type="integer" default="1">1–20. A higher page is treated as 20. See [Pagination](/partner-api/pagination).</ParamField>
+<ParamField query="per_page" type="integer" default="50">1–100. A higher value is treated as 100.</ParamField>
+
+<Note>
+  The `q`, `grading_company` and grade filters are applied to user listings after we take the first 500 listings in the category by price (cheapest first, or priciest first with `price_desc`). In a category with more listings than that, a filtered search can miss matches past the first 500, and `has_more` stays `true`. `min_price` and `max_price` apply before that cut, so a price band reaches the rest. Shop stock is filtered in full.
+</Note>
 
 ## Response
 
 <ResponseField name="category" type="string" />
 <ResponseField name="page" type="integer" />
 <ResponseField name="per_page" type="integer" />
-<ResponseField name="has_more" type="boolean">Whether another page exists.</ResponseField>
+<ResponseField name="has_more" type="boolean">Whether another page may exist. It can still be `true` on page 20, the last page you can ask for: narrow the filters to see more.</ResponseField>
 <ResponseField name="results" type="object[]">
   <Expandable title="result">
     <ResponseField name="card_id" type="string">Pass to [Buy a card](/partner-api/endpoints/buy-card).</ResponseField>
@@ -39,6 +47,17 @@ Each result is buyable with [Buy a card](/partner-api/endpoints/buy-card) unless
     <ResponseField name="item" type="object">A [card object](/partner-api/card-object).</ResponseField>
   </Expandable>
 </ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | An unknown `category` (the five above) |
+| `400` | `q` shorter than 2 or longer than 60 characters, or with a character outside letters, digits, spaces and `'` `&` `.` `-` |
+| `400` | `grading_company` that isn't 2–10 letters |
+| `400` | `min_grade`, `max_grade`, `min_price` or `max_price` that isn't a number |
+| `400` | `source` other than `all`, `shop` or `listing`, or `sort` other than `price_asc` or `price_desc` |
+| `500` | We couldn't run the search. Retry with backoff |
 
 <RequestExample>
 ```bash cURL

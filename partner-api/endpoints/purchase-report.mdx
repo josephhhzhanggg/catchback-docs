@@ -10,10 +10,12 @@ Every completed pack purchase in a window, priced the same way our own revenue r
 
 It returns nothing about what was pulled and nothing about the buyer beyond an opaque id: no cards, no email, username, phone, address or balance. That is permanent for this scope.
 
+`read:pulls` is opt-in ([Scopes](/partner-api/authentication#scopes)). This report gives you the numbers to reconcile; revenue-share terms themselves are agreed per partner, so [contact us](mailto:catchbackcards@gmail.com) about them.
+
 <ParamField query="since" type="string">ISO 8601, inclusive. Defaults to `until` minus 7 days.</ParamField>
 <ParamField query="until" type="string">ISO 8601, inclusive. Defaults to now.</ParamField>
-<ParamField query="page" type="integer" default="1">1-based.</ParamField>
-<ParamField query="per_page" type="integer" default="500">1–1000.</ParamField>
+<ParamField query="page" type="integer" default="1">1-based. See [Pagination](/partner-api/pagination).</ParamField>
+<ParamField query="per_page" type="integer" default="500">1–1000. A higher value is treated as 1000.</ParamField>
 
 The window is capped at **31 days**, and a malformed or inverted window is a `400`. There is no "all of history" mode, so pull a long report a month at a time.
 
@@ -27,14 +29,16 @@ The window is capped at **31 days**, and a malformed or inverted window is a `40
 <ResponseField name="until" type="string" />
 <ResponseField name="page" type="integer" />
 <ResponseField name="per_page" type="integer" />
-<ResponseField name="total" type="integer" />
+<ResponseField name="total" type="integer | null">Purchases in the window, across all pages.</ResponseField>
 <ResponseField name="pulls" type="object[]">
   <Expandable title="purchase">
     <ResponseField name="user_id" type="string">The buyer's opaque, stable CatchBack id. Join on it.</ResponseField>
     <ResponseField name="created_at" type="string">When the pack was bought (UTC).</ResponseField>
     <ResponseField name="amount" type="number">Sale price in USD.</ResponseField>
-    <ResponseField name="source" type="string">The catalog: `pokemon`, `onepiece`, `sports`, `riftbound`, `custom`, `loose` or `steph`.</ResponseField>
-    <ResponseField name="pack_type" type="string">The tier or named pack.</ResponseField>
+    <ResponseField name="source" type="string">
+      Where the sale is booked: a catalog (`pokemon`, `onepiece`, `sports`, `riftbound`, `watches`, `goods` or `singles`) or a pack line (`custom` for custom packs, `loose` for sealed product packs, `steph` for the Steph Curry pack). A raw single is booked to the catalog of the pack it came from, so `singles` appears only when that catalog isn't recorded. New values can be added, so don't fail on one you don't know.
+    </ResponseField>
+    <ResponseField name="pack_type" type="string">The tier or named pack. Base packs report `Base` or `Mega Base`.</ResponseField>
   </Expandable>
 </ResponseField>
 
