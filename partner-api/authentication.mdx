@@ -1,6 +1,6 @@
 ---
 title: "Authentication"
-description: "API keys, scopes, and keeping your key safe."
+description: "API keys, scopes, which endpoint each scope unlocks, and keeping your key safe."
 ---
 
 Every request sends your API key as a bearer token:
@@ -9,31 +9,55 @@ Every request sends your API key as a bearer token:
 Authorization: Bearer cb_live_...
 ```
 
-A missing, malformed, disabled or unknown key is a `401`.
+A key is `cb_live_` followed by 48 hexadecimal characters. We store only a hash of it, so we can't show it to you again: keep it safe when you receive it.
+
+A missing or malformed key is a `401` with `"error": "Missing or malformed API key"`. A disabled or unknown key is a `401` with `"error": "Invalid API key"`.
 
 ## Scopes
 
-Each key carries a set of scopes, and every endpoint except [Who am I](/partner-api/endpoints/get-me) requires exactly one. Calling an endpoint your key has no scope for is a `403`. We grant scopes per partner; ask us if you need one you don't have.
+Each key carries a set of scopes, and every endpoint except [Who am I](/partner-api/endpoints/get-me) requires exactly one. Calling an endpoint your key has no scope for is a `403` (`"error": "API key lacks required scope: <scope>"`). We grant scopes per partner; ask us if you need one you don't have.
 
-| Scope | Lets you | Moves money |
-|---|---|---|
-| `read:catalog` | See the packs you can buy, what each pack can pull, and every card for sale (shop and user listings) | No |
-| `read:account` | See your balance, limits and the cards you hold | No |
-| `rip:packs` | Open packs with your CatchCoins | **Yes** |
-| `buy:cards` | Buy cards from the shop and user listings with your CatchCoins | **Yes** |
-| `sell:cards` | Sell cards back to CatchBack for CatchCoins | **Yes** |
-| `write:listings` | List held cards on the marketplace, and take listings down | No |
-| `read:pulls` | Revenue-share report of completed pack purchases | No |
+| Scope | Lets you | Moves money | Granted |
+|---|---|---|---|
+| `read:catalog` | See the packs you can buy, what each pack can pull, and every card for sale (shop and user listings) | No | Standard |
+| `read:account` | See your balance, limits and the cards you hold | No | Standard |
+| `rip:packs` | Open packs with your CatchCoins | **Yes** | Standard |
+| `buy:cards` | Buy cards from the shop and user listings with your CatchCoins | **Yes** | Standard |
+| `sell:cards` | Sell cards back to CatchBack for CatchCoins | **Yes** | Standard |
+| `write:listings` | List held cards on the marketplace, and take listings down | No | Standard |
+| `read:pulls` | Revenue-share report of completed pack purchases | No | **Opt-in** |
 
-Account actions (`read:account`, `rip:packs`, `buy:cards`, `sell:cards`, `write:listings`) also need the key to be linked to a CatchBack account. An unlinked key gets a `403` on them. [Who am I](/partner-api/endpoints/get-me) shows whether your key is linked, and to which account.
+Standard scopes are the usual set for a partner key; we may leave out any you don't need. `read:pulls` is opt-in: it's never on a new key by default, and we grant it on request for revenue-share reporting.
+
+Account actions (`read:account`, `rip:packs`, `buy:cards`, `sell:cards`, `write:listings`) also need the key to be linked to a CatchBack account. An unlinked key gets a `403` on them (`"error": "This API key is not linked to a CatchBack account"`). [Who am I](/partner-api/endpoints/get-me) shows whether your key is linked, and to which account.
+
+## Which scope each endpoint needs
+
+| Endpoint | Scope | MCP tool | Linked account |
+|---|---|---|---|
+| [`GET /me`](/partner-api/endpoints/get-me) | none (any valid key) | `whoami` | No |
+| [`GET /catalog/packs`](/partner-api/endpoints/list-packs) | `read:catalog` | `list_packs` | No. An unlinked key sees the public packs |
+| [`GET /catalog/packs/pool`](/partner-api/endpoints/get-pack-pool) | `read:catalog` | `get_pack_pool` | No |
+| [`GET /marketplace/listings`](/partner-api/endpoints/search-cards) | `read:catalog` | `search_cards` | No |
+| [`GET /catalog/cards`](/partner-api/endpoints/card-catalog) | `read:catalog` | none | No |
+| [`POST /packs/purchase`](/partner-api/endpoints/buy-packs) | `rip:packs` | `buy_packs` | Yes |
+| [`POST /cards/purchase`](/partner-api/endpoints/buy-card) | `buy:cards` | `buy_card` | Yes |
+| [`GET /account`](/partner-api/endpoints/get-account) | `read:account` | `get_balance` | Yes |
+| [`GET /vault`](/partner-api/endpoints/get-vault) | `read:account` | `get_vault` | Yes |
+| [`POST /cards/sell-back`](/partner-api/endpoints/sell-back) | `sell:cards` | `sell_back_cards` | Yes |
+| [`POST /listings`](/partner-api/endpoints/list-card) | `write:listings` | `list_card` | Yes |
+| [`DELETE /listings`](/partner-api/endpoints/delist-card) | `write:listings` | `delist_card` | Yes |
+| [`GET /pulls`](/partner-api/endpoints/purchase-report) | `read:pulls` | none | No |
+
+Every path is under `https://catchbackcards.com/api/partner/v1`. The [MCP server](/partner-api/mcp) shows an agent only the tools its key has scopes for.
 
 ## Keeping your key safe
 
 <Warning>
-  A key with `rip:packs` or `sell:cards` can spend your balance. Treat it like a bank credential.
+  A key with `rip:packs`, `buy:cards` or `sell:cards` can move your balance. Treat it like a bank credential.
 </Warning>
 
 - Keep it **server-side only**. Never put it in browser, mobile or other client code.
 - Store it in a secret manager, not in source control.
-- Rotate it when someone with access leaves your team.
+- Keys don't expire. When someone with access leaves your team, ask us for a new key and we'll disable the old one.
 - If it leaks, tell us immediately at [catchbackcards@gmail.com](mailto:catchbackcards@gmail.com). Keys are revoked individually, within minutes, without affecting your other keys.

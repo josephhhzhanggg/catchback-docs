@@ -28,7 +28,7 @@ The Partner API lets companies, bots and AI agents work with CatchBack programma
 - **Base URL:** `https://catchbackcards.com`. All endpoints live under `/api/partner/v1/`.
 - **Auth:** every request sends your key as a bearer token. See [Authentication](/partner-api/authentication).
 - **Format:** JSON in and out, UTF-8. Money is in **US dollars** as numbers (not cents). Your CatchCoins balance is also in dollars.
-- **Versioning:** breaking changes ship under a new version prefix. A `v1` response may gain new fields at any time, so build your parser to ignore fields it doesn't know.
+- **Versioning:** breaking changes ship under a new version prefix. A `v1` response may gain new fields at any time, so build your parser to ignore fields it doesn't know. What changed and when: [Changelog](/partner-api/changelog).
 
 ## How a partner account works
 
@@ -39,15 +39,17 @@ The Partner API lets companies, bots and AI agents work with CatchBack programma
 The whole flow, step by step: [How it works](/partner-api/how-it-works).
 
 <Note>
-  Interested in becoming a partner? Email [catchbackcards@gmail.com](mailto:catchbackcards@gmail.com).
+  Interested in becoming a partner, or want to talk terms (funding, pricing, revenue share or your limits)? Contact us at [catchbackcards@gmail.com](mailto:catchbackcards@gmail.com).
 </Note>
 
 ## Quick start
 
+The three calls below show the shape of the API. The [Quickstart](/partner-api/quickstart) goes the whole way, from a new key to selling a pull back.
+
 <Steps>
   <Step title="See what you can buy">
     ```bash
-    curl https://catchbackcards.com/api/partner/v1/catalog/packs?category=pokemon \
+    curl "https://catchbackcards.com/api/partner/v1/catalog/packs?category=pokemon" \
       -H "Authorization: Bearer $CATCHBACK_KEY"
     ```
   </Step>

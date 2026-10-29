@@ -8,7 +8,7 @@ Scope: `read:catalog` · No MCP tool
 
 A full sync of shop stock, for keeping your own copy of our inventory. It has no filters and leaves out user listings. To find a card to buy, use [Search cards](/partner-api/endpoints/search-cards).
 
-The purchasable inventory: the same pool our storefront and pack openings draw from. Paginate by incrementing `page` until you've fetched `total` cards. Ordering is stable (`id` ascending) within a sync, but the set changes between syncs, because the inventory is [point-in-time](/partner-api/errors-and-limits#inventory-is-point-in-time).
+The purchasable inventory: the same pool our storefront and pack openings draw from. Paginate by incrementing `page` until you've fetched `total` cards ([Pagination](/partner-api/pagination)). Ordering is stable (`id` ascending) within a sync, but the set changes between syncs, because the inventory is [point-in-time](/partner-api/errors-and-limits#inventory-is-point-in-time).
 
 <ParamField query="category" type="string" default="pokemon">
   `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.

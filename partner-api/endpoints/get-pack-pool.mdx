@@ -37,13 +37,13 @@ A sold-out pack still returns `200` with `available: false`, not an error; its p
 <ResponseField name="risk_level" type="string" />
 <ResponseField name="price" type="number">Price per pack in USD.</ResponseField>
 <ResponseField name="available" type="boolean" />
-<ResponseField name="reason" type="string">Why the pack is unavailable. Only present when a sold-out pack's pool is empty; [List packs](/partner-api/endpoints/list-packs) gives the reason for any unavailable pack.</ResponseField>
+<ResponseField name="reason" type="string">Why the pack is unavailable. Only present when a sold-out slab pack's pool is empty; never sent for a sealed pack. [List packs](/partner-api/endpoints/list-packs) gives the reason for any unavailable pack.</ResponseField>
 <ResponseField name="kind" type="string">`slab` (pays out graded cards) or `sealed` (pays out sealed products).</ResponseField>
-<ResponseField name="expected_value" type="number | null">Expected value of one pack in USD at this risk level. `null` when there is no pool to value.</ResponseField>
+<ResponseField name="expected_value" type="number | null">Expected value of one pack in USD at this risk level. For a slab pack, `null` when there is no pool to value. A sealed pack always has a number: `0` when nothing is in stock.</ResponseField>
 <ResponseField name="bands" type="object[]">
   <Expandable title="band">
     <ResponseField name="bucket_id" type="string">Band id. Each card's `bucket_id` points here.</ResponseField>
-    <ResponseField name="label" type="string">Display range, e.g. `$5-$20`. For a sealed pack, the product's name.</ResponseField>
+    <ResponseField name="label" type="string | null">Display range, e.g. `$5-$20`. For a sealed pack, the product's name (`null` if it has none).</ResponseField>
     <ResponseField name="min_value" type="number" />
     <ResponseField name="max_value" type="number" />
     <ResponseField name="odds" type="number">Probability of landing in this band, 0–1.</ResponseField>
@@ -54,7 +54,7 @@ A sold-out pack still returns `200` with `available: false`, not an error; its p
 <ResponseField name="chase" type="object | null">
   A hand-picked card hittable at fixed odds on top of the bands, or `null`.
   <Expandable title="chase">
-    <ResponseField name="card" type="object">A [card object](/partner-api/card-object).</ResponseField>
+    <ResponseField name="card" type="object | null">A [card object](/partner-api/card-object), or `null` if we can't load the card.</ResponseField>
     <ResponseField name="probability" type="number" />
     <ResponseField name="odds_label" type="string">e.g. `1 in 5,000`.</ResponseField>
     <ResponseField name="label" type="string" />

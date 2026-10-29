@@ -9,17 +9,17 @@ Scope: `read:account` · MCP tool: `get_vault`
 Cards in your vault or listed on the marketplace. Cards that have shipped are not included. Each card names its latest acquisition: a pull (`pull_id`) or a buy (`purchase_id`). The other is `null`, and [Sell back](/partner-api/endpoints/sell-back) takes whichever is set.
 
 <ParamField query="category" type="string" default="pokemon">
-  `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
+  `pokemon`, `onepiece`, `sports`, `riftbound`, `watches`, `goods` (luxury goods) or `singles` (raw singles). A pull can land in a different catalog from its pack's (a raw single from a Pokémon pack, for example), and the item's `category` says which, so sync every category you might hold.
 </ParamField>
-<ParamField query="page" type="integer" default="1">1-based.</ParamField>
-<ParamField query="per_page" type="integer" default="100">1–200.</ParamField>
+<ParamField query="page" type="integer" default="1">1-based. See [Pagination](/partner-api/pagination).</ParamField>
+<ParamField query="per_page" type="integer" default="100">1–200. A higher value is treated as 200.</ParamField>
 
 ## Response
 
 <ResponseField name="category" type="string" />
 <ResponseField name="page" type="integer" />
 <ResponseField name="per_page" type="integer" />
-<ResponseField name="total" type="integer" />
+<ResponseField name="total" type="integer | null">Cards held in this category, across all pages.</ResponseField>
 <ResponseField name="cards" type="object[]">
   <Expandable title="held card">
     <ResponseField name="card_id" type="string" />
@@ -28,7 +28,7 @@ Cards in your vault or listed on the marketplace. Cards that have shipped are no
     <ResponseField name="purchase_id" type="string | null">The sale, if your latest acquisition was a [card buy](/partner-api/endpoints/buy-card). It is that buy's `transaction_id`.</ResponseField>
     <ResponseField name="purchased_at" type="string | null" />
     <ResponseField name="item" type="object">A [card object](/partner-api/card-object).</ResponseField>
-    <ResponseField name="value" type="number">Current market value.</ResponseField>
+    <ResponseField name="value" type="number | null">Current market value. `null` when we have no valuation for the card.</ResponseField>
     <ResponseField name="listed" type="boolean">Listed on the marketplace.</ResponseField>
     <ResponseField name="catchback" type="object | null">
       The sell-back offer right now: `amount`, `rate`, `basis_value` (the value the offer is based on) and `locked_value_until`. `null` while the card is listed. Delist it first.

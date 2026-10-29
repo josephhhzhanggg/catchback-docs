@@ -1,0 +1,53 @@
+---
+title: "Changelog"
+description: "What changed in the Partner API, newest first."
+---
+
+Changes to `v1` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. A breaking change would ship under a new version prefix. Dates are US Pacific time.
+
+<Update label="October 26, 2026" description="Sealed pack pools">
+  - [Get a pack's pool](/partner-api/endpoints/get-pack-pool) covers sealed packs (the Starter and the sealed mystery packs). The response gains `kind` (`slab` or `sealed`); a sealed pack lists its products in `products`, with `total_products`, and one band per product.
+  - A sold-out pack with no pool to show returns `200` with `available: false` and an empty pool, instead of an error.
+  - The Starter pack opens at the `standard` risk level only, and [List packs](/partner-api/endpoints/list-packs) says so in its `risk_levels`.
+</Update>
+
+<Update label="October 18, 2026" description="Vault acquisitions">
+  - [Get vault](/partner-api/endpoints/get-vault) finds each card's latest acquisition across every kind of pack pull and buy, so its `pull_id` or `purchase_id` always names the acquisition a sell-back pays on.
+</Update>
+
+<Update label="October 14, 2026" description="Who am I, card limits">
+  - New: [Who am I](/partner-api/endpoints/get-me) (`GET /me`, MCP tool `whoami`) works with any valid key and shows which account it acts as.
+  - [Get account](/partner-api/endpoints/get-account) gains `card_limits`: your card and spend usage against the daily card caps.
+</Update>
+
+<Update label="October 12, 2026" description="Buying cards">
+  - New: [Search cards](/partner-api/endpoints/search-cards) (`GET /marketplace/listings`, MCP tool `search_cards`) finds every card you can buy, from the shop and fixed-price user listings.
+  - New: [Buy a card](/partner-api/endpoints/buy-card) (`POST /cards/purchase`, scope `buy:cards`, MCP tool `buy_card`), with a `max_price` guard and daily card and spend caps.
+  - [Sell back cards](/partner-api/endpoints/sell-back) takes a `purchase_id` for a card you bought, and [Get vault](/partner-api/endpoints/get-vault) returns `purchase_id` and `purchased_at`.
+  - Card orders share your account's order ids with pack orders, and an interrupted card order is closed the same way as a pack order.
+</Update>
+
+<Update label="October 11, 2026" description="Interrupted orders">
+  - A pack order cut off after it was charged is now closed from our records, usually within about 10 minutes. Resending its order id then returns a shorter body marked `"reconciled": true`. See [Idempotency](/partner-api/idempotency#timeouts-and-interrupted-orders).
+  - New error code: `409 IDEMPOTENCY_RETRY`, when an earlier attempt with the same order id failed just as the retry arrived. Resend it.
+</Update>
+
+<Update label="October 6, 2026" description="Pack pools and the full card object">
+  - New: [Get a pack's pool](/partner-api/endpoints/get-pack-pool) (`GET /catalog/packs/pool`, MCP tool `get_pack_pool`): a pack's value bands, their odds at a risk level, and every card a pull can produce.
+  - Every endpoint that returns a card returns the same [card object](/partner-api/card-object), with front, back and render images and the slab, set and value fields.
+</Update>
+
+<Update label="September 29, 2026" description="Buying packs and managing cards">
+  - New: [Buy packs](/partner-api/endpoints/buy-packs) (`POST /packs/purchase`, scope `rip:packs`), with a required `Idempotency-Key`, one purchase per minute and 100 packs per day per key.
+  - New: [Sell back cards](/partner-api/endpoints/sell-back) (`sell:cards`), [List a card](/partner-api/endpoints/list-card) and [Delist a card](/partner-api/endpoints/delist-card) (`write:listings`), [Get account](/partner-api/endpoints/get-account) and [Get vault](/partner-api/endpoints/get-vault) (`read:account`).
+  - New: the [MCP server](/partner-api/mcp) at `/api/mcp`, with the same key.
+  - [List packs](/partner-api/endpoints/list-packs) returns exactly the packs your account can buy, at the price it will be charged.
+</Update>
+
+<Update label="August 7, 2026" description="Purchase report">
+  - New: [Purchase report](/partner-api/endpoints/purchase-report) (`GET /pulls`, scope `read:pulls`, opt-in): completed pack purchases in a time window, for revenue-share reporting.
+</Update>
+
+<Update label="August 4, 2026" description="Partner API v1">
+  - Scoped API keys, and the first read-only endpoints: [List packs](/partner-api/endpoints/list-packs) and the [Card catalog export](/partner-api/endpoints/card-catalog) (scope `read:catalog`).
+</Update>

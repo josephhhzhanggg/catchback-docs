@@ -1,0 +1,42 @@
+---
+title: "Pagination"
+description: "How the list endpoints page, the most each one returns, and how to know when you've reached the end."
+---
+
+Four endpoints return pages. Each takes `page` (1-based) and `per_page`, and echoes back the values it used.
+
+| Endpoint | Default `per_page` | Most per page | Most pages | Order | How you know there's more |
+|---|---|---|---|---|---|
+| [Search cards](/partner-api/endpoints/search-cards) | 50 | 100 | 20 | `price` (your `sort`), then `card_id` | `has_more` |
+| [Get vault](/partner-api/endpoints/get-vault) | 100 | 200 | no limit | card id, ascending | `total` |
+| [Card catalog export](/partner-api/endpoints/card-catalog) | 500 | 1000 | no limit | card id, ascending | `total` |
+| [Purchase report](/partner-api/endpoints/purchase-report) | 500 | 1000 | no limit | `created_at`, then `user_id`, `source`, `pack_type` and `amount` | `total` |
+
+So Search cards reaches at most 20 pages of 100 (2,000 results), Get vault returns up to 200 cards a page, and the catalog export and purchase report up to 1,000 rows a page.
+
+The other endpoints aren't paginated. [List packs](/partner-api/endpoints/list-packs) returns every pack you can buy, and [Get a pack's pool](/partner-api/endpoints/get-pack-pool) every card or product a pull can produce, in one response.
+
+## Out-of-range values
+
+Paging values are clamped, not rejected:
+
+- A `page` below 1, or one that isn't a number, is page 1.
+- A `per_page` above the most per page is that maximum. Send a whole number from 1 up: anything else is replaced, by the default or by 1.
+- On Search cards, a `page` above 20 is page 20.
+
+Read `page` and `per_page` back from the response rather than assuming what you sent was used.
+
+## Reaching the end
+
+- **Get vault, Card catalog export and Purchase report** return `total`, the number of rows across all pages. Keep incrementing `page` until you've fetched `total` rows; a page past the end is an empty list.
+- **Search cards** returns `has_more` instead. It is `true` while another page may exist. Search stops at page 20: if `has_more` is still `true` there, narrow your filters (a price band, a grade range) rather than paging on, since asking for page 21 returns page 20 again.
+
+<Note>
+  Search cards filters user listings by `q`, `grading_company` and grade after taking the first 500 by price, so in a big category a filtered search can miss listings past that point, and `has_more` stays `true`. A `min_price` / `max_price` band applies before the cut: use one to reach the rest. Details: [Search cards](/partner-api/endpoints/search-cards).
+</Note>
+
+## Pages are snapshots
+
+Inventory changes between your requests ([why](/partner-api/errors-and-limits#inventory-is-point-in-time)), so a card can move between pages, or drop out, while you page through Search cards, Get vault or the catalog export. Ordering by id keeps a sync stable enough to diff against your copy, but don't treat one pass as an exact snapshot.
+
+The Purchase report is different: purchases are only ever added, so a window that has already closed pages consistently. Pin both `since` and `until` in the past for a report.

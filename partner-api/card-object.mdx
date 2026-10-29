@@ -3,7 +3,7 @@ title: "The card object"
 description: "One card shape, returned by every endpoint that returns a card."
 ---
 
-The card catalog, a pack's pool, the cards you pull, and your vault all return the same card object. Fields a card doesn't have are `null`; fields that only apply to one catalog (sports, watches) appear only on cards from that catalog.
+The card catalog, a pack's pool, the cards you pull, and your vault all return the same card object. `id`, `category`, `name`, `set`, `grading_company`, `grading_rank`, `slab_label`, `language`, `cert_number`, `market_value` and the four image fields are always present: `null` when unknown, except `market_value`, which is `0`. Other fields appear only on cards whose catalog has them: the sports fields on sports cards, the watch fields on watches and luxury goods, and `description` and `attributes` on luxury goods.
 
 <ResponseExample>
 ```json Card
@@ -36,7 +36,7 @@ The card catalog, a pack's pool, the cards you pull, and your vault all return t
 ## Identity
 
 <ResponseField name="id" type="string">The card's id. Use it for sell-back and listings.</ResponseField>
-<ResponseField name="category" type="string">`pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.</ResponseField>
+<ResponseField name="category" type="string">The catalog the card belongs to: `pokemon`, `onepiece`, `sports`, `riftbound`, `watches`, `goods` (luxury goods) or `singles` (raw, ungraded cards). Goods and singles only ever come out of packs: they can be sold back (goods only within 5 minutes of the pull), but not listed or bought from the shop.</ResponseField>
 <ResponseField name="name" type="string">Card name.</ResponseField>
 <ResponseField name="set" type="string">Set name.</ResponseField>
 <ResponseField name="year" type="string">Release year.</ResponseField>
@@ -56,7 +56,7 @@ The card catalog, a pack's pool, the cards you pull, and your vault all return t
 
 ## Value
 
-<ResponseField name="market_value" type="number">Our current market valuation in USD. It drives pack odds and buyback offers.</ResponseField>
+<ResponseField name="market_value" type="number">Our current market valuation in USD. It drives pack odds and buyback offers. `0` when we have no valuation.</ResponseField>
 <ResponseField name="price" type="number">The shop sale price in USD.</ResponseField>
 <ResponseField name="market_value_last_updated" type="string">When `market_value` was last refreshed (ISO 8601).</ResponseField>
 
@@ -65,7 +65,7 @@ The card catalog, a pack's pool, the cards you pull, and your vault all return t
 <ResponseField name="front_image" type="string">Scan of the front of the slab.</ResponseField>
 <ResponseField name="back_image" type="string">Scan of the back of the slab.</ResponseField>
 <ResponseField name="render_image" type="string">The slab on our display pedestal, as our app shows it.</ResponseField>
-<ResponseField name="image_url" type="string">Same as `render_image`, kept for older integrations.</ResponseField>
+<ResponseField name="image_url" type="string">`render_image`, or `front_image` when there is no render. Kept for older integrations.</ResponseField>
 
 <Note>
   Scans can be several MB each. Cache them and resize on your side; don't hotlink full-size images in list views.
@@ -83,10 +83,25 @@ The card catalog, a pack's pool, the cards you pull, and your vault all return t
 <ResponseField name="is_memorabilia" type="boolean" />
 <ResponseField name="serial_numbered" type="string">Serial numbering, e.g. `/99`.</ResponseField>
 
-## Watches only
+## Watches and luxury goods
 
 <ResponseField name="brand" type="string" />
 <ResponseField name="reference_number" type="string">The manufacturer's model reference.</ResponseField>
 <ResponseField name="condition" type="string" />
 <ResponseField name="size" type="string" />
-<ResponseField name="video_url" type="string">A 360° video of the watch.</ResponseField>
+<ResponseField name="video_url" type="string">A 360° video of the item.</ResponseField>
+
+## Luxury goods only
+
+<ResponseField name="description" type="string">The item's description.</ResponseField>
+<ResponseField name="attributes" type="object">Extra details about the item as key-value pairs, e.g. `{ "gender": "unisex" }`. The keys vary by item, so read the ones you know and ignore the rest. `{}` when there are none.</ResponseField>
+
+## Pull and purchase ids
+
+A card object never carries how you got the card. The endpoints that return one put these ids next to it:
+
+| Field | Where | What it is |
+|---|---|---|
+| `pull_id` | [Buy packs](/partner-api/endpoints/buy-packs), [Get vault](/partner-api/endpoints/get-vault) | The pull that dealt you the card. It is the pull's `transaction_uuid`, the UUID the [Provably Fair](/about-catchback/provably-fair) seed is derived from. Send it to [Sell back](/partner-api/endpoints/sell-back) |
+| `transaction_id` | [Buy a card](/partner-api/endpoints/buy-card) | The sale of a card you bought |
+| `purchase_id` | [Get vault](/partner-api/endpoints/get-vault) | The same sale, as Get vault names it. Send it to Sell back for a bought card |

@@ -9,11 +9,11 @@ Scope: `buy:cards` · MCP tool: `buy_card` · **Moves money**
 Charges the card's price plus a $1 buyer fee, from your cash CatchCoins balance only (no promo codes, bonus balance or card payments). The card lands in your [vault](/partner-api/endpoints/get-vault), where you can hold it, [list it](/partner-api/endpoints/list-card) or [sell it back](/partner-api/endpoints/sell-back). Find cards with [Search cards](/partner-api/endpoints/search-cards).
 
 <ParamField header="Idempotency-Key" type="string" required>
-  Your order id, 8–128 characters of `A-Za-z0-9_-`. Reuse it to retry the same order safely. See [Idempotency](/partner-api/errors-and-limits#idempotency-retrying-a-purchase-safely).
+  Your order id, 8–128 characters of `A-Za-z0-9_-`, unique per account across card and pack orders. Reuse it to retry the same order safely. See [Idempotency](/partner-api/idempotency).
 </ParamField>
-<ParamField body="card_id" type="string" required>`card_id` from [Search cards](/partner-api/endpoints/search-cards).</ParamField>
+<ParamField body="card_id" type="string" required>`card_id` from [Search cards](/partner-api/endpoints/search-cards). A UUID.</ParamField>
 <ParamField body="max_price" type="number" required>
-  The most you'll pay for the card in dollars, before the fee. Usually the `price` the search showed. If the price is now higher, nothing is charged and you get `409 PRICE_CHANGED` with the new `price`.
+  The most you'll pay for the card in dollars, before the fee: more than 0 and at most 1,000,000. Usually the `price` the search showed. If the price is now higher, nothing is charged and you get `409 PRICE_CHANGED` with the new `price`.
 </ParamField>
 
 ## Response
@@ -30,24 +30,34 @@ Charges the card's price plus a $1 buyer fee, from your cash CatchCoins balance 
 <ResponseField name="item" type="object">A [card object](/partner-api/card-object).</ResponseField>
 <ResponseField name="idempotent_replay" type="boolean">Present and `true` when this is a stored response to a retried order. Nothing was charged again.</ResponseField>
 <ResponseField name="needs_review" type="boolean">
-  Present and `true` when the sale went through but our bookkeeping needs a manual check. The card is yours; don't retry under a new order id. We're alerted automatically.
+  Present and `true` when the sale went through but our bookkeeping needs a manual check. The card is yours; don't retry under a new order id. We're alerted automatically. An error can carry it too: see [When a card buy needs review](/partner-api/errors-and-limits#when-a-card-buy-needs-review).
 </ResponseField>
 
 ## Errors
 
 | Status | Code | When |
 |---|---|---|
-| `400` | | Missing `Idempotency-Key`, a bad `card_id`, no `max_price`, or not enough balance |
+| `400` | | Missing or malformed `Idempotency-Key`, a `card_id` that isn't a UUID, a missing or out-of-range `max_price`, or not enough balance |
+| `403` | | The key lacks `buy:cards` or isn't linked to an account, the account is unavailable, or it can't buy cards |
+| `403` | `FEATURE_RESTRICTED` | The marketplace is switched off for your account (`capability: "marketplace"`). Contact us |
 | `404` | | No such card |
 | `409` | `PRICE_CHANGED` | The price is above your `max_price`. The response has the current `price` |
-| `409` | `CARD_NO_LONGER_AVAILABLE` | Sold, pulled from a pack, or delisted. Search again |
+| `409` | `CARD_NO_LONGER_AVAILABLE` | Sold, pulled from a pack, delisted or shipped, or an item that is only sold in packs. Search again |
+| `409` | `CARD_MOVED_TO_AUCTION` | The card is now in an auction, not sold at a fixed price. The response has `listing_id` and `listing_type` |
 | `409` | `OWN_LISTING` | The card is your own listing |
 | `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running |
+| `409` | `IDEMPOTENCY_RETRY` | An earlier attempt with this key failed just as this one arrived. Retry with the same key |
 | `422` | `IDEMPOTENCY_KEY_REUSED` | This key was used for a different order |
-| `429` | `DAILY_CARD_LIMIT_REACHED` | Your daily card or spend cap. See [Card limits](/partner-api/errors-and-limits#card-limits) |
+| `429` | `DAILY_CARD_LIMIT_REACHED` | Your daily card or spend cap. See [Rate limits](/partner-api/rate-limits#card-purchases) |
+| `500` | | The purchase failed on our side. Retry with the same key: if you were charged, the retry can't charge you again |
+| `503` | | We couldn't check your limits, record the order or take the payment. Nothing was charged; retry with the same key |
+
+Errors from the purchase itself carry the order's `checkout_id`, as in the `409` example.
 
 <Note>
   For 7 days after you buy a card, its sell-back offer is based on the lower of the price you paid and its market value when you bought it. See [Liquidity](/about-catchback/liquidity).
+
+  A card bought from another user's listing can carry over the seller's lock instead. If the seller's own 7-day lock on the card is still running and is lower than the one your purchase would set, you inherit it: its value and its end date. That way, passing a card between accounts can't lift its lock to today's market value.
 </Note>
 
 <RequestExample>
@@ -78,6 +88,7 @@ curl -X POST https://catchbackcards.com/api/partner/v1/cards/purchase \
 
 ```json 409
 {
+  "checkout_id": "5d1c…",
   "error": "The price changed to $1500.00 since you looked. Check the new price and try again.",
   "code": "PRICE_CHANGED",
   "card_id": "0e94dc61-…",

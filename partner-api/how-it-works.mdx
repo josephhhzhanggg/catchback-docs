@@ -26,7 +26,7 @@ flowchart LR
 
 ## 2. Every request
 
-Send your key as `Authorization: Bearer cb_live_…`. Each endpoint requires one scope; a key without it gets a `403`. Anything that touches your balance or cards also needs the key to be linked to your account. Details: [Authentication](/partner-api/authentication).
+Send your key as `Authorization: Bearer cb_live_…`. Every endpoint except Who am I requires one scope; a key without it gets a `403`. Anything that touches your balance or cards also needs the key to be linked to your account. Details: [Authentication](/partner-api/authentication).
 
 ## 3. Decide what to buy
 
@@ -48,7 +48,7 @@ All of these are snapshots. Inventory is shared with every CatchBack customer, s
     Before anything is charged, we record your `Idempotency-Key` as an order number. From then on, sending that order again can never charge you twice (see [step 6](#6-if-something-goes-wrong-retry-the-same-order)).
   </Step>
   <Step title="We check your limits">
-    By default your key can open 100 packs per day and send one pack purchase per minute; both are set per partner. Over either limit is a `429` that says when to retry, and nothing is charged. [Purchase limits](/partner-api/errors-and-limits#purchase-limits)
+    By default your key can open 100 packs per day and send one pack purchase per minute; both are set per partner. Over either limit is a `429` that says when to retry, and nothing is charged. [Rate limits](/partner-api/rate-limits#pack-purchases)
   </Step>
   <Step title="We charge and open the packs">
     We charge the list price for every pack from your balance, then open them with the same odds a customer gets at your chosen risk level. The order is all-or-nothing: if any pack fails to open, the whole charge is refunded and no pulls stand.
@@ -65,7 +65,7 @@ All of these are snapshots. Inventory is shared with every CatchBack customer, s
 - You pay the card's price plus a $1 buyer fee.
 - You send `max_price`, normally the `price` the search showed. If the price has gone up since, you get `409 PRICE_CHANGED` with the new price, and nothing is charged.
 - If someone else got the card first, you get `409 CARD_NO_LONGER_AVAILABLE`. Search again.
-- Card buys have daily caps on the number of cards and on dollars spent, but no per-minute limit. [Card limits](/partner-api/errors-and-limits#card-limits)
+- Card buys have daily caps on the number of cards and on dollars spent, but no per-minute limit. [Rate limits](/partner-api/rate-limits#card-purchases)
 - The card lands in your vault.
 
 ## 6. If something goes wrong, retry the same order
@@ -76,10 +76,13 @@ Every purchase needs an `Idempotency-Key`: your own order id. Generate one per o
 |---|---|
 | The order had finished | The original response, with `"idempotent_replay": true`. Nothing is charged again |
 | The order is still running | `409 IDEMPOTENCY_IN_PROGRESS`. Wait a moment and resend |
+| An attempt with that id failed just as you resent it | `409 IDEMPOTENCY_RETRY`. Resend it |
 | The order had failed | It runs again. A failed order refunds itself |
 | You changed the body | `422 IDEMPOTENCY_KEY_REUSED`. A different order needs a new id |
 
-If your connection drops mid-order, resend the same order id; never a new one, which would be a second order. If an order is interrupted on our side after you were charged, we complete it, and your resend returns the result. That usually takes about 10 minutes. If an order is still `409` after 30 minutes, contact us with the order id.
+If your connection drops mid-order, resend the same order id; never a new one, which would be a second order.
+
+If an order is interrupted on our side after you were charged, your resends get `409 IDEMPOTENCY_IN_PROGRESS` until we close the order from our own records, usually within about 10 minutes. After that, a resend returns a shorter body than the original, marked `"reconciled": true`. For a pack order it has `checkout_id`, `pack_type`, `quantity`, `total_charged`, the `pull_ids` and a `message`, but no `pulls` and no `summary`, so read the cards and their offers from [Get vault](/partner-api/endpoints/get-vault). Both reconciled bodies, pack and card: [Idempotency](/partner-api/idempotency#timeouts-and-interrupted-orders). If an order is still `409` after 30 minutes, contact us with the order id.
 
 ## 7. Decide what to do with each card
 
@@ -103,6 +106,8 @@ What a sell-back pays, the same as any customer:
 |---|---|---|---|
 | Pulled from a pack | 90% of the value at pull | 80% of the value at pull | 80% of market value |
 | Bought | 80% of the lower of the price you paid and its market value at purchase | same | 80% of market value |
+
+A card bought from another user's listing can instead carry over that seller's 7-day lock, if it is lower and still running ([Buy a card](/partner-api/endpoints/buy-card)).
 
 The fresh 90% window is why the pack response includes the offer: decide on each pull right away. Sell-backs aren't rate-limited, and each card pays out once, so retrying a sell-back is safe. See [Liquidity](/about-catchback/liquidity) for the full rules.
 

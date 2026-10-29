@@ -6,12 +6,22 @@ description: "Take a marketplace listing down. The card returns to your vault."
 
 Scope: `write:listings` · MCP tool: `delist_card`
 
-<ParamField body="card_id" type="string" required>The listed card's `card_id`.</ParamField>
+<ParamField body="card_id" type="string" required>The listed card's `card_id`. A UUID.</ParamField>
 
 ## Response
 
 <ResponseField name="card_id" type="string" />
 <ResponseField name="delisted" type="boolean" />
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | `card_id` isn't a UUID, or the card isn't listed |
+| `403` | The key lacks `write:listings` or isn't linked to an account |
+| `404` | The card isn't in your account |
+| `409` | The listing changed while we were taking it down (e.g. it was just bought). Read your vault and try again |
+| `500` | We couldn't take the listing down. Retry with backoff |
 
 <RequestExample>
 ```bash cURL
