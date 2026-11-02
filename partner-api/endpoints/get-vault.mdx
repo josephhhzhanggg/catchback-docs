@@ -33,7 +33,7 @@ Cards in your vault or listed on the marketplace. Cards that have shipped are no
     <ResponseField name="listing_id" type="string | null">The card's active listing while it is listed, the id [Change a listing's price](/partner-api/endpoints/update-listing-price) takes. `null` otherwise.</ResponseField>
     <ResponseField name="listing_price" type="number | null">That listing's price right now, in USD. `null` when the card isn't listed.</ResponseField>
     <ResponseField name="catchback" type="object | null">
-      The sell-back offer right now: `amount`, `rate`, `basis_value` (the value the offer is based on) and `locked_value_until` (`null` when no lock applies). `null` while the card is listed (delist it first), when we have no value for the card, and for a luxury goods item once its 5-minute sell-back window has closed.
+      The sell-back offer right now: `amount`, `rate`, `basis_value` (the value the offer is based on) and `locked_value_until` (`null` when no lock applies). `null` while the card is listed (delist it first), and for a luxury goods item once its 5-minute sell-back window has closed. A card we have no value for shows an `amount` of `0`.
     </ResponseField>
   </Expandable>
 </ResponseField>

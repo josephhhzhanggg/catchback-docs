@@ -21,7 +21,7 @@ The purchasable inventory: the same pool our storefront and pack openings draw f
 <ResponseField name="category" type="string" />
 <ResponseField name="page" type="integer" />
 <ResponseField name="per_page" type="integer" />
-<ResponseField name="total" type="integer" />
+<ResponseField name="total" type="integer | null">Cards in this category, across all pages. `null` on a page past the end.</ResponseField>
 <ResponseField name="cards" type="object[]">
   [Card objects](/partner-api/card-object), each with `sale_status`, the pool the card sits in.
 </ResponseField>

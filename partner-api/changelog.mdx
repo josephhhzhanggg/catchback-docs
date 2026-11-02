@@ -7,6 +7,7 @@ Changes to `v1` are additive: a response can gain fields, an enum can gain value
 
 <Update label="November 2, 2026" description="Buy packs refusals">
   - [Buy packs](/partner-api/endpoints/buy-packs) now refuses an order before it charges anything when the pack can't be bought: a `pack_type` that [List packs](/partner-api/endpoints/list-packs) doesn't offer your key is a `404`, and a pack with `available: false` is a `409 PACK_UNAVAILABLE`, with its `reason`. A `risk_level` outside the pack's `risk_levels`, and the category `goods`, are a `400`. A refused order charges nothing and frees its order id. A retry of a finished order is unaffected.
+  - [Card catalog export](/partner-api/endpoints/card-catalog) now lists only what [Buy a card](/partner-api/endpoints/buy-card) can sell, and `category=goods` is a `400`.
 </Update>
 
 <Update label="November 2, 2026" description="Optional shipping insurance">

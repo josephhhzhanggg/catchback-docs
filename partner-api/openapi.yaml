@@ -70,7 +70,7 @@ paths:
                     name: Starter Pack
                     price: 8
                     available: false
-                    reason: Starter pack temporarily out of stock
+                    reason: Out of stock
                     max_quantity: 1
                     risk_levels: [standard]
                   - pack_type: bronze
@@ -274,7 +274,6 @@ paths:
 
             - The key lacks `rip:packs` or isn't linked to an account.
             - `Partner account unavailable`: the account is deleted.
-            - The account can't open this pack.
             - `FEATURE_RESTRICTED`: opening packs is switched off for the account (`capability: "open_packs"`). Contact us.
 
             We also answer "not linked" or "unavailable" when we couldn't read your key or account just then, so one retry is worth it.
@@ -283,7 +282,7 @@ paths:
               schema: { $ref: '#/components/schemas/RestrictedError' }
               example: { error: "Your account can't open packs right now. Contact support if you think this is a mistake.", code: FEATURE_RESTRICTED, capability: open_packs }
         '404':
-          description: '`pack_type` is not one List packs offers this key. Nothing was charged, and the order id is free to use again.'
+          description: '`pack_type` is not one List packs offers this key, including one this account can''t open. Nothing was charged, and the order id is free to use again.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -364,7 +363,7 @@ paths:
                 needs_review: true
                 checkout_id: c8baa66a-…
         '503':
-          description: We couldn't record the order, count today's packs or take the payment. This attempt charged nothing, but an earlier attempt with the same key may have gone through, so retry shortly with the same key, never a new one.
+          description: We couldn't record the order, count today's packs, check the pack or take the payment. This attempt charged nothing, but an earlier attempt with the same key may have gone through, so retry shortly with the same key, never a new one.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2276,7 +2275,7 @@ paths:
                         listing_price: { type: [number, 'null'] }
                         catchback:
                           type: [object, 'null']
-                          description: The sell-back offer right now. `null` while the card is listed, when we have no value for the card, and for a luxury goods item once its 5-minute sell-back window has closed.
+                          description: The sell-back offer right now. `null` while the card is listed, and for a luxury goods item once its 5-minute sell-back window has closed. A card we have no value for shows an `amount` of `0`.
                           properties:
                             amount: { type: number }
                             rate: { type: number }

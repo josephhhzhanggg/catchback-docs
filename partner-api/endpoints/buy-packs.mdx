@@ -73,9 +73,9 @@ Each pull's `proof` lets you check that the pull followed from its seed: `GET` i
 | Status | Code | When |
 |---|---|---|
 | `400` | | Missing or malformed `Idempotency-Key`, a missing or malformed `pack_type`, a bad `category` (`goods` included), `quantity` or `risk_level`, a `risk_level` outside the pack's `risk_levels`, not enough balance, or the pack can't be bought in multiples. Nothing was charged |
-| `403` | | The key lacks `rip:packs` or isn't linked to an account, the account can't open this pack, or `"Partner account unavailable"` (the account is deleted). We also answer "not linked" or "unavailable" when we couldn't read your key or account just then, so one retry is worth it. Nothing was charged |
+| `403` | | The key lacks `rip:packs` or isn't linked to an account, or `"Partner account unavailable"` (the account is deleted). We also answer "not linked" or "unavailable" when we couldn't read your key or account just then, so one retry is worth it. Nothing was charged |
 | `403` | `FEATURE_RESTRICTED` | Opening packs is switched off for your account (`capability: "open_packs"`). Contact us |
-| `404` | | A `pack_type` that List packs doesn't offer this key. Nothing was charged, and the order id is free to use again |
+| `404` | | A `pack_type` that List packs doesn't offer this key, including one this account can't open. Nothing was charged, and the order id is free to use again |
 | `409` | `PACK_UNAVAILABLE` | The pack has `available: false`. The body has the `reason`. Nothing was charged, and the order id is free to use again |
 | `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body usually has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order), or retry later with the same key. Don't retry in a tight loop |
 | `409` | `IDEMPOTENCY_RETRY` | An earlier attempt with this key failed just as this one arrived. Retry with the same key |
@@ -84,7 +84,7 @@ Each pull's `proof` lets you check that the pull followed from its seed: `GET` i
 | `429` | `DAILY_LIMIT_REACHED` | Your daily pack ceiling would be exceeded. Resets at `resets_at` |
 | `500` | | A pack failed to open. The whole order was refunded; nothing was charged |
 | `500` | `PAYMENT_OUTCOME_UNKNOWN` | We couldn't confirm whether the order was charged: it may have been, and nothing was delivered. It's held for review (`needs_review: true`) and we settle any charge. Stop retrying, and never place it again under a new key: the same key answers `409 IDEMPOTENCY_IN_PROGRESS` until we settle it. The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order). Also sent when a pack failed to open and its refund errored |
-| `503` | | We couldn't record the order, count today's packs or take the payment. This attempt charged nothing, but an earlier attempt with the same key may have gone through, so retry shortly with the same key, never a new one |
+| `503` | | We couldn't record the order, count today's packs, check the pack or take the payment. This attempt charged nothing, but an earlier attempt with the same key may have gone through, so retry shortly with the same key, never a new one |
 
 <RequestExample>
 ```bash cURL
