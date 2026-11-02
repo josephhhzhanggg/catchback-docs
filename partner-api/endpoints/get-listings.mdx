@@ -1,0 +1,84 @@
+---
+title: "Your listings"
+api: "GET /api/partner/v1/listings"
+description: "Your account's active marketplace listings, newest first, with what each one pays you if it sells."
+---
+
+Scope: `read:account` · MCP tool: `get_listings`
+
+[Search cards](/partner-api/endpoints/search-cards) leaves your own listings out. This lists them: each `listing_id`, the card, its price, and your payout if it sells, which is the price less the $1 seller fee. Use the `listing_id` to [change a listing's price](/partner-api/endpoints/update-listing-price). A Dutch auction you started in our app shows here too, at its current auction price.
+
+<ParamField query="category" type="string">
+  Only this catalog: `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`. Leave it out for every catalog.
+</ParamField>
+<ParamField query="page" type="integer" default="1">1-based. See [Pagination](/partner-api/pagination).</ParamField>
+<ParamField query="per_page" type="integer" default="100">1–200. A higher value is treated as 200.</ParamField>
+
+## Response
+
+<ResponseField name="page" type="integer" />
+<ResponseField name="per_page" type="integer" />
+<ResponseField name="total" type="integer | null">Active listings across all pages.</ResponseField>
+<ResponseField name="has_more" type="boolean">Whether another page has listings.</ResponseField>
+<ResponseField name="listings" type="object[]">
+  Newest first.
+  <Expandable title="listing">
+    <ResponseField name="listing_id" type="string">Send it to [Change a listing's price](/partner-api/endpoints/update-listing-price).</ResponseField>
+    <ResponseField name="card_id" type="string" />
+    <ResponseField name="category" type="string | null">The card's catalog. `null` on some older listings.</ResponseField>
+    <ResponseField name="listing_type" type="string">`fixed_price`, or `dutch_auction` for a Dutch auction started in our app.</ResponseField>
+    <ResponseField name="price" type="number">The listing's price right now, in USD: what a buyer is charged for the card, before the $1 buyer fee. For a Dutch auction, its current auction price.</ResponseField>
+    <ResponseField name="seller_fee" type="number">What a sale takes from your payout: $1.</ResponseField>
+    <ResponseField name="payout" type="number">What your balance is credited if it sells at `price`: `price` − `seller_fee`.</ResponseField>
+    <ResponseField name="listed_at" type="string">When you listed it.</ResponseField>
+    <ResponseField name="updated_at" type="string">When the listing last changed, a price change included.</ResponseField>
+    <ResponseField name="item" type="object | null">A [card object](/partner-api/card-object), or `null` if we can't load the card.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | An unknown `category` (the five above) |
+| `403` | The key lacks `read:account` or isn't linked to an account |
+| `500` | We couldn't load your listings. Retry with backoff |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/listings?page=1&per_page=100" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "page": 1,
+  "per_page": 100,
+  "total": 1,
+  "has_more": false,
+  "listings": [
+    {
+      "listing_id": "5f1c2a90-…",
+      "card_id": "0e94dc61-…",
+      "category": "pokemon",
+      "listing_type": "fixed_price",
+      "price": 45,
+      "seller_fee": 1,
+      "payout": 44,
+      "listed_at": "2026-10-28T19:56:28Z",
+      "updated_at": "2026-10-28T19:56:28Z",
+      "item": {
+        "id": "0e94dc61-…",
+        "category": "pokemon",
+        "name": "Greavard",
+        "grading_company": "PSA",
+        "grading_rank": 9,
+        "market_value": 38.43
+      }
+    }
+  ]
+}
+```
+</ResponseExample>

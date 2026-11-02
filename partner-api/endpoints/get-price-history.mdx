@@ -1,0 +1,62 @@
+---
+title: "Price history"
+api: "GET /api/partner/v1/cards/{id}/price-history"
+description: "A card's CardLadder value readings over the last 1–365 days, oldest first."
+---
+
+Scope: `read:catalog` · MCP tool: `get_price_history`
+
+Each point is the raw value estimate CardLadder gave for the card on one day, as our daily price sweep recorded it. It isn't the card's `market_value`, which we smooth before using it, so the two won't always match: the latest point can differ from `market_value`.
+
+Since September 24, 2026 there is at most one point a day: cards worth $500 or more are read every day, and cheaper cards every other day. Before that, cards were read up to twice a day. A card we've never priced (a watch, a luxury goods item, or a card we only just added) returns an empty `points` list, not an error.
+
+<ParamField path="id" type="string" required>A card id, as in [Get a card](/partner-api/endpoints/get-card).</ParamField>
+<ParamField query="category" type="string">The card's catalog, if you know it. See [Get a card](/partner-api/endpoints/get-card).</ParamField>
+<ParamField query="days" type="integer" default="90">How many days back from now: a whole number from 1 to 365. Anything else is a `400`.</ParamField>
+
+A history is cached for up to five minutes.
+
+## Response
+
+<ResponseField name="card_id" type="string" />
+<ResponseField name="category" type="string">The card's catalog.</ResponseField>
+<ResponseField name="days" type="integer" />
+<ResponseField name="since" type="string">The start of the window: `days` before now.</ResponseField>
+<ResponseField name="points" type="object[]">
+  Oldest first.
+  <Expandable title="point">
+    <ResponseField name="recorded_at" type="string">When the reading was taken.</ResponseField>
+    <ResponseField name="estimated_value" type="number">The estimate in USD.</ResponseField>
+    <ResponseField name="source" type="string">Where the reading came from, e.g. `cardladder`.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | A malformed card id, an unknown `category`, or `days` that isn't a whole number from 1 to 365 |
+| `404` | No card has this id |
+| `500` | We couldn't read the history. Retry with backoff |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/cards/0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e/price-history?days=90" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "card_id": "0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e",
+  "category": "pokemon",
+  "days": 90,
+  "since": "2026-07-30T18:00:00.000Z",
+  "points": [
+    { "recorded_at": "2026-10-27T17:05:02Z", "estimated_value": 398.5, "source": "cardladder" },
+    { "recorded_at": "2026-10-28T17:04:11Z", "estimated_value": 410, "source": "cardladder" }
+  ]
+}
+```
+</ResponseExample>

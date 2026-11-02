@@ -23,10 +23,11 @@ flowchart LR
 1. **Account and key.** You sign up for a CatchBack account. We create an API key with the [scopes](/partner-api/authentication#scopes) you need and link it to that account. The key is shown once; store it like a bank credential.
 2. **Funding.** You wire funds and we credit your account's CatchCoins balance (1 CatchCoin = $1). Purchases spend only that balance. There are no promo codes, add-ons or bonus balance on partner purchases.
 3. **Check the link.** Call [Who am I](/partner-api/endpoints/get-me). It works with any key and shows which account your key acts as. Quote that `account.id` when you fund the account or contact us.
+4. **Track your own customers.** A key acts as one CatchBack account, so we don't know which of your customers a pull or an order is for. Record that on your side, against each `pull_id` and the order ids you choose.
 
 ## 2. Every request
 
-Send your key as `Authorization: Bearer cb_live_…`. Each endpoint requires one scope; a key without it gets a `403`. Anything that touches your balance or cards also needs the key to be linked to your account. Details: [Authentication](/partner-api/authentication).
+Send your key as `Authorization: Bearer cb_live_…`. Every endpoint except Who am I requires one scope; a key without it gets a `403`. Anything that touches your balance or cards also needs the key to be linked to your account. Details: [Authentication](/partner-api/authentication).
 
 ## 3. Decide what to buy
 
@@ -35,6 +36,7 @@ Send your key as `Authorization: Bearer cb_live_…`. Each endpoint requires one
 | Which packs you can buy, and at what price | [List packs](/partner-api/endpoints/list-packs) |
 | What a pack can pull, at what odds | [Get a pack's pool](/partner-api/endpoints/get-pack-pool) |
 | Which cards are for sale, from the shop and from other users | [Search cards](/partner-api/endpoints/search-cards) |
+| A card's details, its value over time and its recent sales | [Get a card](/partner-api/endpoints/get-card), [Price history](/partner-api/endpoints/get-price-history), [Card activity](/partner-api/endpoints/get-card-activity) |
 | Your balance, and how much of today's limits are left | [Get account](/partner-api/endpoints/get-account) |
 
 All of these are snapshots. Inventory is shared with every CatchBack customer, so a card can be pulled or sold at any moment. Treat what you read as a cache, and let the purchase response be the final word ([why](/partner-api/errors-and-limits#inventory-is-point-in-time)).
@@ -48,13 +50,13 @@ All of these are snapshots. Inventory is shared with every CatchBack customer, s
     Before anything is charged, we record your `Idempotency-Key` as an order number. From then on, sending that order again can never charge you twice (see [step 6](#6-if-something-goes-wrong-retry-the-same-order)).
   </Step>
   <Step title="We check your limits">
-    By default your key can open 100 packs per day and send one pack purchase per minute; both are set per partner. Over either limit is a `429` that says when to retry, and nothing is charged. [Purchase limits](/partner-api/errors-and-limits#purchase-limits)
+    By default your key can open 100 packs per day and send one pack purchase per minute; we can change both for your key on request. Over either limit is a `429` that says when to retry, and nothing is charged. [Rate limits](/partner-api/rate-limits#pack-purchases)
   </Step>
   <Step title="We charge and open the packs">
     We charge the list price for every pack from your balance, then open them with the same odds a customer gets at your chosen risk level. The order is all-or-nothing: if any pack fails to open, the whole charge is refunded and no pulls stand.
   </Step>
   <Step title="You get every hit back">
-    Each pull comes back with its `pull_id`, the card, its value, the rarity and odds of the hit, and its CatchBack offer: what we pay now, and what we pay after the first 5 minutes. The cards are already in your vault.
+    Each pull comes back with its `pull_id`, the card, its value, the rarity and odds of the hit, its CatchBack offer (what we pay now, and what we pay after the first 5 minutes), and a `proof` you can check: [Verify a pull](/partner-api/verify-a-pull). The cards are already in your vault.
   </Step>
 </Steps>
 
@@ -65,7 +67,7 @@ All of these are snapshots. Inventory is shared with every CatchBack customer, s
 - You pay the card's price plus a $1 buyer fee.
 - You send `max_price`, normally the `price` the search showed. If the price has gone up since, you get `409 PRICE_CHANGED` with the new price, and nothing is charged.
 - If someone else got the card first, you get `409 CARD_NO_LONGER_AVAILABLE`. Search again.
-- Card buys have daily caps on the number of cards and on dollars spent, but no per-minute limit. [Card limits](/partner-api/errors-and-limits#card-limits)
+- Card buys have daily caps on the number of cards and on dollars spent, but no per-minute limit. [Rate limits](/partner-api/rate-limits#card-purchases)
 - The card lands in your vault.
 
 ## 6. If something goes wrong, retry the same order
@@ -76,10 +78,13 @@ Every purchase needs an `Idempotency-Key`: your own order id. Generate one per o
 |---|---|
 | The order had finished | The original response, with `"idempotent_replay": true`. Nothing is charged again |
 | The order is still running | `409 IDEMPOTENCY_IN_PROGRESS`. Wait a moment and resend |
+| An attempt with that id failed just as you resent it | `409 IDEMPOTENCY_RETRY`. Resend it |
 | The order had failed | It runs again. A failed order refunds itself |
 | You changed the body | `422 IDEMPOTENCY_KEY_REUSED`. A different order needs a new id |
 
-If your connection drops mid-order, resend the same order id; never a new one, which would be a second order. If an order is interrupted on our side after you were charged, we complete it, and your resend returns the result. That usually takes about 10 minutes. If an order is still `409` after 30 minutes, contact us with the order id.
+If your connection drops mid-order, resend the same order id; never a new one, which would be a second order. To see where an order stands without resending it, call [Get an order](/partner-api/endpoints/get-order) with its `checkout_id`.
+
+If an order is interrupted on our side after you were charged, your resends get `409 IDEMPOTENCY_IN_PROGRESS` until we close the order from our own records, usually within about 10 minutes. After that, a resend returns a shorter body than the original, marked `"reconciled": true`. For a pack order it has `checkout_id`, `pack_type`, `quantity`, `total_charged`, the `pull_ids` and a `message`, but no `pulls` and no `summary`, so read the cards and their offers from [Get vault](/partner-api/endpoints/get-vault). Both reconciled bodies, pack and card: [Idempotency](/partner-api/idempotency#timeouts-and-interrupted-orders). If an order is still `409` after 30 minutes, contact us with the order id.
 
 ## 7. Decide what to do with each card
 
@@ -93,7 +98,7 @@ Everything you pull or buy is held by CatchBack in your vault. [Get vault](/part
     Sell it to CatchBack for CatchCoins at our guaranteed rates.
   </Card>
   <Card title="List" icon="tag" href="/partner-api/endpoints/list-card">
-    Put it on the marketplace at a fixed price. Delist to sell it back.
+    Put it on the marketplace at a fixed price, and change the price in place. Delist to sell it back.
   </Card>
 </CardGroup>
 
@@ -103,6 +108,8 @@ What a sell-back pays, the same as any customer:
 |---|---|---|---|
 | Pulled from a pack | 90% of the value at pull | 80% of the value at pull | 80% of market value |
 | Bought | 80% of the lower of the price you paid and its market value at purchase | same | 80% of market value |
+
+A card bought from another user's listing can instead carry over that seller's 7-day lock, if it is lower and still running ([Buy a card](/partner-api/endpoints/buy-card)).
 
 The fresh 90% window is why the pack response includes the offer: decide on each pull right away. Sell-backs aren't rate-limited, and each card pays out once, so retrying a sell-back is safe. See [Liquidity](/about-catchback/liquidity) for the full rules.
 
@@ -117,6 +124,8 @@ for each pull:
     keep it, or sell_back_cards within 5 minutes for the fresh rate
 wait until next_purchase_at    -> repeat
 ```
+
+To reconcile against your own records, [List orders](/partner-api/endpoints/list-orders) gives every pack purchase, card buy, sell-back and sale of your listings in a window, each with its effect on your balance.
 
 ## Doing it with an AI agent
 

@@ -9,17 +9,17 @@ Scope: `read:account` · MCP tool: `get_vault`
 Cards in your vault or listed on the marketplace. Cards that have shipped are not included. Each card names its latest acquisition: a pull (`pull_id`) or a buy (`purchase_id`). The other is `null`, and [Sell back](/partner-api/endpoints/sell-back) takes whichever is set.
 
 <ParamField query="category" type="string" default="pokemon">
-  `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
+  `pokemon`, `onepiece`, `sports`, `riftbound`, `watches`, `goods` (luxury goods) or `singles` (raw singles). A pull can land in a different catalog from its pack's (a raw single from a Pokémon pack, for example), and the item's `category` says which, so sync every category you might hold.
 </ParamField>
-<ParamField query="page" type="integer" default="1">1-based.</ParamField>
-<ParamField query="per_page" type="integer" default="100">1–200.</ParamField>
+<ParamField query="page" type="integer" default="1">1-based. See [Pagination](/partner-api/pagination).</ParamField>
+<ParamField query="per_page" type="integer" default="100">1–200. A higher value is treated as 200.</ParamField>
 
 ## Response
 
 <ResponseField name="category" type="string" />
 <ResponseField name="page" type="integer" />
 <ResponseField name="per_page" type="integer" />
-<ResponseField name="total" type="integer" />
+<ResponseField name="total" type="integer | null">Cards held in this category, across all pages.</ResponseField>
 <ResponseField name="cards" type="object[]">
   <Expandable title="held card">
     <ResponseField name="card_id" type="string" />
@@ -28,8 +28,10 @@ Cards in your vault or listed on the marketplace. Cards that have shipped are no
     <ResponseField name="purchase_id" type="string | null">The sale, if your latest acquisition was a [card buy](/partner-api/endpoints/buy-card). It is that buy's `transaction_id`.</ResponseField>
     <ResponseField name="purchased_at" type="string | null" />
     <ResponseField name="item" type="object">A [card object](/partner-api/card-object).</ResponseField>
-    <ResponseField name="value" type="number">Current market value.</ResponseField>
+    <ResponseField name="value" type="number | null">Current market value. `null` when we have no valuation for the card.</ResponseField>
     <ResponseField name="listed" type="boolean">Listed on the marketplace.</ResponseField>
+    <ResponseField name="listing_id" type="string | null">The card's active listing while it is listed, the id [Change a listing's price](/partner-api/endpoints/update-listing-price) takes. `null` otherwise.</ResponseField>
+    <ResponseField name="listing_price" type="number | null">That listing's price right now, in USD. `null` when the card isn't listed.</ResponseField>
     <ResponseField name="catchback" type="object | null">
       The sell-back offer right now: `amount`, `rate`, `basis_value` (the value the offer is based on) and `locked_value_until`. `null` while the card is listed. Delist it first.
     </ResponseField>
@@ -53,7 +55,7 @@ curl "https://catchbackcards.com/api/partner/v1/vault?category=pokemon&page=1&pe
   "category": "pokemon",
   "page": 1,
   "per_page": 100,
-  "total": 1,
+  "total": 2,
   "cards": [
     {
       "card_id": "0e94dc61-…",
@@ -76,7 +78,22 @@ curl "https://catchbackcards.com/api/partner/v1/vault?category=pokemon&page=1&pe
       },
       "value": 38.43,
       "listed": false,
+      "listing_id": null,
+      "listing_price": null,
       "catchback": { "amount": 30.74, "rate": 0.8, "basis_value": 38.43, "locked_value_until": "2026-10-06T19:56:28Z" }
+    },
+    {
+      "card_id": "4a51bc92-…",
+      "pull_id": null,
+      "pulled_at": null,
+      "purchase_id": "e22855d2-…",
+      "purchased_at": "2026-10-20T04:55:14Z",
+      "item": { "id": "4a51bc92-…", "category": "pokemon", "name": "Charizard ex", "grading_company": "PSA", "grading_rank": 10 },
+      "value": 1450,
+      "listed": true,
+      "listing_id": "b7d2c0e4-…",
+      "listing_price": 1525,
+      "catchback": null
     }
   ]
 }

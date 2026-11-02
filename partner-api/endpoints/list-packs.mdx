@@ -6,7 +6,7 @@ description: "Exactly the packs you can buy, at the price you'll be charged."
 
 Scope: `read:catalog` · MCP tool: `list_packs`
 
-Every pack this endpoint returns is one [Buy packs](/partner-api/endpoints/buy-packs) will sell you, at the listed `price`. Packs you can never buy are left out. A pack that is only out of stock right now stays in with `available: false` and a `reason`.
+Every pack this endpoint returns is one [Buy packs](/partner-api/endpoints/buy-packs) will sell you, at the listed `price`. Packs you can never buy are left out. A pack that is only out of stock right now stays in with `available: false` and a `reason`. Packs are sorted by `price`, cheapest first.
 
 <ParamField query="category" type="string" default="pokemon">
   `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
@@ -21,8 +21,8 @@ Every pack this endpoint returns is one [Buy packs](/partner-api/endpoints/buy-p
     <ResponseField name="name" type="string" />
     <ResponseField name="price" type="number">Price per pack in USD. This is what you're charged.</ResponseField>
     <ResponseField name="available" type="boolean">Whether the pack can be opened right now.</ResponseField>
-    <ResponseField name="reason" type="string">Why it can't, when `available` is false.</ResponseField>
-    <ResponseField name="max_quantity" type="integer">Most packs you can open in one request.</ResponseField>
+    <ResponseField name="reason" type="string">Why it can't. Present only when `available` is false.</ResponseField>
+    <ResponseField name="max_quantity" type="integer">Most packs you can open in one request: up to 10, 5 for watch packs, and 1 for the Starter, sealed mystery packs and community packs. See [Rate limits](/partner-api/rate-limits#pack-purchases).</ResponseField>
     <ResponseField name="risk_levels" type="string[]">The [risk levels](/about-catchback/risk-levels) the pack opens at.</ResponseField>
   </Expandable>
 </ResponseField>
@@ -40,14 +40,6 @@ curl "https://catchbackcards.com/api/partner/v1/catalog/packs?category=pokemon" 
   "category": "pokemon",
   "packs": [
     {
-      "pack_type": "bronze",
-      "name": "Bronze Pack",
-      "price": 25,
-      "available": true,
-      "max_quantity": 10,
-      "risk_levels": ["chill", "standard", "aggressive"]
-    },
-    {
       "pack_type": "starter",
       "name": "Starter Pack",
       "price": 8,
@@ -55,6 +47,14 @@ curl "https://catchbackcards.com/api/partner/v1/catalog/packs?category=pokemon" 
       "reason": "Starter pack temporarily out of stock",
       "max_quantity": 1,
       "risk_levels": ["standard"]
+    },
+    {
+      "pack_type": "bronze",
+      "name": "Bronze Pack",
+      "price": 25,
+      "available": true,
+      "max_quantity": 10,
+      "risk_levels": ["chill", "standard", "aggressive"]
     }
   ]
 }

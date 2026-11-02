@@ -43,15 +43,25 @@ The agent only sees the tools your key has scopes for, plus `whoami`, which ever
 | `list_packs` | [List packs](/partner-api/endpoints/list-packs) | `read:catalog` |
 | `get_pack_pool` | [Get a pack's pool](/partner-api/endpoints/get-pack-pool) | `read:catalog` |
 | `search_cards` | [Search cards](/partner-api/endpoints/search-cards) | `read:catalog` |
-| `buy_card` | [Buy a card](/partner-api/endpoints/buy-card) | `buy:cards` |
+| `get_card` | [Get a card](/partner-api/endpoints/get-card) | `read:catalog` |
+| `find_card_by_cert` | [Find a card by cert](/partner-api/endpoints/find-card-by-cert) | `read:catalog` |
+| `get_price_history` | [Price history](/partner-api/endpoints/get-price-history) | `read:catalog` |
+| `get_card_activity` | [Card activity](/partner-api/endpoints/get-card-activity) | `read:catalog` |
 | `buy_packs` | [Buy packs](/partner-api/endpoints/buy-packs) | `rip:packs` |
+| `buy_card` | [Buy a card](/partner-api/endpoints/buy-card) | `buy:cards` |
 | `get_balance` | [Get account](/partner-api/endpoints/get-account) | `read:account` |
 | `get_vault` | [Get vault](/partner-api/endpoints/get-vault) | `read:account` |
+| `get_listings` | [Your listings](/partner-api/endpoints/get-listings) | `read:account` |
+| `list_orders` | [List orders](/partner-api/endpoints/list-orders) | `read:account` |
+| `get_order` | [Get an order](/partner-api/endpoints/get-order) | `read:account` |
 | `sell_back_cards` | [Sell back cards](/partner-api/endpoints/sell-back) | `sell:cards` |
 | `list_card` | [List a card](/partner-api/endpoints/list-card) | `write:listings` |
+| `update_listing_price` | [Change a listing's price](/partner-api/endpoints/update-listing-price) | `write:listings` |
 | `delist_card` | [Delist a card](/partner-api/endpoints/delist-card) | `write:listings` |
 
 `buy_packs` and `buy_card` take an `order_id` argument, which is sent as the `Idempotency-Key`. Have your agent generate one per order and reuse it when retrying that order. A retry under a new `order_id` is a new order: a second set of packs, or a second card. `buy_card` also needs `max_price`, normally the `price` that `search_cards` returned.
+
+A tool whose endpoint has an id in its path takes that id as an argument: `card_id` for `get_card`, `get_price_history` and `get_card_activity`, `listing_id` for `update_listing_price`, and `checkout_id` for `get_order`. Every other argument is the endpoint's query parameter or body field of the same name.
 
 [Card catalog export](/partner-api/endpoints/card-catalog) and [Purchase report](/partner-api/endpoints/purchase-report) are REST only, with no MCP tool.
 

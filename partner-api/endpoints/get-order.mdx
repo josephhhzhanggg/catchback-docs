@@ -1,0 +1,93 @@
+---
+title: "Get an order"
+api: "GET /api/partner/v1/orders/{checkout_id}"
+description: "One order by its id, including one that is still running, with every pull or card in it."
+---
+
+Scope: `read:account` · MCP tool: `get_order`
+
+One order on your account, with the same fields as in [List orders](/partner-api/endpoints/list-orders) plus what it contains: a pack purchase's pulls, or the card for any other order.
+
+It answers while an order is still running. After a timeout, or a `409 IDEMPOTENCY_IN_PROGRESS` that carries the order's `checkout_id`, follow the order here rather than resending it in a tight loop: it shows `pending` until the order completes or we close it, and a pack order's pulls as soon as they have landed. See [Idempotency](/partner-api/idempotency).
+
+<ParamField path="checkout_id" type="string" required>
+  The `checkout_id` that [Buy packs](/partner-api/endpoints/buy-packs) or [Buy a card](/partner-api/endpoints/buy-card) returned, the `transaction_id` of a [sell-back](/partner-api/endpoints/sell-back), or any order's `checkout_id` from List orders. A UUID.
+</ParamField>
+
+## Response
+
+Every field of an order in [List orders](/partner-api/endpoints/list-orders), plus:
+
+<ResponseField name="pulls" type="object[]">
+  A pack purchase's pulls, in order. Empty for any other order.
+  <Expandable title="pull">
+    <ResponseField name="pull_id" type="string" />
+    <ResponseField name="kind" type="string | null">`card`, or `sealed_pack` for a sealed product (a pull from the Starter or a sealed mystery pack, or a consolation pull). `null` if we can't find the pull.</ResponseField>
+    <ResponseField name="item" type="object | null">The card as it is now: a [card object](/partner-api/card-object), with today's images and market value. A sealed pack is `{ id, name, set, category, image_url }`. `null` if we can't load it.</ResponseField>
+    <ResponseField name="value" type="number | null">Market value at the moment of the pull.</ResponseField>
+    <ResponseField name="hit" type="object | null">`rarity_tier`, `bucket`, `bucket_odds`, `is_chase` and `chase_label`, as the purchase returned them. `null` while the order is still running, and for an order we closed after its response was lost.</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="item" type="object | null">The card, for a card buy, a sell-back or a sale: a [card object](/partner-api/card-object) as it is now. `null` for a pack purchase, or if we can't load the card.</ResponseField>
+<ResponseField name="payout_rate" type="number | null">Sell-backs only: the rate the sell-back paid at.</ResponseField>
+<ResponseField name="basis_value" type="number | null">Sell-backs only: the value the payout was based on.</ResponseField>
+
+A pull here has no `catchback` offer and no `proof`. For a card's offer right now, read [Get vault](/partner-api/endpoints/get-vault). To check a pull, see [Verify a pull](/partner-api/verify-a-pull).
+
+## Errors
+
+| Status | When |
+|---|---|
+| `403` | The key lacks `read:account` or isn't linked to an account |
+| `404` | No order with this id on your account. An unknown id, a malformed one and another account's order all look the same |
+| `500` | We couldn't load the order. Retry with backoff |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v1/orders/3e1ab17c-e93b-4a4e-b1f6-7b0719882a41 \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "checkout_id": "3e1ab17c-…",
+  "order_id": "order-1042",
+  "type": "pack_purchase",
+  "status": "completed",
+  "created_at": "2026-10-20T04:54:57.373+00:00",
+  "completed_at": "2026-10-20T04:54:58.563+00:00",
+  "amount": 25,
+  "fee": 0,
+  "balance_change": -25,
+  "reconciled": false,
+  "pack_type": "bronze",
+  "quantity": 1,
+  "pull_ids": ["e9d27918-…"],
+  "card_id": null,
+  "listing_id": null,
+  "transaction_id": null,
+  "pulls": [
+    {
+      "pull_id": "e9d27918-…",
+      "kind": "card",
+      "item": {
+        "id": "e3d7148d-…",
+        "category": "pokemon",
+        "name": "Pyroar",
+        "grading_company": "PSA",
+        "grading_rank": 10,
+        "market_value": 20,
+        "front_image": "https://…"
+      },
+      "value": 20,
+      "hit": { "rarity_tier": "starter", "bucket": "P0", "bucket_odds": 0.72, "is_chase": false, "chase_label": null }
+    }
+  ],
+  "item": null,
+  "payout_rate": null,
+  "basis_value": null
+}
+```
+</ResponseExample>

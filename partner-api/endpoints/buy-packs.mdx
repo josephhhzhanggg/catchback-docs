@@ -11,11 +11,11 @@ Opens packs with your account's CatchCoins at list price, through the same check
 **All or nothing:** if any pack in the request fails to open, the whole order is refunded and none of its pulls stand.
 
 <Warning>
-  This endpoint spends money. Always send an `Idempotency-Key`, and reuse it when retrying the same order. See [Idempotency](/partner-api/errors-and-limits#idempotency-retrying-a-purchase-safely).
+  This endpoint spends money. Always send an `Idempotency-Key`, and reuse it when retrying the same order. See [Idempotency](/partner-api/idempotency).
 </Warning>
 
 <ParamField header="Idempotency-Key" type="string" required>
-  Your order id: 8–128 characters of `A-Za-z0-9_-`. Retrying with the same key returns the original result instead of charging again.
+  Your order id: 8–128 characters of `A-Za-z0-9_-`, unique per account across pack and card orders. Retrying with the same key returns the original result instead of charging again.
 </ParamField>
 <ParamField body="pack_type" type="string" required>
   A `pack_type` from [List packs](/partner-api/endpoints/list-packs).
@@ -24,7 +24,7 @@ Opens packs with your account's CatchCoins at list price, through the same check
   `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
 </ParamField>
 <ParamField body="quantity" type="integer" default="1">
-  1–10, up to the pack's `max_quantity`.
+  1–10, up to the pack's `max_quantity`. See [Rate limits](/partner-api/rate-limits#pack-purchases).
 </ParamField>
 <ParamField body="risk_level" type="string" default="standard">
   `chill`, `standard` or `aggressive` (shown as Chill, Standard and Hot in the app), from the pack's `risk_levels`. See [Risk levels](/about-catchback/risk-levels).
@@ -42,30 +42,41 @@ Opens packs with your account's CatchCoins at list price, through the same check
 </ResponseField>
 <ResponseField name="pulls" type="object[]">
   <Expandable title="pull">
-    <ResponseField name="pull_id" type="string">Keep this. [Sell back](/partner-api/endpoints/sell-back) needs it.</ResponseField>
-    <ResponseField name="kind" type="string">`card`, or `sealed_pack` for a consolation pull.</ResponseField>
+    <ResponseField name="pull_id" type="string">Keep this. [Sell back](/partner-api/endpoints/sell-back) needs it. It is the pull's `transaction_uuid` ([what that is](/partner-api/card-object#pull-and-purchase-ids)).</ResponseField>
+    <ResponseField name="kind" type="string">`card`, or `sealed_pack` for a sealed product: every pull from the Starter or a sealed mystery pack, and a consolation pull.</ResponseField>
     <ResponseField name="item" type="object">A [card object](/partner-api/card-object). A sealed pack is `{ id, name, set, category, image_url }`.</ResponseField>
-    <ResponseField name="value" type="number">Market value at the moment of the pull.</ResponseField>
+    <ResponseField name="value" type="number | null">Market value at the moment of the pull. `null` when we have no value for the pull.</ResponseField>
     <ResponseField name="hit" type="object">
       `rarity_tier`, the `bucket` (band) it came from and that band's `bucket_odds`, `is_chase` and `chase_label`.
     </ResponseField>
     <ResponseField name="catchback" type="object | null">
       What we'll pay to buy it back: `amount` and `rate` now (90% for the first 5 minutes), `valid_until`, and `after`, the offer once the fresh window ends (80% of the value at pull). `null` for sealed packs. The [sell-back](/partner-api/endpoints/sell-back) response is the authoritative amount.
     </ResponseField>
+    <ResponseField name="proof" type="object | null">
+      The pull's provably fair record: `seed`, `verification_hash`, `seed_commit_hash`, `timestamp`, and `verify_path`, a check you can `GET` without a key. `null` for a guaranteed pull, which no roll chose. Keep it: no other endpoint returns it. See [Verify a pull](/partner-api/verify-a-pull).
+    </ResponseField>
   </Expandable>
 </ResponseField>
 <ResponseField name="idempotent_replay" type="boolean">Present and `true` when this is a stored result returned for a retry.</ResponseField>
+
+## Checking a pull
+
+Each pull's `proof` lets you check that the pull followed from its seed: `GET` its `verify_path` on `https://catchbackcards.com`, with no key, and read `verified`. A card draw is replayed from its seed, the first 8 hex digits of `pull_id`; a Starter or sealed mystery pack's recorded hash is recomputed. To replay a draw yourself, see [Verify a pull](/partner-api/verify-a-pull).
 
 ## Errors
 
 | Status | Code | When |
 |---|---|---|
-| `400` | | Missing `Idempotency-Key`, a bad parameter, not enough balance, or the pack can't be bought in multiples |
-| `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running. Retry shortly with the same key |
+| `400` | | Missing or malformed `Idempotency-Key`, a bad `pack_type`, `category`, `quantity` or `risk_level`, not enough balance, or the pack can't be bought in multiples |
+| `403` | | The key lacks `rip:packs` or isn't linked to an account, the account can't open this pack, or `"Partner account unavailable"` (the account is deleted). We also answer "not linked" or "unavailable" when we couldn't read your key or account just then, so one retry is worth it. Nothing was charged |
+| `403` | `FEATURE_RESTRICTED` | Opening packs is switched off for your account (`capability: "open_packs"`). Contact us |
+| `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running, or is being settled after a failed attempt. The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order), or retry later with the same key. Don't retry in a tight loop |
+| `409` | `IDEMPOTENCY_RETRY` | An earlier attempt with this key failed just as this one arrived. Retry with the same key |
 | `422` | `IDEMPOTENCY_KEY_REUSED` | This key was already used for a different order |
-| `429` | `RATE_LIMITED` | Too soon after your last purchase. Wait `retry_after_seconds` |
+| `429` | `RATE_LIMITED` | Too soon after your last purchase. Wait `retry_after_seconds` (also the `Retry-After` header) |
 | `429` | `DAILY_LIMIT_REACHED` | Your daily pack ceiling would be exceeded. Resets at `resets_at` |
-| `500` | | A pack failed to open. The whole order was refunded |
+| `500` | | A pack failed to open. The whole order was refunded; nothing was charged |
+| `503` | | We couldn't record the order, count today's packs or take the payment, so the order didn't go through. Retry shortly with the same key |
 
 <RequestExample>
 ```bash cURL
@@ -115,6 +126,13 @@ curl -X POST https://catchbackcards.com/api/partner/v1/packs/purchase \
         "rate": 0.9,
         "valid_until": "2026-09-29T20:24:55Z",
         "after": { "amount": 16.5, "rate": 0.8, "valid_until": "2026-10-06T20:19:55Z" }
+      },
+      "proof": {
+        "seed": 4261688475,
+        "verification_hash": "9c4f1e…",
+        "seed_commit_hash": "2be07a…",
+        "timestamp": "2026-09-29T20:19:55.418Z",
+        "verify_path": "/api/verify-pull?transaction_id=fe04349b-…&card_source=pokemon"
       }
     }
   ]

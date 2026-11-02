@@ -74,27 +74,50 @@
             "group": "Get started",
             "pages": [
               "partner-api/introduction",
+              "partner-api/quickstart",
               "partner-api/how-it-works",
               "partner-api/authentication",
-              "partner-api/errors-and-limits",
-              "partner-api/card-object",
               "partner-api/mcp"
             ]
           },
           {
-            "group": "Catalog",
+            "group": "Core concepts",
             "pages": [
-              "partner-api/endpoints/list-packs",
-              "partner-api/endpoints/get-pack-pool",
-              "partner-api/endpoints/search-cards",
-              "partner-api/endpoints/card-catalog"
+              "partner-api/errors-and-limits",
+              "partner-api/rate-limits",
+              "partner-api/idempotency",
+              "partner-api/pagination",
+              "partner-api/card-object"
             ]
           },
           {
-            "group": "Buying",
+            "group": "Gacha",
             "pages": [
+              "partner-api/endpoints/list-packs",
+              "partner-api/endpoints/get-pack-pool",
               "partner-api/endpoints/buy-packs",
-              "partner-api/endpoints/buy-card"
+              "partner-api/verify-a-pull"
+            ]
+          },
+          {
+            "group": "Marketplace",
+            "pages": [
+              "partner-api/endpoints/search-cards",
+              "partner-api/endpoints/buy-card",
+              "partner-api/endpoints/get-listings",
+              "partner-api/endpoints/list-card",
+              "partner-api/endpoints/update-listing-price",
+              "partner-api/endpoints/delist-card"
+            ]
+          },
+          {
+            "group": "Metadata",
+            "pages": [
+              "partner-api/endpoints/get-card",
+              "partner-api/endpoints/find-card-by-cert",
+              "partner-api/endpoints/get-price-history",
+              "partner-api/endpoints/get-card-activity",
+              "partner-api/endpoints/card-catalog"
             ]
           },
           {
@@ -103,15 +126,26 @@
               "partner-api/endpoints/get-me",
               "partner-api/endpoints/get-account",
               "partner-api/endpoints/get-vault",
-              "partner-api/endpoints/sell-back",
-              "partner-api/endpoints/list-card",
-              "partner-api/endpoints/delist-card"
+              "partner-api/endpoints/sell-back"
+            ]
+          },
+          {
+            "group": "Orders",
+            "pages": [
+              "partner-api/endpoints/list-orders",
+              "partner-api/endpoints/get-order"
             ]
           },
           {
             "group": "Reporting",
             "pages": [
               "partner-api/endpoints/purchase-report"
+            ]
+          },
+          {
+            "group": "Updates",
+            "pages": [
+              "partner-api/changelog"
             ]
           }
         ]

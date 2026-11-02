@@ -1,0 +1,53 @@
+---
+title: "Pagination"
+description: "How the list endpoints page, the most each one returns, and how to know when you've reached the end."
+---
+
+Six endpoints return their results in pages. Five page by number, and [List orders](/partner-api/endpoints/list-orders) pages by cursor.
+
+## Numbered pages
+
+These take `page` (1-based) and `per_page`, and echo back the values they used.
+
+| Endpoint | Default `per_page` | Most per page | Most pages | Order | How you know there's more |
+|---|---|---|---|---|---|
+| [Search cards](/partner-api/endpoints/search-cards) | 50 | 100 | 20 | `price` (your `sort`); at an equal price, user listings before shop stock, each by id | `has_more` |
+| [Your listings](/partner-api/endpoints/get-listings) | 100 | 200 | no limit | newest first, then listing id | `total` and `has_more` |
+| [Get vault](/partner-api/endpoints/get-vault) | 100 | 200 | no limit | card id, ascending | `total` |
+| [Card catalog export](/partner-api/endpoints/card-catalog) | 500 | 1000 | no limit | card id, ascending | `total` |
+| [Purchase report](/partner-api/endpoints/purchase-report) | 500 | 1000 | no limit | `created_at`, then `user_id`, `source`, `pack_type` and `amount` | `total` |
+
+So Search cards reaches at most 20 pages of 100 (2,000 results), Your listings and Get vault return up to 200 a page, and the catalog export and purchase report up to 1,000 rows a page.
+
+## Cursor pages
+
+[List orders](/partner-api/endpoints/list-orders) merges four kinds of order, newest first, so it pages by an opaque cursor instead of a page number:
+
+- `limit` sets the page size: 1–100, default 50.
+- Each page returns `has_more` and `next_cursor`. Send `next_cursor` back as `cursor`, unchanged, for the next page. On the last page `has_more` is `false` and `next_cursor` is `null`.
+- The cursor carries the first page's `since`, `until` and `type`, so later pages ignore those parameters. Orders placed while you page can't shift what you see, even with the default `until` of now.
+- A cursor that wasn't passed back unchanged is a `400`.
+
+The other endpoints aren't paginated. [List packs](/partner-api/endpoints/list-packs) returns every pack you can buy, and [Get a pack's pool](/partner-api/endpoints/get-pack-pool) every card or product a pull can produce, in one response. [Price history](/partner-api/endpoints/get-price-history) returns every point in its window, and [Card activity](/partner-api/endpoints/get-card-activity) the newest sales and listings up to its `limit`.
+
+## Out-of-range values
+
+Paging values are clamped, not rejected:
+
+- A `page` below 1, or one that isn't a number, is page 1.
+- A `per_page` or `limit` above the most per page is that maximum. Send a whole number from 1 up: anything else is replaced, by the default or by 1.
+- On Search cards, a `page` above 20 is page 20.
+
+Read `page` and `per_page` back from the response rather than assuming what you sent was used. Card activity's `limit` and the `days` on Price history and Card activity aren't paging values: out of range, they're a `400`.
+
+## Reaching the end
+
+- **Get vault, Card catalog export and Purchase report** return `total`, the number of rows across all pages. Keep incrementing `page` until you've fetched `total` rows; a page past the end is an empty list. **Your listings** returns `total` and `has_more`.
+- **Search cards** returns `has_more` instead. It is `true` when at least one more result follows the page, and always `false` on page 20, the last page you can ask for: a `page` above 20 returns page 20 again. To see further, narrow the price range: set `min_price` to the last result's price (`max_price` with `price_desc`) and start again from page 1, skipping the results at that price you already have. A search can also stop at its read ceiling, with `truncated: true`: see [How far a search reaches](/partner-api/endpoints/search-cards#how-far-a-search-reaches).
+- **List orders** returns `has_more` and `next_cursor`: see [Cursor pages](#cursor-pages).
+
+## Pages are snapshots
+
+Inventory changes between your requests ([why](/partner-api/errors-and-limits#inventory-is-point-in-time)), so a card can move between pages, or drop out, while you page through Search cards, Your listings, Get vault or the catalog export. Ordering by id keeps a sync stable enough to diff against your copy, but don't treat one pass as an exact snapshot.
+
+The Purchase report is different: purchases are only ever added, so a window that has already closed pages consistently. Pin both `since` and `until` in the past for a report. List orders keeps its place by cursor, so new orders can't shift a page, though an order's `status` can still change between pages.

@@ -1,0 +1,63 @@
+---
+title: "Find a card by cert"
+api: "GET /api/partner/v1/cards"
+description: "Look a graded slab up by the certificate number on its label."
+---
+
+Scope: `read:catalog` · MCP tool: `find_card_by_cert`
+
+Finds the CatchBack cards whose grading certificate number is exactly `cert`: normally one. Only graded slabs carry a cert, so the lookup covers `pokemon`, `onepiece`, `sports` and `riftbound`; watches, luxury goods and raw singles never match. A card we've retired from our inventory isn't matched here, though [Get a card](/partner-api/endpoints/get-card) still finds it by id. Like Get a card, it returns the [card object](/partner-api/card-object) only.
+
+<ParamField query="cert" type="string" required>
+  The cert number exactly as printed on the slab, e.g. `84512377`: 4–24 letters, digits or hyphens.
+</ParamField>
+<ParamField query="grading_company" type="string">
+  Only slabs from this grader, e.g. `PSA`, `CGC`, `BGS`: 2–10 letters, matched without regard to case. A slab with no grader on file counts as `PSA`.
+</ParamField>
+
+A lookup is cached for up to a minute.
+
+## Response
+
+<ResponseField name="cert" type="string">The cert you sent.</ResponseField>
+<ResponseField name="grading_company" type="string | null">The grader you sent, in capitals, or `null`.</ResponseField>
+<ResponseField name="cards" type="object[]">The [card objects](/partner-api/card-object) carrying this cert. Normally one.</ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | `cert` is missing, or isn't 4–24 letters, digits or hyphens; or `grading_company` isn't 2–10 letters |
+| `404` | No CatchBack card carries this cert (from that grader, if you sent one). The body repeats `cert` and `grading_company` |
+| `500` | We couldn't run the lookup. Retry with backoff |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/cards?cert=84512377&grading_company=PSA" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "cert": "84512377",
+  "grading_company": "PSA",
+  "cards": [
+    {
+      "id": "0e94dc61-…",
+      "category": "pokemon",
+      "name": "Charizard ex",
+      "grading_company": "PSA",
+      "grading_rank": 10,
+      "cert_number": "84512377",
+      "market_value": 410
+    }
+  ]
+}
+```
+
+```json 404
+{ "error": "No card with that cert", "cert": "84512377", "grading_company": "PSA" }
+```
+</ResponseExample>

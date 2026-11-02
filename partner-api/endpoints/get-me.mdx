@@ -21,8 +21,8 @@ Use it to check which CatchBack account your key is linked to. Quote `account.id
   `null` when `linked` is `false`.
   <Expandable title="account">
     <ResponseField name="id" type="string">Your account's id.</ResponseField>
-    <ResponseField name="username" type="string" />
-    <ResponseField name="profile_url" type="string">Your public profile on CatchBack.</ResponseField>
+    <ResponseField name="username" type="string | null">`null` if the account has no username yet.</ResponseField>
+    <ResponseField name="profile_url" type="string | null">Your public profile on CatchBack. `null` when there is no username.</ResponseField>
   </Expandable>
 </ResponseField>
 
