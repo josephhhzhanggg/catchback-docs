@@ -1,0 +1,3297 @@
+openapi: 3.1.0
+info:
+  title: CatchBack Partner API
+  version: 1.0.0
+  summary: Open packs, trade cards, read card data and ship vaulted cards.
+  description: |-
+    The Partner API acts on one CatchBack account with its real CatchCoins balance. Several
+    operations here move money or data, so read [Idempotency](/partner-api/idempotency) before
+    you call them.
+
+    Error bodies are JSON with a human-readable `error` and, where you might branch on it, a
+    machine-readable `code`. Branch on the status and the `code`, because the `error` text can
+    change. New fields can be added to any response.
+  contact:
+    name: CatchBack support
+    email: catchbackcards@gmail.com
+servers:
+  - url: https://catchbackcards.com
+    description: Production. Every call acts on real money and real inventory.
+tags:
+  - name: Gacha
+    description: Open packs, see what they can pull, check a pull, and sell cards back.
+  - name: Marketplace
+    description: Search and buy cards, and manage your own listings.
+  - name: Metadata
+    description: Look cards up by id or cert, with price history and recent activity.
+  - name: Shipping
+    description: Estimate, create and track shipments of cards you hold.
+  - name: Account
+    description: Your key, balance, limits, vault and order history, across every rail.
+  - name: Testing
+    description: Test logins for trying CatchBack without real money.
+  - name: Webhooks
+    description: Signed POSTs we send to your URL when something happens on your account.
+security:
+  - bearerAuth: []
+# A keyless operation below says `security: [{}]`, not `[]`. With an empty list Mintlify falls
+# back to docs.json's api.mdx.auth and shows a bearer header on the page.
+paths:
+  /api/partner/v1/catalog/packs:
+    get:
+      tags: [Gacha]
+      operationId: listPacks
+      summary: List packs
+      description: |-
+        **Scope:** `read:catalog`
+
+        Exactly the packs [Buy packs](/partner-api/endpoints/buy-packs) will sell this key's account, at the price it charges, with live availability. A pack that is only out of stock stays in the list with `available: false` and a `reason`. A key with no linked account sees the public packs.
+      security:
+        - bearerAuth: ['read:catalog']
+      parameters:
+        - $ref: '#/components/parameters/PackCategory'
+      responses:
+        '200':
+          description: The packs, cheapest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [category, packs]
+                properties:
+                  category: { $ref: '#/components/schemas/PackCategory' }
+                  packs:
+                    type: array
+                    items: { $ref: '#/components/schemas/Pack' }
+              example:
+                category: pokemon
+                packs:
+                  - pack_type: bronze
+                    name: Bronze Pack
+                    price: 25
+                    available: true
+                    max_quantity: 10
+                    risk_levels: [chill, standard, aggressive]
+                  - pack_type: starter
+                    name: Starter Pack
+                    price: 8
+                    available: false
+                    reason: Starter pack temporarily out of stock
+                    max_quantity: 1
+                    risk_levels: [standard]
+        '400':
+          description: Unknown `category`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'Unknown category: pokemn' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:catalog`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'API key lacks required scope: read:catalog' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/catalog/packs/pool:
+    get:
+      tags: [Gacha]
+      operationId: getPackPool
+      summary: Get a pack's pool
+      description: |-
+        **Scope:** `read:catalog`
+
+        What a pack can pull right now: its value bands with odds at a risk level, the chase card if one is set, and every hittable card. A band at 0% odds is still listed, but its cards are not.
+
+        `kind` says what the pack pays out. A `slab` pack pays graded cards, listed in `cards`. A `sealed` pack (the Starter and the sealed mystery packs) pays sealed products: every in-stock product is its own band, `products` lists them, and `cards` is empty.
+
+        The pool is [point-in-time](/partner-api/errors-and-limits#inventory-is-point-in-time): any opening on CatchBack can take a card from it. A sold-out pack still answers `200` with `available: false`.
+      security:
+        - bearerAuth: ['read:catalog']
+      parameters:
+        - name: pack_type
+          in: query
+          required: true
+          description: A `pack_type` from List packs. A pack this key can't buy is a `404`.
+          schema: { type: string, maxLength: 100 }
+          example: bronze
+        - $ref: '#/components/parameters/PackCategory'
+        - name: risk_level
+          in: query
+          description: Odds change with the risk level, and so can which cards are hittable. `aggressive` is shown as Hot in the app. Use one of the pack's `risk_levels`; any other is a `400`.
+          schema: { $ref: '#/components/schemas/RiskLevel' }
+      responses:
+        '200':
+          description: The pool.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PackPool' }
+              example:
+                pack_type: bronze
+                name: Bronze Pack
+                category: pokemon
+                risk_level: standard
+                price: 25
+                available: true
+                kind: slab
+                expected_value: 24.1
+                bands:
+                  - { bucket_id: P1, label: '$5-$20', min_value: 5, max_value: 20, odds: 0.72, is_consolation: false, hittable_cards: 412 }
+                  - { bucket_id: P2, label: '$20-$50', min_value: 20, max_value: 50, odds: 0.2, is_consolation: false, hittable_cards: 188 }
+                chase: null
+                total_cards: 1043
+                cards:
+                  - id: 0e94dc61-…
+                    category: pokemon
+                    name: Charizard ex
+                    set: Pokemon Sv3 En-Obsidian Flames
+                    language: english
+                    slab_label: 2023 Obsidian Flames Charizard ex
+                    grading_company: PSA
+                    grading_rank: 10
+                    cert_number: '84512377'
+                    market_value: 410
+                    front_image: https://…/0e94dc61-….png
+                    back_image: https://…/0e94dc61-…-back.png
+                    render_image: https://…/0e94dc61-…-render.png
+                    image_url: https://…/0e94dc61-…-render.png
+                    bucket_id: P5
+        '400':
+          description: A missing `pack_type`, an unknown `category`, or a risk level the pack doesn't open at.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: pack_type is required }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:catalog`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: '`pack_type` is not one this key can buy in that category.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/packs/purchase:
+    post:
+      tags: [Gacha]
+      operationId: buyPacks
+      summary: Buy packs
+      description: |-
+        **Scope:** `rip:packs` (needs a linked account). **Moves money.**
+
+        Opens 1–10 packs with your CatchCoins at list price. No promo codes, add-ons or bonus balance apply. The cards land in your vault, and every hit comes back with its CatchBack offer and a proof you can [check](/partner-api/verify-a-pull).
+
+        **All or nothing:** if any pack fails to open, the whole order is refunded and none of its pulls stand.
+
+        **`needs_review: true` on an error means the order may have been charged and we are settling it.** Never place it again under a new key. Follow it with [Get an order](/partner-api/endpoints/get-order). See [Idempotency](/partner-api/idempotency) and [Rate limits](/partner-api/rate-limits#pack-purchases).
+      security:
+        - bearerAuth: ['rip:packs']
+      parameters:
+        - $ref: '#/components/parameters/OrderIdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pack_type]
+              properties:
+                pack_type:
+                  type: string
+                  maxLength: 100
+                  description: A `pack_type` from List packs.
+                category: { $ref: '#/components/schemas/StorefrontCategory' }
+                quantity:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  default: 1
+                  description: Up to the pack's `max_quantity`.
+                risk_level: { $ref: '#/components/schemas/RiskLevel' }
+            example: { pack_type: bronze, category: pokemon, quantity: 2, risk_level: standard }
+      responses:
+        '200':
+          description: 'The order and every pull in it. A retry of a finished order returns the same body with `idempotent_replay: true`, and charges nothing.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PackPurchase' }
+              example:
+                checkout_id: c8baa66a-…
+                pack_type: bronze
+                quantity: 2
+                total_charged: 50
+                remaining_balance: 189935
+                summary:
+                  total_value: 32.62
+                  catchback_now_total: 29.36
+                  best_pull: { pull_id: fe04349b-…, name: Tyrunt, value: 20.62 }
+                pulls:
+                  - pull_id: fe04349b-…
+                    kind: card
+                    item:
+                      id: 2b814ce0-…
+                      name: Tyrunt
+                      set: Pokemon Japanese M3-Nullifying Zero
+                      category: pokemon
+                      grading_company: PSA
+                      grading_rank: 10
+                      slab_label: 2026 Japanese M3-Nullifying Zero Tyrunt Art Rare
+                      language: english
+                      cert_number: '84512377'
+                      market_value: 20.62
+                      front_image: https://…/2b814ce0-….png
+                      back_image: https://…/2b814ce0-…-back.png
+                      render_image: https://…/2b814ce0-…-render.png
+                      image_url: https://…/2b814ce0-…-render.png
+                    value: 20.62
+                    hit: { rarity_tier: starter, bucket: P0, bucket_odds: 0.72, is_chase: false, chase_label: null }
+                    catchback:
+                      amount: 18.56
+                      rate: 0.9
+                      valid_until: '2026-09-29T20:24:55Z'
+                      after: { amount: 16.5, rate: 0.8, valid_until: '2026-10-06T20:19:55Z' }
+                    proof:
+                      seed: 4261688475
+                      verification_hash: 9c4f1e…
+                      seed_commit_hash: 2be07a…
+                      timestamp: '2026-09-29T20:19:55.418Z'
+                      verify_path: /api/verify-pull?transaction_id=fe04349b-…&card_source=pokemon
+        '400':
+          description: A missing or malformed `Idempotency-Key`, a body that isn't JSON, a bad `pack_type`, `category`, `quantity` or `risk_level`, not enough balance, or a pack that can't be bought in multiples.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Idempotency-Key header is required }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: |-
+            Nothing was charged. One of:
+
+            - The key lacks `rip:packs` or isn't linked to an account.
+            - `Partner account unavailable`: the account is deleted.
+            - The account can't open this pack.
+            - `FEATURE_RESTRICTED`: opening packs is switched off for the account (`capability: "open_packs"`). Contact us.
+
+            We also answer "not linked" or "unavailable" when we couldn't read your key or account just then, so one retry is worth it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RestrictedError' }
+              example: { error: "Your account can't open packs right now. Contact support if you think this is a mistake.", code: FEATURE_RESTRICTED, capability: open_packs }
+        '409':
+          description: |-
+            - `IDEMPOTENCY_IN_PROGRESS`: an order with this key is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body has its `checkout_id` and `started_at`. Follow it with Get an order, or retry later with the same key. Don't retry in a tight loop.
+            - `IDEMPOTENCY_RETRY`: an earlier attempt with this key failed just as this one arrived. Retry with the same key.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/OrderError'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_RETRY] }
+              example:
+                error: A purchase with this idempotency key is still in progress.
+                code: IDEMPOTENCY_IN_PROGRESS
+                checkout_id: c8baa66a-…
+                started_at: '2026-09-29T20:19:55.418Z'
+        '422':
+          description: '`IDEMPOTENCY_KEY_REUSED`: this key was already used for a different order. Use a new key.'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [IDEMPOTENCY_KEY_REUSED] }
+              example: { error: This idempotency key was already used for a different purchase., code: IDEMPOTENCY_KEY_REUSED }
+        '429':
+          description: |-
+            - `RATE_LIMITED`: too soon after your last purchase. Wait `retry_after_seconds`, also sent as a `Retry-After` header.
+            - `DAILY_LIMIT_REACHED`: your daily pack ceiling would be exceeded. The body has `limit`, `used` and `resets_at`.
+
+            A refused request charges nothing.
+          headers:
+            Retry-After:
+              description: Seconds to wait. Sent with `RATE_LIMITED` only.
+              schema: { type: integer }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [RATE_LIMITED, DAILY_LIMIT_REACHED] }
+                      retry_after_seconds: { type: integer }
+                      limit: { type: integer }
+                      used: { type: integer }
+                      resets_at: { type: string, format: date-time }
+              examples:
+                rate_limited:
+                  summary: RATE_LIMITED
+                  value: { error: 'Rate limited: one purchase per key every 60 seconds.', code: RATE_LIMITED, retry_after_seconds: 43 }
+                daily_limit:
+                  summary: DAILY_LIMIT_REACHED
+                  value: { error: 'Daily limit reached: 100 packs per day (98 used).', code: DAILY_LIMIT_REACHED, limit: 100, used: 98, resets_at: '2026-10-29T00:00:00.000Z' }
+        '500':
+          description: |-
+            - No `code`: a pack failed to open. The whole order was refunded and nothing was charged.
+            - `PAYMENT_OUTCOME_UNKNOWN`: we couldn't confirm whether the order was charged. It may have been, and nothing was delivered. It's held for review (`needs_review: true`) and we settle any charge. **Stop retrying, and never place it again under a new key:** the same key answers `409 IDEMPOTENCY_IN_PROGRESS` until we settle it. The body has its `checkout_id`: follow it with Get an order. Also sent when a pack failed to open and its refund errored.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/OrderError'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [PAYMENT_OUTCOME_UNKNOWN] }
+              example:
+                error: We couldn't confirm whether this order was charged. It's held for review and we'll settle any charge, so check your balance before ordering again.
+                code: PAYMENT_OUTCOME_UNKNOWN
+                needs_review: true
+                checkout_id: c8baa66a-…
+        '503':
+          description: We couldn't record the order, count today's packs or take the payment, so the order didn't go through. Retry shortly with the same key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Could not process payment. Please try again. }
+  /api/partner/v1/cards/sell-back:
+    post:
+      tags: [Gacha]
+      operationId: sellBackCards
+      summary: Sell back cards
+      description: |-
+        **Scope:** `sell:cards` (needs a linked account). **Moves money.**
+
+        CatchBack up to 10 cards for CatchCoins, at the same rate a customer gets. A pulled card: the pull's fresh rate (90%) within 5 minutes of the pull, then 80% of the value at pull for 7 days, then 80% of market value. A bought card: 80% of the lower of the price you paid and its market value at purchase for 7 days, then 80% of market value.
+
+        Items run in order, and one failing doesn't stop the rest. A pull or purchase pays out only once: selling it again returns `already_sold` with the earlier sale, so a retry is always safe. A sealed pack can't be sold back through the API.
+      security:
+        - bearerAuth: ['sell:cards']
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  description: Each item needs a `card_id` and exactly one of `pull_id` and `purchase_id`, all UUIDs. Get vault has them, and so do Buy packs and Buy a card. The same card can't be listed twice.
+                  items:
+                    type: object
+                    required: [card_id]
+                    oneOf:
+                      - title: A pulled card
+                        required: [pull_id]
+                      - title: A bought card
+                        required: [purchase_id]
+                    properties:
+                      card_id: { type: string, format: uuid }
+                      pull_id:
+                        type: string
+                        format: uuid
+                        description: The pull the card came from.
+                      purchase_id:
+                        type: string
+                        format: uuid
+                        description: For a card you bought, the `purchase_id` from Get vault (Buy a card's `transaction_id`).
+            example:
+              items:
+                - { card_id: 0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e, pull_id: 873deb80-0000-4000-8000-000000000001 }
+      responses:
+        '200':
+          description: 'One result per item, in the order you sent them. A `200` can carry failed items: check each `status`.'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total_paid, remaining_balance, results]
+                properties:
+                  total_paid:
+                    type: number
+                    description: USD credited by this request, from `sold` items only.
+                  remaining_balance:
+                    type: [number, 'null']
+                    description: Your balance after the request, or `null` if we couldn't read it.
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      required: [card_id, status]
+                      properties:
+                        card_id: { type: string }
+                        pull_id: { type: string, description: Echoed when you sent one. }
+                        purchase_id: { type: string, description: Echoed when you sent one. }
+                        status:
+                          type: string
+                          enum: [sold, already_sold, failed]
+                        transaction_id:
+                          type: string
+                          description: The sell-back; for `already_sold`, the earlier one. Not on `failed`. Get an order takes it.
+                        payout_amount:
+                          type: number
+                          description: What the sell-back paid. Not on `failed`.
+                        payout_rate:
+                          type: number
+                          description: The rate it paid at. Only on `sold`.
+                        error:
+                          type: string
+                          description: Why it failed. Only on `failed`.
+                        code:
+                          type: string
+                          description: |-
+                            A machine-readable reason, on some `failed` items.
+
+                            - `CARD_LISTED_ON_MARKETPLACE`: the card is listed. Delist it first.
+                            - `GOODS_SELLBACK_WINDOW_CLOSED`: a luxury goods item, more than 5 minutes after its pull.
+                            - `CARD_IN_BATTLE`: the card is held by a pack battle that hasn't finished.
+                            - `NO_PURCHASE_RECORD`: a sealed pack with no purchase on record.
+                            - `SHOP_PURCHASE_NOT_SELLABLE`: an item bought from a partner shop, which ships but doesn't sell back.
+                          enum: [CARD_LISTED_ON_MARKETPLACE, GOODS_SELLBACK_WINDOW_CLOSED, CARD_IN_BATTLE, NO_PURCHASE_RECORD, SHOP_PURCHASE_NOT_SELLABLE]
+              example:
+                total_paid: 16.2
+                remaining_balance: 189937
+                results:
+                  - { card_id: bee48cce-…, pull_id: 873deb80-…, status: sold, transaction_id: 93727497-…, payout_amount: 16.2, payout_rate: 0.9 }
+                  - { card_id: e3d7148d-…, pull_id: e9d27918-…, status: already_sold, transaction_id: 2fa30a7d-…, payout_amount: 18 }
+                  - { card_id: 4a51bc92-…, purchase_id: e22855d2-…, status: failed, error: No purchase of this card by this account with that purchase_id }
+        '400':
+          description: The body isn't JSON, `items` is missing, empty or longer than 10, an item lacks a UUID `card_id` or doesn't have exactly one of `pull_id` and `purchase_id`, or the same card is listed twice.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: The same card is listed twice }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `sell:cards` or isn't linked to an account, or `Partner account unavailable`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/partner/v1/pulls:
+    get:
+      tags: [Gacha]
+      operationId: purchaseReport
+      summary: Purchase report
+      description: |-
+        **Scope:** `read:pulls`, opt-in, granted on request.
+
+        Every completed pack purchase in a window, for revenue-share reporting. Purchases with an `amount` of 0 and our own internal accounts are excluded. It returns nothing about what was pulled and nothing about the buyer beyond an opaque id.
+
+        The window is capped at 31 days. For a monthly report, pin both `since` and `until` in the past: the `until = now` default moves between page requests.
+      security:
+        - bearerAuth: ['read:pulls']
+      parameters:
+        - $ref: '#/components/parameters/Since'
+        - $ref: '#/components/parameters/Until'
+        - $ref: '#/components/parameters/Page'
+        - name: per_page
+          in: query
+          description: 1–1000. A higher value is treated as 1000.
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 500 }
+      responses:
+        '200':
+          description: The purchases, oldest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [since, until, page, per_page, total, pulls]
+                properties:
+                  since: { type: string, format: date-time }
+                  until: { type: string, format: date-time }
+                  page: { type: integer }
+                  per_page: { type: integer }
+                  total: { type: [integer, 'null'] }
+                  pulls:
+                    type: array
+                    items:
+                      type: object
+                      required: [user_id, created_at, amount, source, pack_type]
+                      properties:
+                        user_id: { type: string, description: The buyer as an opaque id. }
+                        created_at: { type: string }
+                        amount: { type: number, description: USD. }
+                        source: { type: string }
+                        pack_type: { type: [string, 'null'] }
+              example:
+                since: '2026-10-01T00:00:00.000Z'
+                until: '2026-10-31T00:00:00.000Z'
+                page: 1
+                per_page: 500
+                total: 1
+                pulls:
+                  - { user_id: 6f1c0000-…, created_at: '2026-10-20T04:54:57.373+00:00', amount: 25, source: pokemon, pack_type: bronze }
+        '400':
+          description: A malformed or inverted window, or a window over 31 days.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'Invalid window: since must be before until' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:pulls`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/verify-pull:
+    get:
+      tags: [Gacha]
+      operationId: verifyPull
+      summary: Verify a pull
+      description: |-
+        **No key.** No scope.
+
+        Replays a pull's draw from the proof every pull carries. This is the `verify_path` on a pull's `proof`. Read `verified`, and `verification_type` for what was checked. How to read the steps: [Verify a pull](/partner-api/verify-a-pull).
+      security:
+        - {}
+      parameters:
+        - name: transaction_id
+          in: query
+          required: true
+          description: The `pull_id`.
+          schema: { type: string, format: uuid }
+          example: fe04349b-0000-4000-8000-000000000001
+        - name: card_source
+          in: query
+          description: The pull's catalog, or `sealed` for a sealed pack. Without it, every catalog is searched.
+          schema:
+            type: string
+            enum: [pokemon, onepiece, sports, riftbound, watches, goods, singles, sealed]
+        - name: pack_type
+          in: query
+          description: A hint for the lookup. `verify_path` doesn't send it, and you don't need it.
+          schema: { type: string, maxLength: 64 }
+      responses:
+        '200':
+          description: The verdict, with `verified` `true` or `false`.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [verified]
+                additionalProperties: true
+                properties:
+                  transaction_id: { type: string }
+                  card_id: { type: string }
+                  pulled_card_name: { type: string }
+                  verified: { type: boolean }
+                  verification_type:
+                    type: string
+                    enum: [provably_fair, hash_only, legacy_hash, none]
+                    description: |-
+                      - `provably_fair`: the draw is replayed from the seed, and `verified` is `true` only when every step matches.
+                      - `hash_only`: the Starter or a sealed mystery pack, whose seed is random. The result hash is recomputed.
+                      - `legacy_hash`, `none`: a pull from before full proofs, or with no record.
+                  algorithm: { type: string, description: 'The draw''s version, e.g. `shuffle-scaled-v3`.' }
+                  summary:
+                    type: object
+                    properties:
+                      all_steps_passed: { type: boolean }
+                      message: { type: string }
+              example:
+                transaction_id: fe04349b-…
+                card_id: 2b814ce0-…
+                pulled_card_name: Tyrunt
+                verified: true
+                verification_type: provably_fair
+                algorithm: shuffle-scaled-v3
+                summary:
+                  all_steps_passed: true
+                  message: "All verification steps passed: the seed reproduces this pull's draws, and the result hash binds the card delivered."
+        '400':
+          description: A missing or malformed parameter, or one the check doesn't take.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: '`Access denied`: requests from your location are refused.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: 'No pull with this id. The body has `verified: false`.'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      verified: { type: boolean }
+              example: { verified: false, error: Transaction not found }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503':
+          description: We couldn't load the pull just then. Retry.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/partner/v1/marketplace/listings:
+    get:
+      tags: [Marketplace]
+      operationId: searchCards
+      summary: Search cards
+      description: |-
+        **Scope:** `read:catalog`
+
+        Every card you can buy right now: shop stock and fixed-price user listings. Each result has the exact price Buy a card charges, plus the $1 fee. Dutch auctions and your own listings are left out.
+
+        Page while `has_more` is true; page 20 is the last. `truncated: true` means the search stopped at its scan ceiling with matches unread. To get past either, narrow the price range: `min_price` at the last result's price (`max_price` for `price_desc`). Results at exactly that price come back again, so skip the ones you have.
+      security:
+        - bearerAuth: ['read:catalog']
+      parameters:
+        - $ref: '#/components/parameters/PackCategory'
+        - name: q
+          in: query
+          description: Text in the card name, slab label or set. 2–60 letters, digits, spaces or `' & . -`.
+          schema: { type: string, minLength: 2, maxLength: 60 }
+          example: charizard
+        - name: grading_company
+          in: query
+          description: 2–10 letters, e.g. `PSA`.
+          schema: { type: string, pattern: '^[A-Za-z]{2,10}$' }
+        - name: min_grade
+          in: query
+          schema: { type: number }
+        - name: max_grade
+          in: query
+          schema: { type: number }
+        - name: min_price
+          in: query
+          description: Dollars.
+          schema: { type: number }
+        - name: max_price
+          in: query
+          description: Dollars.
+          schema: { type: number }
+        - name: source
+          in: query
+          schema: { type: string, enum: [all, shop, listing], default: all }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [price_asc, price_desc], default: price_asc }
+        - name: page
+          in: query
+          description: 1–20. A later page is treated as 20.
+          schema: { type: integer, minimum: 1, maximum: 20, default: 1 }
+        - name: per_page
+          in: query
+          description: 1–100. A higher value is treated as 100.
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: The cards, sorted by price.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [category, page, per_page, has_more, truncated, results]
+                properties:
+                  category: { type: string }
+                  page: { type: integer }
+                  per_page: { type: integer }
+                  has_more: { type: boolean, description: Another page has results. Always false on page 20. }
+                  truncated: { type: boolean, description: The search stopped at its scan ceiling with matches unread. }
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      required: [card_id, source, listing_id, price, fee, total_cost, item]
+                      properties:
+                        card_id: { type: string, description: What Buy a card takes. }
+                        source: { type: string, enum: [shop, listing] }
+                        listing_id: { type: [string, 'null'], description: '`null` for a shop card.' }
+                        price: { type: number, description: 'What the buy charges for the card, in USD.' }
+                        fee: { type: number, description: The $1 buyer fee. }
+                        total_cost: { type: number, description: '`price` + `fee`.' }
+                        item: { $ref: '#/components/schemas/Card' }
+              example:
+                category: pokemon
+                page: 1
+                per_page: 50
+                has_more: false
+                truncated: false
+                results:
+                  - card_id: 0e94dc61-…
+                    source: shop
+                    listing_id: null
+                    price: 1450
+                    fee: 1
+                    total_cost: 1451
+                    item: { id: 0e94dc61-…, category: pokemon, name: Charizard ex, set: Pokemon Sv3 En-Obsidian Flames, grading_company: PSA, grading_rank: 10, slab_label: 2023 Obsidian Flames Charizard ex, language: english, cert_number: '84512377', market_value: 1450, front_image: 'https://…/0e94dc61-….png', back_image: 'https://…/0e94dc61-…-back.png', render_image: 'https://…/0e94dc61-…-render.png', image_url: 'https://…/0e94dc61-…-render.png' }
+        '400':
+          description: An unknown `category`, or a malformed `q`, `grading_company`, grade, price, `source` or `sort`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:catalog`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/cards/purchase:
+    post:
+      tags: [Marketplace]
+      operationId: buyCard
+      summary: Buy a card
+      description: |-
+        **Scope:** `buy:cards` (needs a linked account). **Moves money.**
+
+        Buys one card from the shop or a fixed-price listing: its price plus a $1 buyer fee, from your cash CatchCoins balance only. The card lands in your vault. Daily card and spend caps apply: see [Rate limits](/partner-api/rate-limits#card-purchases).
+
+        **`needs_review: true` in any response means money moved and we are settling the order.** Never place it again under a new key. Follow it with [Get an order](/partner-api/endpoints/get-order). See [Idempotency](/partner-api/idempotency).
+      security:
+        - bearerAuth: ['buy:cards']
+      parameters:
+        - $ref: '#/components/parameters/OrderIdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [card_id, max_price]
+              properties:
+                card_id:
+                  type: string
+                  format: uuid
+                  description: '`card_id` from Search cards.'
+                max_price:
+                  type: number
+                  exclusiveMinimum: 0
+                  maximum: 1000000
+                  description: The most you'll pay for the card in dollars, before the fee. Usually the `price` the search showed.
+            example: { card_id: 0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e, max_price: 1450 }
+      responses:
+        '200':
+          description: 'The card is yours. A retry of a finished order returns the same body with `idempotent_replay: true`, and charges nothing.'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [checkout_id, transaction_id, card_id, source, listing_id, price, fee, total_charged, remaining_balance, item]
+                properties:
+                  checkout_id: { type: string, description: Our id for the order. }
+                  transaction_id:
+                    type: [string, 'null']
+                    description: The sale. It is the `purchase_id` that Get vault and Sell back use for this card.
+                  card_id: { type: string }
+                  source: { type: string, enum: [shop, listing] }
+                  listing_id: { type: [string, 'null'] }
+                  price: { type: number, description: Charged for the card. }
+                  fee: { type: number, description: The $1 buyer fee. }
+                  total_charged: { type: number }
+                  remaining_balance: { type: number }
+                  item:
+                    anyOf:
+                      - $ref: '#/components/schemas/Card'
+                      - type: 'null'
+                  needs_review:
+                    type: boolean
+                    description: The sale went through and the card is yours, but our bookkeeping needs a manual check. Don't retry under a new key.
+                  idempotent_replay: { type: boolean }
+              example:
+                checkout_id: 5d1c…
+                transaction_id: a17e…
+                card_id: 0e94dc61-…
+                source: shop
+                listing_id: null
+                price: 1450
+                fee: 1
+                total_charged: 1451
+                remaining_balance: 48549
+                item: { id: 0e94dc61-…, category: pokemon, name: Charizard ex, set: Pokemon Sv3 En-Obsidian Flames, grading_company: PSA, grading_rank: 10, slab_label: 2023 Obsidian Flames Charizard ex, language: english, cert_number: '84512377', market_value: 1450, front_image: 'https://…/0e94dc61-….png', back_image: 'https://…/0e94dc61-…-back.png', render_image: 'https://…/0e94dc61-…-render.png', image_url: 'https://…/0e94dc61-…-render.png' }
+        '400':
+          description: A missing or malformed `Idempotency-Key`, a body that isn't JSON, a `card_id` that isn't a UUID, a missing or out-of-range `max_price`, or not enough balance.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Insufficient CatchCoins }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: |-
+            Nothing was charged. One of:
+
+            - The key lacks `buy:cards` or isn't linked to an account.
+            - The account can't buy cards.
+            - `Partner account unavailable`: the account is deleted.
+            - `FEATURE_RESTRICTED`: the marketplace is switched off for the account (`capability: "marketplace"`). Contact us.
+
+            We also answer "not linked" or "unavailable" when we couldn't read your key or account just then, so one retry is worth it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RestrictedError' }
+        '404':
+          description: No such card, or a read the purchase needs failed just then. One retry is worth it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |-
+            Nothing was charged, unless the body has `needs_review: true`.
+
+            - No `code`: the card is never sold here (an energy card, a Steph Curry card, or a shop card with no valid price). Pick another.
+            - `PRICE_CHANGED`: the price is above your `max_price`. The body has the current `price`.
+            - `CARD_NO_LONGER_AVAILABLE`: sold, pulled from a pack, delisted or shipped, or an item that is only sold in packs. Search again.
+            - `CARD_MOVED_TO_AUCTION`: the card is now in an auction, not sold at a fixed price. The body has `listing_id` and `listing_type`.
+            - `OWN_LISTING`: the card is your own listing.
+            - `IDEMPOTENCY_IN_PROGRESS`: an order with this key is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body has its `checkout_id`: follow it with Get an order, or retry later with the same key. Don't retry in a tight loop.
+            - `IDEMPOTENCY_RETRY`: an earlier attempt with this key failed just as this one arrived. Retry with the same key.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/OrderError'
+                  - type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [PRICE_CHANGED, CARD_NO_LONGER_AVAILABLE, CARD_MOVED_TO_AUCTION, OWN_LISTING, IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_RETRY]
+              examples:
+                price_changed:
+                  summary: PRICE_CHANGED
+                  value:
+                    checkout_id: 5d1c…
+                    error: The price changed to $1500.00 since you looked. Check the new price and try again.
+                    code: PRICE_CHANGED
+                    card_id: 0e94dc61-…
+                    price: 1500
+                    max_price: 1450
+        '422':
+          description: '`IDEMPOTENCY_KEY_REUSED`: this key was used for a different order. Use a new key.'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [IDEMPOTENCY_KEY_REUSED] }
+        '429':
+          description: '`DAILY_CARD_LIMIT_REACHED`: this key''s cards-per-day or spend-per-day cap would be exceeded. A refused order charges nothing. Resets at `resets_at`, midnight UTC.'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [DAILY_CARD_LIMIT_REACHED] }
+                      cards_used: { type: integer }
+                      max_cards_per_day: { type: integer }
+                      spend_used: { type: number }
+                      max_card_spend_per_day: { type: number }
+                      resets_at: { type: string, format: date-time }
+              example:
+                error: 'Daily card limit reached: 25 cards / $50000 per day.'
+                code: DAILY_CARD_LIMIT_REACHED
+                cards_used: 25
+                max_cards_per_day: 25
+                spend_used: 18240.5
+                max_card_spend_per_day: 50000
+                resets_at: '2026-10-29T00:00:00.000Z'
+        '500':
+          description: |-
+            - No `code`: the purchase failed. Retry once with the same key, never a new one: if nothing was charged, it runs again. If the body has `needs_review: true`, or the retry answers `409 IDEMPOTENCY_IN_PROGRESS`, the order may have been charged and we're settling it: stop retrying and follow it with Get an order.
+            - `PAYMENT_OUTCOME_UNKNOWN`: we couldn't confirm whether the order was charged. It may have been, and nothing was delivered. It's held for review (`needs_review: true`) and we settle any charge. **Stop retrying, and never place it again under a new key:** the same key answers `409 IDEMPOTENCY_IN_PROGRESS` until we settle it. The body has its `checkout_id`: follow it with Get an order.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/OrderError'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [PAYMENT_OUTCOME_UNKNOWN] }
+              example:
+                error: We couldn't confirm whether this order was charged. It's held for review and we'll settle any charge, so check your balance before ordering again.
+                code: PAYMENT_OUTCOME_UNKNOWN
+                needs_review: true
+                checkout_id: 5d1c…
+        '503':
+          description: We couldn't read your key's limits, record the order, count today's cards or take the payment, so the order didn't go through. Retry shortly with the same key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/partner/v1/listings:
+    get:
+      tags: [Marketplace]
+      operationId: getListings
+      summary: Your listings
+      description: |-
+        **Scope:** `read:account` (needs a linked account).
+
+        Your own active marketplace listings, newest first. Search cards leaves them out. A Dutch auction you started in the app shows here too, at its current price.
+      security:
+        - bearerAuth: ['read:account']
+      parameters:
+        - name: category
+          in: query
+          description: Only this catalog. Leave it out for every catalog.
+          schema: { type: string, enum: [pokemon, onepiece, sports, riftbound, watches] }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPageVault'
+      responses:
+        '200':
+          description: Your listings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [page, per_page, total, has_more, listings]
+                properties:
+                  page: { type: integer }
+                  per_page: { type: integer }
+                  total: { type: [integer, 'null'] }
+                  has_more: { type: boolean }
+                  listings:
+                    type: array
+                    items:
+                      type: object
+                      required: [listing_id, card_id, category, listing_type, price, seller_fee, payout, listed_at, updated_at, item]
+                      properties:
+                        listing_id: { type: string }
+                        card_id: { type: string }
+                        category: { type: string }
+                        listing_type: { type: string, enum: [fixed_price, dutch_auction] }
+                        price: { type: number, description: 'What a buy would charge right now, in USD.' }
+                        seller_fee: { type: number, description: 'What a sale takes from your payout, $1.' }
+                        payout: { type: number, description: '`price` − `seller_fee`.' }
+                        listed_at: { type: string }
+                        updated_at: { type: [string, 'null'] }
+                        item:
+                          anyOf:
+                            - $ref: '#/components/schemas/Card'
+                            - type: 'null'
+              example:
+                page: 1
+                per_page: 100
+                total: 1
+                has_more: false
+                listings:
+                  - listing_id: 5f1c…
+                    card_id: 0e94dc61-…
+                    category: pokemon
+                    listing_type: fixed_price
+                    price: 45
+                    seller_fee: 1
+                    payout: 44
+                    listed_at: '2026-10-28T19:56:28Z'
+                    updated_at: '2026-10-28T19:56:28Z'
+                    item: { id: 0e94dc61-…, category: pokemon, name: Greavard, set: Pokemon Svi En-Scarlet & Violet, grading_company: PSA, grading_rank: 9, slab_label: 2023 Scarlet & Violet Greavard, language: english, cert_number: '84512377', market_value: 38.43, front_image: 'https://…/0e94dc61-….png', back_image: 'https://…/0e94dc61-…-back.png', render_image: 'https://…/0e94dc61-…-render.png', image_url: 'https://…/0e94dc61-…-render.png' }
+        '400':
+          description: Unknown `category`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:account` or isn't linked to an account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+    post:
+      tags: [Marketplace]
+      operationId: listCard
+      summary: List a card
+      description: |-
+        **Scope:** `write:listings` (needs a linked account). **Changes data.**
+
+        Puts a card you hold up for sale at a fixed price. The price must be at least $5 and at most the larger of $5 and 2× the card's market value, and a card with no market value has no upper cap. The account needs a verified phone number. A listed card can't be sold back until you delist it.
+      security:
+        - bearerAuth: ['write:listings']
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [card_id, price]
+              properties:
+                card_id:
+                  type: string
+                  format: uuid
+                  description: A `card_id` from Get vault.
+                price:
+                  type: number
+                  exclusiveMinimum: 0
+                  description: Asking price in USD.
+            example: { card_id: 0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e, price: 45 }
+      responses:
+        '200':
+          description: The listing.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [listing_id, card_id, price]
+                properties:
+                  listing_id: { type: string }
+                  card_id: { type: string }
+                  price: { type: number }
+              example: { listing_id: 5f1c…, card_id: 0e94dc61-…, price: 45 }
+        '400':
+          description: |-
+            - No `code`: `card_id` isn't a UUID, `price` isn't a positive number, you don't hold the card, it's already listed, the price is out of range, or the card can't be listed (shipped, archived, an energy card, a luxury goods item or a raw single).
+            - `CARD_ON_PACK_HOLD`: the card came from a pack that holds its cards. Sell it back.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [CARD_ON_PACK_HOLD] }
+              example: { error: You do not hold this card }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: |-
+            - The key lacks `write:listings` or isn't linked to an account.
+            - `Phone verification required`.
+            - The account can't list cards.
+            - `FEATURE_RESTRICTED`: the marketplace is switched off for the account (`capability: "marketplace"`). Contact us.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RestrictedError' }
+        '404':
+          description: The card was gone by the time we created the listing. Read your vault and try again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The card changed while we were listing it. Read your vault and try again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+    delete:
+      tags: [Marketplace]
+      operationId: delistCard
+      summary: Delist a card
+      description: |-
+        **Scope:** `write:listings` (needs a linked account). **Changes data.**
+
+        Takes a listing down, and the card returns to your vault. This runs none of the seller checks that listing does, so an account that can no longer list can still take its listings down. The card goes in a JSON body, not the URL.
+      security:
+        - bearerAuth: ['write:listings']
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [card_id]
+              properties:
+                card_id:
+                  type: string
+                  format: uuid
+                  description: The listed card's `card_id`.
+            example: { card_id: 0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e }
+      responses:
+        '200':
+          description: The listing is down.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [card_id, delisted]
+                properties:
+                  card_id: { type: string }
+                  delisted: { type: boolean }
+              example: { card_id: 0e94dc61-…, delisted: true }
+        '400':
+          description: '`card_id` isn''t a UUID, or the card isn''t listed.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `write:listings` or isn't linked to an account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: The card isn't in your account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The listing changed while we were taking it down, e.g. it was just bought. Read your vault and try again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/listings/{listing_id}:
+    patch:
+      tags: [Marketplace]
+      operationId: updateListingPrice
+      summary: Change a listing's price
+      description: |-
+        **Scope:** `write:listings` (needs a linked account). **Changes data.**
+
+        Changes the price of one of your active fixed-price listings in place, in one transaction. The listing keeps its `listing_id`. The limits are the same as List a card, and the price is rounded to the cent. Sending the price a listing already has writes nothing and answers `200`, as long as it's still within the limits.
+      security:
+        - bearerAuth: ['write:listings']
+      parameters:
+        - name: listing_id
+          in: path
+          required: true
+          description: The listing, from Your listings or a listed card in Get vault.
+          schema: { type: string, format: uuid }
+          example: 5f1c2a90-0000-4000-8000-000000000001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [price]
+              properties:
+                price:
+                  type: number
+                  exclusiveMinimum: 0
+                  description: The new asking price in USD.
+            example: { price: 52.5 }
+      responses:
+        '200':
+          description: The new price.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [listing_id, card_id, category, price, previous_price, seller_fee, payout, updated_at]
+                properties:
+                  listing_id: { type: string }
+                  card_id: { type: string }
+                  category: { type: string }
+                  price: { type: number, description: 'The new price, rounded to the cent.' }
+                  previous_price: { type: number }
+                  seller_fee: { type: number }
+                  payout: { type: number, description: '`price` − `seller_fee`.' }
+                  updated_at: { type: [string, 'null'] }
+              example:
+                listing_id: 5f1c…
+                card_id: 0e94dc61-…
+                category: pokemon
+                price: 52.5
+                previous_price: 45
+                seller_fee: 1
+                payout: 51.5
+                updated_at: '2026-10-28T20:02:11Z'
+        '400':
+          description: |-
+            - No `code`: the listing id isn't a UUID, or `price` isn't a positive number.
+            - `PRICE_BELOW_MINIMUM`: under $5. The body has `min_price` and `max_price`.
+            - `PRICE_ABOVE_MAXIMUM`: over the larger of $5 and 2× market value. The body has `min_price` and `max_price`.
+            - `NOT_FIXED_PRICE`: the listing is a Dutch auction, whose price follows its schedule.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [PRICE_BELOW_MINIMUM, PRICE_ABOVE_MAXIMUM, NOT_FIXED_PRICE] }
+                      min_price: { type: number }
+                      max_price: { type: [number, 'null'], description: '`null` when the card has no market value, so no cap.' }
+                      listing_type: { type: string }
+              example: { error: Listings must be priced at least $5, code: PRICE_BELOW_MINIMUM, min_price: 5, max_price: 76.86 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: |-
+            - The key lacks `write:listings` or isn't linked to an account.
+            - `Phone verification required`.
+            - The account can't list cards.
+            - `FEATURE_RESTRICTED`: the marketplace is switched off for the account (`capability: "marketplace"`). Contact us.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RestrictedError' }
+        '404':
+          description: '`LISTING_NOT_FOUND`: no listing with this id belongs to your account.'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [LISTING_NOT_FOUND] }
+        '409':
+          description: |-
+            Nothing was written.
+
+            - `LISTING_NOT_ACTIVE`: the listing sold, was taken down or expired, or its card left your account. Once the listing has closed, the body has its `status`.
+            - `LISTING_CHANGED`: another change to the listing landed first, and the listing is still active. Read it again and retry.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [LISTING_NOT_ACTIVE, LISTING_CHANGED] }
+                      status: { type: string }
+        '500':
+          description: A database error. Send the same price again. That finishes the change, or writes nothing if it had already landed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/partner/v1/catalog/cards:
+    get:
+      tags: [Metadata]
+      operationId: cardCatalog
+      summary: Card catalog export
+      description: |-
+        **Scope:** `read:catalog`
+
+        A bulk export of our purchasable shop inventory, paginated. It has no filters and leaves out user listings. To find something to buy, use Search cards. The export is point-in-time: a pack pull or a sale can take any card at any moment.
+      security:
+        - bearerAuth: ['read:catalog']
+      parameters:
+        - name: category
+          in: query
+          schema: { $ref: '#/components/schemas/StorefrontCategory' }
+        - $ref: '#/components/parameters/Page'
+        - name: per_page
+          in: query
+          description: 1–1000. A higher value is treated as 1000.
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 500 }
+      responses:
+        '200':
+          description: One page of the catalog.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [category, page, per_page, total, cards]
+                properties:
+                  category: { type: string }
+                  page: { type: integer }
+                  per_page: { type: integer }
+                  total: { type: [integer, 'null'] }
+                  cards:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Card'
+                        - type: object
+                          properties:
+                            sale_status: { type: string, description: The card's shop status. }
+              example:
+                category: pokemon
+                page: 1
+                per_page: 500
+                total: 1
+                cards:
+                  - { id: 0e94dc61-…, category: pokemon, name: Charizard ex, set: Pokemon Sv3 En-Obsidian Flames, grading_company: PSA, grading_rank: 10, slab_label: 2023 Obsidian Flames Charizard ex, language: english, cert_number: '84512377', market_value: 410, sale_status: available in shop, front_image: 'https://…/0e94dc61-….png', back_image: 'https://…/0e94dc61-…-back.png', render_image: 'https://…/0e94dc61-…-render.png', image_url: 'https://…/0e94dc61-…-render.png' }
+        '400':
+          description: Unknown `category`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:catalog`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/cards:
+    get:
+      tags: [Metadata]
+      operationId: findCardByCert
+      summary: Find a card by cert
+      description: |-
+        **Scope:** `read:catalog`
+
+        Looks a graded slab up by the cert number on its label, optionally for one grader: every CatchBack card carrying that cert, normally one. Watches, goods and singles carry no cert. Cached for up to a minute.
+      security:
+        - bearerAuth: ['read:catalog']
+      parameters:
+        - name: cert
+          in: query
+          required: true
+          description: The cert number, exactly as on the slab.
+          schema: { type: string, pattern: '^[A-Za-z0-9-]{4,24}$' }
+          example: '84512377'
+        - name: grading_company
+          in: query
+          description: 2–10 letters, e.g. `PSA`, `CGC` or `BGS`. Case doesn't matter.
+          schema: { type: string, pattern: '^[A-Za-z]{2,10}$' }
+          example: PSA
+      responses:
+        '200':
+          description: The cards carrying this cert.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cert, grading_company, cards]
+                properties:
+                  cert: { type: string }
+                  grading_company: { type: [string, 'null'], description: 'What you sent, in upper case, or `null`.' }
+                  cards:
+                    type: array
+                    items: { $ref: '#/components/schemas/Card' }
+              example:
+                cert: '84512377'
+                grading_company: PSA
+                cards:
+                  - { id: 0e94dc61-…, category: pokemon, name: Charizard ex, set: Pokemon Sv3 En-Obsidian Flames, grading_company: PSA, grading_rank: 10, slab_label: 2023 Obsidian Flames Charizard ex, language: english, cert_number: '84512377', market_value: 410, front_image: 'https://…/0e94dc61-….png', back_image: 'https://…/0e94dc61-…-back.png', render_image: 'https://…/0e94dc61-…-render.png', image_url: 'https://…/0e94dc61-…-render.png' }
+        '400':
+          description: A missing or malformed `cert`, or a `grading_company` that isn't letters.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:catalog`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No CatchBack card carries this cert, from that grader if you sent one. The body echoes `cert` and `grading_company`.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      cert: { type: string }
+                      grading_company: { type: [string, 'null'] }
+              example: { error: No card with that cert, cert: '84512377', grading_company: PSA }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/cards/{id}:
+    get:
+      tags: [Metadata]
+      operationId: getCard
+      summary: Get a card
+      description: |-
+        **Scope:** `read:catalog`
+
+        One card by id, from any catalog: the same [card object](/partner-api/card-object) every other endpoint returns. No owner, acquisition or sale data. Cached for up to a minute.
+      security:
+        - bearerAuth: ['read:catalog']
+      parameters:
+        - $ref: '#/components/parameters/CardId'
+        - $ref: '#/components/parameters/LookupCategory'
+      responses:
+        '200':
+          description: The card.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [card]
+                properties:
+                  card: { $ref: '#/components/schemas/Card' }
+              example:
+                card:
+                  id: 0e94dc61-…
+                  category: pokemon
+                  name: Charizard ex
+                  set: Pokemon Sv3 En-Obsidian Flames
+                  year: '2023'
+                  number: '223'
+                  grading_company: PSA
+                  grading_rank: 10
+                  slab_label: 2023 Obsidian Flames Charizard ex
+                  language: english
+                  cert_number: '84512377'
+                  market_value: 410
+                  price: 410
+                  market_value_last_updated: '2026-10-28T17:04:11Z'
+                  front_image: https://…/0e94dc61-….png
+                  back_image: https://…/0e94dc61-…-back.png
+                  render_image: https://…/0e94dc61-…-render.png
+                  image_url: https://…/0e94dc61-…-render.png
+        '400':
+          description: A malformed card id or an unknown `category`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:catalog`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No card has this id, in that catalog if you sent `category`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/cards/{id}/price-history:
+    get:
+      tags: [Metadata]
+      operationId: getPriceHistory
+      summary: Price history
+      description: |-
+        **Scope:** `read:catalog`
+
+        A card's daily CardLadder value estimates, oldest first. A point is the raw reading, so the latest can differ from the card's `market_value`. A card that has never been priced returns an empty list. Cached for up to five minutes.
+      security:
+        - bearerAuth: ['read:catalog']
+      parameters:
+        - $ref: '#/components/parameters/CardId'
+        - $ref: '#/components/parameters/LookupCategory'
+        - $ref: '#/components/parameters/HistoryDays'
+      responses:
+        '200':
+          description: The readings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [card_id, category, days, since, points]
+                properties:
+                  card_id: { type: string }
+                  category: { type: string }
+                  days: { type: integer }
+                  since: { type: string, format: date-time }
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      required: [recorded_at, estimated_value, source]
+                      properties:
+                        recorded_at: { type: string }
+                        estimated_value: { type: number, description: USD. }
+                        source: { type: string, description: 'e.g. `cardladder`.' }
+              example:
+                card_id: 0e94dc61-…
+                category: pokemon
+                days: 90
+                since: '2026-07-30T18:00:00.000Z'
+                points:
+                  - { recorded_at: '2026-10-27T17:05:02Z', estimated_value: 398.5, source: cardladder }
+                  - { recorded_at: '2026-10-28T17:04:11Z', estimated_value: 410, source: cardladder }
+        '400':
+          description: A malformed card id, an unknown `category`, or `days` outside 1–365.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:catalog`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No card has this id.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/cards/{id}/activity:
+    get:
+      tags: [Metadata]
+      operationId: getCardActivity
+      summary: Card activity
+      description: |-
+        **Scope:** `read:catalog`
+
+        A card's recent sales and listings, newest first. Nobody is named. Trades that are not market prices (a buy by CatchBack staff or test accounts, or a seller buying their own listing) are left out. Cached for up to a minute.
+      security:
+        - bearerAuth: ['read:catalog']
+      parameters:
+        - $ref: '#/components/parameters/CardId'
+        - $ref: '#/components/parameters/LookupCategory'
+        - $ref: '#/components/parameters/HistoryDays'
+        - name: limit
+          in: query
+          description: The most sales, and the most listings, returned. Outside 1–50 is a `400`.
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: The sales and listings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [card_id, category, days, limit, since, sales, listings]
+                properties:
+                  card_id: { type: string }
+                  category: { type: string }
+                  days: { type: integer }
+                  limit: { type: integer }
+                  since: { type: string, format: date-time }
+                  sales:
+                    type: array
+                    items:
+                      type: object
+                      required: [sale_id, sold_at, price, source, listing_id, listing_type]
+                      properties:
+                        sale_id: { type: string }
+                        sold_at: { type: string }
+                        price: { type: number }
+                        source: { type: string, enum: [shop, listing] }
+                        listing_id: { type: [string, 'null'] }
+                        listing_type: { type: [string, 'null'] }
+                  listings:
+                    type: array
+                    items:
+                      type: object
+                      required: [listing_id, listing_type, status, price, listed_at, sold_at]
+                      properties:
+                        listing_id: { type: string }
+                        listing_type: { type: string }
+                        status: { type: string }
+                        price: { type: number }
+                        listed_at: { type: string }
+                        sold_at: { type: [string, 'null'] }
+              example:
+                card_id: 0e94dc61-…
+                category: pokemon
+                days: 90
+                limit: 20
+                since: '2026-07-30T18:00:00.000Z'
+                sales:
+                  - { sale_id: a17e…, sold_at: '2026-10-20T15:02:44Z', price: 395, source: listing, listing_id: 5f1c…, listing_type: fixed_price }
+                  - { sale_id: 93c2…, sold_at: '2026-09-02T11:40:09Z', price: 360, source: shop, listing_id: null, listing_type: null }
+                listings:
+                  - { listing_id: 5f1c…, listing_type: fixed_price, status: sold, price: 395, listed_at: '2026-10-18T09:12:00Z', sold_at: '2026-10-20T15:02:44Z' }
+        '400':
+          description: A malformed card id, an unknown `category`, `days` outside 1–365, or `limit` outside 1–50.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:catalog`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No card has this id.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/public/v1/cards/{id}:
+    get:
+      tags: [Metadata]
+      operationId: getPublicCard
+      summary: Public card metadata
+      description: |-
+        **No key.** No scope.
+
+        Any card's metadata and image URLs, by id. **It carries no price or value of any kind.** Call it from a server: it sends no CORS header, so another site's browser JavaScript can't read the response.
+
+        A `200` is sent with `Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=60`, so a response can be up to about 7 minutes old. Errors are `no-store`. The limit is 60 requests a minute per IP address (an IPv4 address or an IPv6 /64), and a response from the CDN doesn't count. Send only `category` as a query parameter: anything else misses the CDN and counts against your limit.
+      security:
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/CardId'
+        - $ref: '#/components/parameters/LookupCategory'
+      responses:
+        '200':
+          description: The card.
+          headers:
+            Cache-Control:
+              schema: { type: string }
+              example: public, max-age=0, s-maxage=300, stale-while-revalidate=60
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [card]
+                properties:
+                  card: { $ref: '#/components/schemas/PublicCard' }
+              example:
+                card:
+                  id: 0e94dc61-…
+                  category: pokemon
+                  name: Charizard ex
+                  set: Pokemon Sv3 En-Obsidian Flames
+                  grading_company: PSA
+                  grading_rank: 10
+                  slab_label: 2023 Obsidian Flames Charizard ex
+                  language: english
+                  cert_number: '84512377'
+                  front_image: https://…/0e94dc61-….png
+                  back_image: https://…/0e94dc61-…-back.png
+                  render_image: https://…/0e94dc61-…-render.png
+                  image_url: https://…/0e94dc61-…-render.png
+        '400':
+          description: A malformed card id or an unknown `category`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Invalid card id }
+        '403':
+          description: '`Access denied`: requests from your location are refused.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No card has this id, in that catalog if you sent `category`, or the card is archived.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Card not found }
+        '429':
+          description: '`RATE_LIMITED`: over 60 requests a minute. Wait `retry_after_seconds`, also sent as a `Retry-After` header.'
+          headers:
+            Retry-After:
+              schema: { type: integer }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [RATE_LIMITED] }
+                      retry_after_seconds: { type: integer }
+              example: { error: Too many requests, code: RATE_LIMITED, retry_after_seconds: 37 }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/shipments/estimate:
+    post:
+      tags: [Shipping]
+      operationId: estimateShipment
+      summary: Estimate a shipment
+      description: |-
+        **Scope:** `ship:cards`, opt-in, granted on request (needs a linked account).
+
+        Live carrier rates for shipping cards you hold to a customer's address, at the full rate you would pay. It stores nothing, and it is a `POST` so the address never lands in a URL. Create a shipment takes the `carrier` and `token` of the rate you choose. The account needs a verified phone number. 60 estimates a minute per key.
+      security:
+        - bearerAuth: ['ship:cards']
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [card_ids, address]
+              properties:
+                card_ids: { $ref: '#/components/schemas/ShipmentCardIds' }
+                address: { $ref: '#/components/schemas/ShipmentAddress' }
+            example:
+              card_ids: [0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e]
+              address: { name: Sam Rivera, address1: 1 Example Way, city: Testville, state: CA, zip: '94000', country: US }
+      responses:
+        '200':
+          description: The rates.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [destination_country, package_type, rates]
+                properties:
+                  destination_country: { type: string }
+                  package_type: { type: string, description: 'e.g. `mailer`.' }
+                  rates:
+                    type: array
+                    items:
+                      type: object
+                      required: [carrier, service, token, amount, estimated_days]
+                      properties:
+                        carrier: { type: string }
+                        service: { type: string }
+                        token: { type: string }
+                        amount: { type: number, description: 'The full rate, in USD.' }
+                        estimated_days: { type: [integer, 'null'] }
+              example:
+                destination_country: US
+                package_type: mailer
+                rates:
+                  - { carrier: USPS, service: Ground Advantage, token: usps_ground_advantage, amount: 5.4, estimated_days: 3 }
+                  - { carrier: USPS, service: Priority Mail, token: usps_priority, amount: 12.85, estimated_days: 2 }
+        '400':
+          description: |-
+            - No `code`: the body isn't JSON, `card_ids` isn't 1–10 card ids or lists one twice, or the address is invalid. An address error is `"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value.
+            - `COUNTRY_NOT_SUPPORTED`: we don't ship to this country.
+            - `OVER_CUSTOMS_CAP`: an international shipment worth over $2,500, or with a card we have no value for.
+            - `PARTNER_GOODS`: a partner's own goods ship from that partner.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShipmentRequestError' }
+              example: { error: Invalid address, fields: { phone: Required for international shipments } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ShipmentForbidden' }
+        '409': { $ref: '#/components/responses/CardsNotShippable' }
+        '429':
+          description: '`RATE_LIMITED`: more than 60 estimates a minute on this key. Wait `retry_after_seconds`, also sent as a `Retry-After` header.'
+          headers:
+            Retry-After:
+              schema: { type: integer }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [RATE_LIMITED] }
+                      retry_after_seconds: { type: integer }
+              example: { error: Too many estimates. Slow down., code: RATE_LIMITED, retry_after_seconds: 12 }
+        '502':
+          description: The carrier quote failed. Try again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: We couldn't check the account or the cards. Try again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/partner/v1/shipments:
+    post:
+      tags: [Shipping]
+      operationId: createShipment
+      summary: Create a shipment
+      description: |-
+        **Scope:** `ship:cards`, opt-in, granted on request (needs a linked account). **Moves money.**
+
+        Ships cards you hold to a customer's address. It charges your balance the rate's full amount and queues the shipment for us to fulfill. We quote again before charging: if the rate has gone above `max_cost`, nothing is charged. The account needs a verified phone number, and a key can make 50 shipments per UTC day.
+
+        Use a new `Idempotency-Key` for each shipment, and resend the same key and body to retry it: a finished shipment comes back, and is never charged twice. A refused shipment charges nothing and frees its key.
+
+        **`SHIPMENT_OUTCOME_UNKNOWN` means the charge may have gone through.** Don't resend it under a new key until you hear from us.
+      security:
+        - bearerAuth: ['ship:cards']
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Your id for this shipment, 8–128 characters of `A-Za-z0-9_-`, unique per account among your shipments. Pack and card order ids are a separate set.
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
+          example: ship-2077
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [card_ids, address, rate, max_cost]
+              properties:
+                card_ids: { $ref: '#/components/schemas/ShipmentCardIds' }
+                address: { $ref: '#/components/schemas/ShipmentAddress' }
+                rate:
+                  type: object
+                  description: The rate you chose from Estimate a shipment.
+                  required: [carrier, token]
+                  properties:
+                    carrier: { type: string, maxLength: 100, description: 'e.g. `USPS`.' }
+                    token: { type: string, maxLength: 100, description: 'e.g. `usps_priority`.' }
+                max_cost:
+                  type: number
+                  exclusiveMinimum: 0
+                  maximum: 10000
+                  description: The most you'll pay for this rate, in dollars. Normally the `amount` from the estimate.
+            example:
+              card_ids: [0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e]
+              address: { name: Sam Rivera, address1: 1 Example Way, city: Testville, state: CA, zip: '94000', country: US }
+              rate: { carrier: USPS, token: usps_priority }
+              max_cost: 12.85
+      responses:
+        '200':
+          description: 'The shipment. A new one is `processing`. A retry of one that went through returns it as it stands now, with `idempotent_replay: true`.'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Shipment'
+                  - type: object
+                    properties:
+                      idempotent_replay: { type: boolean }
+              example:
+                id: 7c1e0000-…
+                status: processing
+                card_ids: [0e94dc61-…]
+                carrier: USPS
+                service: Priority Mail
+                service_token: usps_priority
+                cost: 12.85
+                destination_country: US
+                tracking_number: null
+                tracking_url: null
+                created_at: '2026-11-02T18:04:11.000Z'
+                status_updated_at: null
+                shipped_at: null
+                expected_delivery: null
+                delivered_at: null
+        '400':
+          description: |-
+            - No `code`: a missing or malformed `Idempotency-Key`, a body that isn't JSON, `card_ids` that aren't 1–10 card ids or list one twice, an invalid address (`"error": "Invalid address"` with `fields`), a `rate` that isn't a carrier and token, or a missing or out-of-range `max_cost`.
+            - `INSUFFICIENT_BALANCE`: your balance is below the rate. The body has the `amount`. Nothing was charged.
+            - `COUNTRY_NOT_SUPPORTED`: we don't ship to this country.
+            - `OVER_CUSTOMS_CAP`: an international shipment worth over $2,500, or with a card we have no value for.
+            - `PARTNER_GOODS`: a partner's own goods ship from that partner.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShipmentRequestError' }
+              example: { error: Insufficient balance, code: INSUFFICIENT_BALANCE, amount: 12.85 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ShipmentForbidden' }
+        '409':
+          description: |-
+            Nothing more was charged.
+
+            - `CARDS_NOT_SHIPPABLE`: a card can't ship. `cards[]` gives each refused `card_id` and its `reason`. A card lost at the last moment comes with no `cards` list: read Get vault again.
+            - `RATE_UNAVAILABLE`: the carrier no longer offers that rate. Estimate again.
+            - `PRICE_CHANGED`: the fresh rate is above `max_cost`. The body has `amount` and `max_cost`.
+            - `IDEMPOTENCY_IN_PROGRESS`: a shipment with this key is still running, or is with our team (`needs_review: true`). The body has `shipment_id` and `started_at`. Follow it with Get a shipment.
+            - `IDEMPOTENCY_RETRY`: an earlier attempt with this key just failed, and freed the key. Resend the same key.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [CARDS_NOT_SHIPPABLE, RATE_UNAVAILABLE, PRICE_CHANGED, IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_RETRY] }
+                      cards: { $ref: '#/components/schemas/RefusedCards' }
+                      amount: { type: number }
+                      max_cost: { type: number }
+                      shipment_id: { type: string }
+                      started_at: { type: string, format: date-time }
+                      needs_review: { type: boolean }
+              examples:
+                price_changed:
+                  summary: PRICE_CHANGED
+                  value: { error: The rate is now above your max_cost., code: PRICE_CHANGED, amount: 14.1, max_cost: 12.85 }
+        '422':
+          description: '`IDEMPOTENCY_KEY_REUSED`: this key was already used with a different body. A retry has to send the same cards, address, rate and `max_cost`.'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [IDEMPOTENCY_KEY_REUSED] }
+        '429':
+          description: '`DAILY_SHIPMENT_LIMIT_REACHED`: this key has made 50 shipments today (UTC). The body has `limit` and `resets_at`.'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [DAILY_SHIPMENT_LIMIT_REACHED] }
+                      limit: { type: integer }
+                      resets_at: { type: string, format: date-time }
+              example: { error: 'Daily shipment limit reached: 50 per key per UTC day.', code: DAILY_SHIPMENT_LIMIT_REACHED, limit: 50, resets_at: '2026-11-03T00:00:00.000Z' }
+        '500':
+          description: |-
+            - No `code`: the shipment didn't go through and nothing was charged. Try again with the same key.
+            - `SHIPMENT_OUTCOME_UNKNOWN`: we couldn't confirm whether the charge went through. It's with our team (`needs_review: true`, with its `shipment_id`). A retry with the same key can't charge twice. **Don't resend it under a new key until you hear from us.**
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code: { type: string, enum: [SHIPMENT_OUTCOME_UNKNOWN] }
+                      shipment_id: { type: string }
+                      needs_review: { type: boolean }
+              example:
+                error: We could not confirm whether this shipment went through. It is with our team; retrying with the same Idempotency-Key is safe and will not charge again.
+                code: SHIPMENT_OUTCOME_UNKNOWN
+                shipment_id: 7c1e0000-…
+                needs_review: true
+        '502':
+          description: We couldn't confirm the carrier rate, and nothing was charged. Try again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: We couldn't check the account, the cards or your daily limit, or start the shipment, and this attempt charged nothing. Try again with the same key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      tags: [Shipping]
+      operationId: listShipments
+      summary: List shipments
+      description: |-
+        **Scope:** `ship:cards`, opt-in, granted on request (needs a linked account).
+
+        Every shipment on your account, newest first, across every key linked to it. No address appears here: Get a shipment has that. Unlike the other list endpoints, this one doesn't clamp: a `page` or `per_page` out of range is a `400`.
+      security:
+        - bearerAuth: ['ship:cards']
+      parameters:
+        - name: page
+          in: query
+          description: 1-based.
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: per_page
+          in: query
+          description: 1–100.
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: One page of shipments.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [page, per_page, total, shipments]
+                properties:
+                  page: { type: integer }
+                  per_page: { type: integer }
+                  total: { type: [integer, 'null'], description: '`null` on a page past the end, which has no shipments.' }
+                  shipments:
+                    type: array
+                    items: { $ref: '#/components/schemas/Shipment' }
+              example:
+                page: 1
+                per_page: 50
+                total: 1
+                shipments:
+                  - id: 7c1e0000-…
+                    status: processing
+                    card_ids: [0e94dc61-…]
+                    carrier: USPS
+                    service: Priority Mail
+                    service_token: usps_priority
+                    cost: 12.85
+                    destination_country: US
+                    tracking_number: null
+                    tracking_url: null
+                    created_at: '2026-11-02T18:04:11.000Z'
+                    status_updated_at: null
+                    shipped_at: null
+                    expected_delivery: null
+                    delivered_at: null
+        '400':
+          description: '`page` isn''t a positive number, or `per_page` isn''t 1–100.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `ship:cards` or isn't linked to an account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/shipments/{id}:
+    get:
+      tags: [Shipping]
+      operationId: getShipment
+      summary: Get a shipment
+      description: |-
+        **Scope:** `ship:cards`, opt-in, granted on request (needs a linked account).
+
+        One shipment on your account, with its cards and the address it ships to. It always has the current status, so it's the place to check after a `shipment.updated` event or a `SHIPMENT_OUTCOME_UNKNOWN`. We remove the address 90 days after a shipment closes, or 180 days after it shipped if the carrier never reported an end.
+      security:
+        - bearerAuth: ['ship:cards']
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The `id` Create a shipment returned, or the `shipment_id` in an error.
+          schema: { type: string, format: uuid }
+          example: 7c1e0000-1111-4222-8333-444444444444
+      responses:
+        '200':
+          description: The shipment.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShipmentDetail' }
+              example:
+                id: 7c1e0000-…
+                status: shipped
+                card_ids: [0e94dc61-…]
+                carrier: USPS
+                service: Priority Mail
+                service_token: usps_priority
+                cost: 12.85
+                destination_country: US
+                tracking_number: '9400100000000000000000'
+                tracking_url: https://tools.usps.com/go/TrackConfirmAction?tLabels=9400100000000000000000
+                created_at: '2026-11-02T18:04:11.000Z'
+                status_updated_at: '2026-11-03T16:20:00.000Z'
+                shipped_at: '2026-11-03T16:20:00.000Z'
+                expected_delivery: null
+                delivered_at: null
+                items:
+                  - { card_id: 0e94dc61-…, name: Charizard ex, grade: 10, grading_company: PSA, value: 410 }
+                address: { name: Sam Rivera, address1: 1 Example Way, address2: null, city: Testville, state: CA, zip: '94000', country: US, phone: null }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: |-
+            - The key lacks `ship:cards` or isn't linked to an account.
+            - `Partner account unavailable`: the account is deleted.
+            - The account can't request shipping.
+            - `FEATURE_RESTRICTED`: the account is restricted from the marketplace or from withdrawals, so its key can't read addresses. Contact us.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RestrictedError' }
+        '404':
+          description: No shipment with this id on your account. An unknown id, a malformed one and another account's shipment all look the same.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Shipment not found }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503':
+          description: We couldn't check the account. Try again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/shipping-countries:
+    get:
+      tags: [Shipping]
+      operationId: listShippingCountries
+      summary: Shipping countries
+      description: |-
+        **No key.** No scope.
+
+        The countries a card can ship to, as ISO 3166 alpha-2 codes. This is the list `address.country` is checked against. Cached for up to 5 minutes.
+      security:
+        - {}
+      responses:
+        '200':
+          description: The countries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [countries]
+                properties:
+                  countries:
+                    type: array
+                    items: { type: string }
+              example: { countries: [US, CA, GB] }
+  /api/partner/v1/me:
+    get:
+      tags: [Account]
+      operationId: whoAmI
+      summary: Who am I
+      description: |-
+        **Scope:** none, any valid key.
+
+        Which key this is, its scopes, and the CatchBack account it acts as. An unlinked key gets `linked: false` here, while the account endpoints answer `403` for it.
+      responses:
+        '200':
+          description: The key and its account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [key, linked, account]
+                properties:
+                  key:
+                    type: object
+                    required: [name, scopes]
+                    properties:
+                      name: { type: string }
+                      scopes:
+                        type: array
+                        items: { type: string }
+                  linked: { type: boolean }
+                  account:
+                    type: [object, 'null']
+                    description: '`null` when `linked` is `false`.'
+                    properties:
+                      id: { type: string }
+                      username: { type: [string, 'null'] }
+                      profile_url: { type: [string, 'null'] }
+              example:
+                key: { name: acme, scopes: ['read:catalog', 'read:account', 'rip:packs'] }
+                linked: true
+                account: { id: 6f1c0000-…, username: acme-cards, profile_url: https://catchbackcards.com/user/acme-cards }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/account:
+    get:
+      tags: [Account]
+      operationId: getAccount
+      summary: Get account
+      description: |-
+        **Scope:** `read:account` (needs a linked account).
+
+        Your CatchCoins balance, packs used today against the daily ceiling, when the next pack purchase is allowed, and cards and card spend used today against the daily caps.
+      security:
+        - bearerAuth: ['read:account']
+      responses:
+        '200':
+          description: The balance and limits.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [username, balance, limits, card_limits]
+                properties:
+                  username: { type: [string, 'null'] }
+                  balance: { type: number }
+                  limits:
+                    type: object
+                    description: Pack limits. `packs_today` and `packs_left_today` are `null` if we can't count them just then.
+                    properties:
+                      packs_today: { type: [integer, 'null'] }
+                      max_packs_per_day: { type: integer }
+                      packs_left_today: { type: [integer, 'null'] }
+                      resets_at: { type: string, format: date-time }
+                      min_seconds_between_purchases: { type: integer }
+                      next_purchase_at: { type: string, format: date-time }
+                  card_limits:
+                    type: object
+                    description: Card limits. The usage fields are `null` if we can't count them just then.
+                    properties:
+                      cards_today: { type: [integer, 'null'] }
+                      max_cards_per_day: { type: integer }
+                      cards_left_today: { type: [integer, 'null'] }
+                      spend_today: { type: [number, 'null'] }
+                      max_card_spend_per_day: { type: number }
+                      spend_left_today: { type: [number, 'null'] }
+                      resets_at: { type: string, format: date-time }
+              example:
+                username: acme-cards
+                balance: 189953.5
+                limits:
+                  packs_today: 4
+                  max_packs_per_day: 100
+                  packs_left_today: 96
+                  resets_at: '2026-09-30T00:00:00.000Z'
+                  min_seconds_between_purchases: 60
+                  next_purchase_at: '2026-09-29T20:24:12.000Z'
+                card_limits:
+                  cards_today: 3
+                  max_cards_per_day: 25
+                  cards_left_today: 22
+                  spend_today: 4353
+                  max_card_spend_per_day: 50000
+                  spend_left_today: 45647
+                  resets_at: '2026-09-30T00:00:00.000Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:account` or isn't linked to an account, or `Partner account unavailable`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/partner/v1/vault:
+    get:
+      tags: [Account]
+      operationId: getVault
+      summary: Get vault
+      description: |-
+        **Scope:** `read:account` (needs a linked account).
+
+        Cards in your vault or listed on the marketplace, one catalog per request. Each names its latest acquisition: a pull (`pull_id`) or a buy (`purchase_id`). The other is `null`, and Sell back takes whichever is set. A pull can land in a different catalog from its pack's, so sync every category you might hold.
+      security:
+        - bearerAuth: ['read:account']
+      parameters:
+        - name: category
+          in: query
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/CardCategory'
+            default: pokemon
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPageVault'
+      responses:
+        '200':
+          description: The cards you hold in this catalog.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [category, page, per_page, total, cards]
+                properties:
+                  category: { type: string }
+                  page: { type: integer }
+                  per_page: { type: integer }
+                  total: { type: [integer, 'null'] }
+                  cards:
+                    type: array
+                    items:
+                      type: object
+                      required: [card_id, pull_id, pulled_at, purchase_id, purchased_at, item, value, listed, listing_id, listing_price, catchback]
+                      properties:
+                        card_id: { type: string }
+                        pull_id: { type: [string, 'null'] }
+                        pulled_at: { type: [string, 'null'] }
+                        purchase_id: { type: [string, 'null'], description: 'The buy''s `transaction_id`.' }
+                        purchased_at: { type: [string, 'null'] }
+                        item: { $ref: '#/components/schemas/Card' }
+                        value: { type: [number, 'null'], description: Current market value. }
+                        listed: { type: boolean }
+                        listing_id: { type: [string, 'null'], description: The card's active listing while it is listed. }
+                        listing_price: { type: [number, 'null'] }
+                        catchback:
+                          type: [object, 'null']
+                          description: The sell-back offer right now. `null` while the card is listed.
+                          properties:
+                            amount: { type: number }
+                            rate: { type: number }
+                            basis_value: { type: number, description: The value the offer is based on. }
+                            locked_value_until: { type: [string, 'null'] }
+              example:
+                category: pokemon
+                page: 1
+                per_page: 100
+                total: 1
+                cards:
+                  - card_id: 0e94dc61-…
+                    pull_id: d9504d3f-…
+                    pulled_at: '2026-09-29T19:56:28Z'
+                    purchase_id: null
+                    purchased_at: null
+                    item: { id: 0e94dc61-…, category: pokemon, name: Greavard, set: Pokemon Svi En-Scarlet & Violet, grading_company: PSA, grading_rank: 9, slab_label: 2023 Scarlet & Violet Greavard, language: english, cert_number: '84512377', market_value: 38.43, front_image: 'https://…/0e94dc61-….png', back_image: 'https://…/0e94dc61-…-back.png', render_image: 'https://…/0e94dc61-…-render.png', image_url: 'https://…/0e94dc61-…-render.png' }
+                    value: 38.43
+                    listed: false
+                    listing_id: null
+                    listing_price: null
+                    catchback: { amount: 30.74, rate: 0.8, basis_value: 38.43, locked_value_until: '2026-10-06T19:56:28Z' }
+        '400':
+          description: Unknown `category`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:account` or isn't linked to an account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/orders:
+    get:
+      tags: [Account]
+      operationId: listOrders
+      summary: List orders
+      description: |-
+        **Scope:** `read:account` (needs a linked account).
+
+        Everything that moved your balance through the API, newest first, so you can reconcile your records against ours: pack purchases, card purchases, sell-backs (one order per card) and sales of your listings. The history belongs to the account, not the key. Purchases and sell-backs made in our app are left out.
+
+        The window is capped at 31 days. Page with `next_cursor`: see [Pagination](/partner-api/pagination#cursor-pages).
+      security:
+        - bearerAuth: ['read:account']
+      parameters:
+        - name: type
+          in: query
+          description: Only orders of this kind. Leave it out for all four.
+          schema: { $ref: '#/components/schemas/OrderType' }
+        - $ref: '#/components/parameters/Since'
+        - $ref: '#/components/parameters/Until'
+        - name: limit
+          in: query
+          description: Orders per page, 1–100. A higher value is treated as 100.
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          description: '`next_cursor` from the previous page, unchanged. It carries that page''s window and type, so `since`, `until` and `type` are ignored when you send it.'
+          schema: { type: string }
+      responses:
+        '200':
+          description: One page of orders.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [since, until, type, limit, has_more, next_cursor, orders]
+                properties:
+                  since: { type: string, format: date-time }
+                  until: { type: string, format: date-time }
+                  type:
+                    anyOf:
+                      - $ref: '#/components/schemas/OrderType'
+                      - type: 'null'
+                  limit: { type: integer }
+                  has_more: { type: boolean }
+                  next_cursor: { type: [string, 'null'], description: Send it as `cursor` for the next page. `null` on the last page. }
+                  orders:
+                    type: array
+                    items: { $ref: '#/components/schemas/Order' }
+              example:
+                since: '2026-10-01T00:00:00.000Z'
+                until: '2026-10-31T00:00:00.000Z'
+                type: null
+                limit: 50
+                has_more: false
+                next_cursor: null
+                orders:
+                  - checkout_id: 3e1ab17c-…
+                    order_id: order-1042
+                    type: pack_purchase
+                    status: completed
+                    created_at: '2026-10-20T04:54:57.373+00:00'
+                    completed_at: '2026-10-20T04:54:58.563+00:00'
+                    amount: 25
+                    fee: 0
+                    balance_change: -25
+                    reconciled: false
+                    pack_type: bronze
+                    quantity: 1
+                    pull_ids: [e9d27918-…]
+                    card_id: null
+                    listing_id: null
+                    transaction_id: null
+        '400':
+          description: An unknown `type`, a malformed or inverted window, a window over 31 days, or a cursor not passed back unchanged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'Invalid cursor: pass next_cursor from the previous page unchanged' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:account` or isn't linked to an account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/orders/{checkout_id}:
+    get:
+      tags: [Account]
+      operationId: getOrder
+      summary: Get an order
+      description: |-
+        **Scope:** `read:account` (needs a linked account).
+
+        One order on your account, with what it contains: a pack purchase's pulls, or the card for any other order. It answers while an order is still running, so after a timeout, a `409 IDEMPOTENCY_IN_PROGRESS` or a `PAYMENT_OUTCOME_UNKNOWN`, follow the order here rather than resending it. A pull here has no `catchback` offer and no `proof`.
+      security:
+        - bearerAuth: ['read:account']
+      parameters:
+        - name: checkout_id
+          in: path
+          required: true
+          description: The `checkout_id` Buy packs or Buy a card returned, the `transaction_id` of a sell-back, or any order's `checkout_id` from List orders.
+          schema: { type: string, format: uuid }
+          example: 3e1ab17c-e93b-4a4e-b1f6-7b0719882a41
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderDetail' }
+              example:
+                checkout_id: 3e1ab17c-…
+                order_id: order-1042
+                type: pack_purchase
+                status: completed
+                created_at: '2026-10-20T04:54:57.373+00:00'
+                completed_at: '2026-10-20T04:54:58.563+00:00'
+                amount: 25
+                fee: 0
+                balance_change: -25
+                reconciled: false
+                pack_type: bronze
+                quantity: 1
+                pull_ids: [e9d27918-…]
+                card_id: null
+                listing_id: null
+                transaction_id: null
+                pulls:
+                  - pull_id: e9d27918-…
+                    kind: card
+                    item: { id: e3d7148d-…, category: pokemon, name: Pyroar, set: Pokemon Xy2-Flashfire, grading_company: PSA, grading_rank: 10, slab_label: 2014 Flashfire Pyroar, language: english, cert_number: '84512377', market_value: 20, front_image: 'https://…/e3d7148d-….png', back_image: 'https://…/e3d7148d-…-back.png', render_image: 'https://…/e3d7148d-…-render.png', image_url: 'https://…/e3d7148d-…-render.png' }
+                    value: 20
+                    hit: { rarity_tier: starter, bucket: P0, bucket_odds: 0.72, is_chase: false, chase_label: null }
+                item: null
+                payout_rate: null
+                basis_value: null
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:account` or isn't linked to an account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No order with this id on your account. An unknown id, a malformed one and another account's order all look the same.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Order not found }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/test-accounts:
+    post:
+      tags: [Testing]
+      operationId: createTestAccount
+      summary: Create a test account
+      description: |-
+        **Scope:** `create:test_accounts`, opt-in, granted on request. **Changes data.**
+
+        Makes a separate CatchBack login, already confirmed and phone-verified, with a $10,000 test balance that lasts 30 days. Each key can have 5 active at a time. There's no body, and the key doesn't have to be linked to an account. **The password is shown once.**
+
+        **A test account is a login, not a key.** Sign in with it to use it: your API calls keep acting on your key's account and spending its real balance. It can open packs up to the Diamond tier, other than sealed mystery and Steph Curry packs, and sell back. It can't use the marketplace, gifts, drops, battles, shipping, chat or DMs, or withdraw. Pulls come from the live pool, and anything it still holds returns there daily at 10:00 UTC.
+      security:
+        - bearerAuth: ['create:test_accounts']
+      responses:
+        '201':
+          description: The new test account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [account, sign_in]
+                properties:
+                  account:
+                    allOf:
+                      - $ref: '#/components/schemas/TestAccount'
+                      - type: object
+                        required: [password]
+                        properties:
+                          password: { type: string, description: Shown only in this response. We can't show it again or reset it. }
+                  sign_in:
+                    type: object
+                    required: [web, note]
+                    properties:
+                      web: { type: string, description: The page to sign in on. }
+                      note: { type: string }
+              example:
+                account:
+                  user_id: 3b0e0000-…
+                  email: acme-9f2c41ab@test.catchbackcards.com
+                  password: x7Qe…
+                  username: swiftFalcon4821
+                  balance: 10000
+                  created_at: '2026-10-21T18:00:00Z'
+                  expires_at: '2026-11-20T18:00:00Z'
+                  active: true
+                sign_in:
+                  web: https://catchbackcards.com/auth
+                  note: Sign in with email and password. The account is confirmed and phone-verified already.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `create:test_accounts`, or it was turned off just then (`This key is disabled`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The key already has 5 active test accounts. Reuse one, or ask us to end one.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: We couldn't set the account up, and removed the login we'd started. Try again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: We couldn't create the login. Try again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: Test accounts are unavailable right now, and nothing was created. Try again later.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      tags: [Testing]
+      operationId: listTestAccounts
+      summary: List test accounts
+      description: |-
+        **Scope:** `create:test_accounts`, opt-in, granted on request.
+
+        The test accounts this key made, the newest 100, including ones that have ended. Another key's accounts aren't listed, even on the same account. Passwords are never shown again.
+      security:
+        - bearerAuth: ['create:test_accounts']
+      responses:
+        '200':
+          description: The test accounts, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accounts]
+                properties:
+                  accounts:
+                    type: array
+                    items: { $ref: '#/components/schemas/TestAccount' }
+              example:
+                accounts:
+                  - user_id: 3b0e0000-…
+                    email: acme-9f2c41ab@test.catchbackcards.com
+                    username: swiftFalcon4821
+                    balance: 9875
+                    created_at: '2026-10-21T18:00:00Z'
+                    expires_at: '2026-11-20T18:00:00Z'
+                    active: true
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `create:test_accounts`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: We couldn't read the list. Retry with backoff.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+webhooks:
+  order.completed:
+    post:
+      tags: [Webhooks]
+      operationId: orderCompletedEvent
+      summary: Order completed
+      description: |-
+        **We send this to your URL.** A pack order, card order or sell-back made through the API finished. It includes an order we closed from our records after you lost its response. App activity sends nothing, and an order held for review sends no event. Every webhook on the account gets it.
+
+        `order` is the same object List orders returns for it. Get an order has its pulls or card.
+      security:
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/WebhookSignature'
+        - $ref: '#/components/parameters/WebhookEvent'
+        - $ref: '#/components/parameters/WebhookEventId'
+        - $ref: '#/components/parameters/WebhookAttempt'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/WebhookEnvelope'
+                - type: object
+                  properties:
+                    type: { const: order.completed }
+                    data:
+                      type: object
+                      required: [order]
+                      properties:
+                        order: { $ref: '#/components/schemas/Order' }
+            example:
+              id: evt_0b7e4d21c8f53a96e1d07c4f2ab86d13
+              type: order.completed
+              created_at: '2026-11-01T18:04:11.312Z'
+              data:
+                order:
+                  checkout_id: 3e1ab17c-…
+                  order_id: order-1042
+                  type: pack_purchase
+                  status: completed
+                  created_at: '2026-11-01T18:04:10.102+00:00'
+                  completed_at: '2026-11-01T18:04:11.312+00:00'
+                  amount: 25
+                  fee: 0
+                  balance_change: -25
+                  reconciled: false
+                  pack_type: bronze
+                  quantity: 1
+                  pull_ids: [e9d27918-…]
+                  card_id: null
+                  listing_id: null
+                  transaction_id: null
+      responses:
+        '200': { $ref: '#/components/responses/WebhookAck' }
+  listing.sold:
+    post:
+      tags: [Webhooks]
+      operationId: listingSoldEvent
+      summary: Listing sold
+      description: |-
+        **We send this to your URL.** Someone bought one of your listings, wherever you listed the card. It doesn't say who bought it. Every webhook on the account gets it.
+
+        `order` is the same object List orders returns for a sale, with `type: "listing_sale"`.
+      security:
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/WebhookSignature'
+        - $ref: '#/components/parameters/WebhookEvent'
+        - $ref: '#/components/parameters/WebhookEventId'
+        - $ref: '#/components/parameters/WebhookAttempt'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/WebhookEnvelope'
+                - type: object
+                  properties:
+                    type: { const: listing.sold }
+                    data:
+                      type: object
+                      required: [order]
+                      properties:
+                        order: { $ref: '#/components/schemas/Order' }
+            example:
+              id: evt_6b1d3f0c9a7e4d218c5fb0a4e2d17c36
+              type: listing.sold
+              created_at: '2026-11-01T18:04:11.312Z'
+              data:
+                order:
+                  checkout_id: a0c3e7d1-…
+                  order_id: null
+                  type: listing_sale
+                  status: completed
+                  created_at: '2026-11-01T18:04:11.312+00:00'
+                  completed_at: '2026-11-01T18:04:11.312+00:00'
+                  amount: 45
+                  fee: 1
+                  balance_change: 44
+                  reconciled: false
+                  pack_type: null
+                  quantity: null
+                  pull_ids: []
+                  card_id: 0e94dc61-…
+                  listing_id: 5f1c2a90-…
+                  transaction_id: a0c3e7d1-…
+      responses:
+        '200': { $ref: '#/components/responses/WebhookAck' }
+  shipment.updated:
+    post:
+      tags: [Webhooks]
+      operationId: shipmentUpdatedEvent
+      summary: Shipment updated
+      description: |-
+        **We send this to your URL.** A shipment made with this key changed status. Only the key that created the shipment gets it, and that key needs `ship:cards` as well as `read:account`. No part of a customer's address is ever in an event.
+
+        Two quick changes can collapse into one event, so `delivered` can arrive with no `shipped` before it, and delivery is unordered: compare `status_updated_at` to tell which of two events is newer. Get a shipment always has the current status.
+      security:
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/WebhookSignature'
+        - $ref: '#/components/parameters/WebhookEvent'
+        - $ref: '#/components/parameters/WebhookEventId'
+        - $ref: '#/components/parameters/WebhookAttempt'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/WebhookEnvelope'
+                - type: object
+                  properties:
+                    type: { const: shipment.updated }
+                    data:
+                      type: object
+                      required: [shipment]
+                      properties:
+                        shipment: { $ref: '#/components/schemas/ShipmentEvent' }
+            example:
+              id: evt_d2a94c17f06b8e3512c7ab04e9f6130d
+              type: shipment.updated
+              created_at: '2026-11-03T16:20:00.000Z'
+              data:
+                shipment:
+                  id: 7c1e0000-…
+                  status: shipped
+                  card_ids: [0e94dc61-…]
+                  carrier: USPS
+                  service: Priority Mail
+                  service_token: usps_priority
+                  cost: 12.85
+                  tracking_number: '9400100000000000000000'
+                  tracking_url: https://tools.usps.com/go/TrackConfirmAction?tLabels=9400100000000000000000
+                  created_at: '2026-11-02T18:04:11.000Z'
+                  status_updated_at: '2026-11-03T16:20:00.000Z'
+                  shipped_at: '2026-11-03T16:20:00.000Z'
+                  expected_delivery: null
+                  delivered_at: null
+      responses:
+        '200': { $ref: '#/components/responses/WebhookAck' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: cb_live_<48 hex>
+      description: Your API key, sent as a bearer token. Keep it on your server. See [Authentication](/partner-api/authentication). A request from a location we refuse gets a `403` with `Access denied`, whether or not it has a valid key.
+  parameters:
+    OrderIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Your order id, 8–128 characters of `A-Za-z0-9_-`, unique per account across pack and card orders. Reuse it to retry the same order safely, and use a new one for every new order.
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
+      example: order-1042
+    PackCategory:
+      name: category
+      in: query
+      description: The catalog.
+      schema: { $ref: '#/components/schemas/PackCategory' }
+    LookupCategory:
+      name: category
+      in: query
+      description: The card's catalog, if you know it. Without it, every catalog is searched.
+      schema: { $ref: '#/components/schemas/CardCategory' }
+    CardId:
+      name: id
+      in: path
+      required: true
+      description: 'A card id: `item.id` or `card_id` from any other endpoint.'
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{1,128}$' }
+      example: 0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e
+    HistoryDays:
+      name: days
+      in: query
+      description: How many days back from now. Outside 1–365 is a `400`.
+      schema: { type: integer, minimum: 1, maximum: 365, default: 90 }
+    Page:
+      name: page
+      in: query
+      description: 1-based. See [Pagination](/partner-api/pagination).
+      schema: { type: integer, minimum: 1, default: 1 }
+    PerPageVault:
+      name: per_page
+      in: query
+      description: 1–200. A higher value is treated as 200.
+      schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+    Since:
+      name: since
+      in: query
+      description: ISO 8601, inclusive. Defaults to `until` minus 7 days.
+      schema: { type: string, format: date-time }
+      example: '2026-10-01T00:00:00Z'
+    Until:
+      name: until
+      in: query
+      description: ISO 8601, inclusive. Defaults to now. At most 31 days after `since`.
+      schema: { type: string, format: date-time }
+      example: '2026-10-31T00:00:00Z'
+    WebhookSignature:
+      name: X-CatchBack-Signature
+      in: header
+      required: true
+      description: '`t=<unix seconds>,v1=<hex>`. `v1` is the HMAC-SHA256 of `<t>.<raw request body>`, keyed with your whole secret, `whsec_` included. Compute it over the raw bytes before any JSON parsing, compare in constant time, and refuse a `t` more than 5 minutes from your clock.'
+      schema: { type: string }
+      example: t=1793404225,v1=d93da821be64a143bbacb3c0e47e37a90f72c6747b8b9bc3571abf03fcabf66c
+    WebhookEvent:
+      name: X-CatchBack-Event
+      in: header
+      required: true
+      description: The event's `type`.
+      schema: { type: string }
+    WebhookEventId:
+      name: X-CatchBack-Event-Id
+      in: header
+      required: true
+      description: The event's `id`, which stays the same on every retry.
+      schema: { type: string }
+    WebhookAttempt:
+      name: X-CatchBack-Attempt
+      in: header
+      required: true
+      description: Which try this is, from 1 to 8.
+      schema: { type: integer, minimum: 1, maximum: 8 }
+  responses:
+    Unauthorized:
+      description: A missing, malformed, disabled or unknown API key.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Missing or malformed API key }
+    ServerError:
+      description: An error on our side. Retry with backoff.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ShipmentForbidden:
+      description: |-
+        - The key lacks `ship:cards` or isn't linked to an account.
+        - `Phone verification required`.
+        - `Partner account unavailable`: the account is deleted.
+        - The account can't request shipping.
+        - `FEATURE_RESTRICTED`: the account is restricted from the marketplace or from withdrawals (`capability` is `marketplace` or `withdraw`). Contact us.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RestrictedError' }
+    CardsNotShippable:
+      description: '`CARDS_NOT_SHIPPABLE`: a card can''t ship. `cards[]` gives each refused `card_id` and its `reason`.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CardsNotShippableError' }
+          example:
+            error: Some cards cannot ship.
+            code: CARDS_NOT_SHIPPABLE
+            cards:
+              - { card_id: 0e94dc61-…, reason: listed }
+    WebhookAck:
+      description: Answer any `2xx` within 5 seconds, and do slow work after you've answered. Anything else counts as a failure, including a redirect. We retry after 1 minute, 5 minutes, 30 minutes, 2, 6, 12 and 24 hours, then stop at 8 attempts. Delivery is at-least-once and unordered, so dedupe on `id`.
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, description: 'For people. The text can change, so branch on the status and the `code`.' }
+        code: { type: string, description: 'Machine-readable, where you might branch on it.' }
+    RestrictedError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            code: { type: string, enum: [FEATURE_RESTRICTED] }
+            capability: { type: string, description: What is switched off for the account. }
+    OrderError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            checkout_id: { type: string, description: The order. Get an order takes it. }
+            needs_review: { type: boolean, description: The order may have been charged and we are settling it. Never place it again under a new key. }
+            started_at: { type: string, format: date-time, description: On `IDEMPOTENCY_IN_PROGRESS`. }
+            card_id: { type: string }
+            price: { type: number, description: 'On `PRICE_CHANGED`, the current price.' }
+            max_price: { type: number }
+            listing_id: { type: string, description: On `CARD_MOVED_TO_AUCTION`. }
+            listing_type: { type: string, description: On `CARD_MOVED_TO_AUCTION`. }
+            refund_pending: { type: boolean, description: You were charged and the refund didn't go through. }
+    ShipmentRequestError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            code: { type: string, enum: [INSUFFICIENT_BALANCE, COUNTRY_NOT_SUPPORTED, OVER_CUSTOMS_CAP, PARTNER_GOODS] }
+            fields:
+              type: object
+              description: On an invalid address, each bad field and what's wrong with it. It never repeats the value.
+              additionalProperties: { type: string }
+            amount: { type: number, description: 'On `INSUFFICIENT_BALANCE`, the rate.' }
+    CardsNotShippableError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            code: { type: string, enum: [CARDS_NOT_SHIPPABLE] }
+            cards: { $ref: '#/components/schemas/RefusedCards' }
+    RefusedCards:
+      type: array
+      description: Each refused card and why. A card lost at the last moment comes with no list.
+      items:
+        type: object
+        required: [card_id, reason]
+        properties:
+          card_id: { type: string }
+          reason:
+            type: string
+            enum: [not_in_vault, listed, shipping, on_hold, not_a_card]
+    RiskLevel:
+      type: string
+      enum: [chill, standard, aggressive]
+      default: standard
+    PackCategory:
+      type: string
+      description: A catalog that has packs and listings.
+      enum: [pokemon, onepiece, sports, riftbound, watches]
+      default: pokemon
+    StorefrontCategory:
+      type: string
+      description: A catalog with a storefront.
+      enum: [pokemon, onepiece, sports, riftbound, watches, goods]
+      default: pokemon
+    CardCategory:
+      type: string
+      description: A card's catalog. `goods` is luxury goods and `singles` is raw singles.
+      enum: [pokemon, onepiece, sports, riftbound, watches, goods, singles]
+    Card:
+      type: object
+      description: The [card object](/partner-api/card-object). Other fields appear only on the catalogs that have them.
+      required: [id, category, name, set, grading_company, grading_rank, slab_label, language, market_value, cert_number, front_image, back_image, render_image, image_url]
+      properties:
+        id: { type: string, description: The card's id. }
+        category: { $ref: '#/components/schemas/CardCategory' }
+        name: { type: [string, 'null'] }
+        set: { type: [string, 'null'] }
+        year: { type: [string, 'null'] }
+        number: { type: [string, 'null'] }
+        variant: { type: [string, 'null'] }
+        rarity: { type: [string, 'null'], description: Printed rarity. }
+        card_type: { type: [string, 'null'] }
+        language: { type: [string, 'null'] }
+        slab_label: { type: [string, 'null'], description: The text on the grading label. }
+        grading_company: { type: [string, 'null'] }
+        grading_rank: { type: [number, 'null'], description: The grade. }
+        cert_number: { type: [string, 'null'], description: The grading company's certificate number. }
+        card_condition: { type: [string, 'null'] }
+        market_value: { type: number, description: Our current market valuation in USD. `0` when we have no valuation. }
+        price: { type: [number, 'null'], description: The shop sale price in USD. }
+        market_value_last_updated: { type: [string, 'null'] }
+        front_image: { type: [string, 'null'] }
+        back_image: { type: [string, 'null'] }
+        render_image: { type: [string, 'null'] }
+        image_url: { type: [string, 'null'], description: '`render_image`, or `front_image` when there is no render.' }
+        sport: { type: [string, 'null'] }
+        player_name: { type: [string, 'null'] }
+        team: { type: [string, 'null'] }
+        manufacturer: { type: [string, 'null'] }
+        parallel: { type: [string, 'null'] }
+        is_rookie: { type: [boolean, 'null'] }
+        is_autograph: { type: [boolean, 'null'] }
+        is_memorabilia: { type: [boolean, 'null'] }
+        serial_numbered: { type: [string, 'null'] }
+        brand: { type: [string, 'null'] }
+        reference_number: { type: [string, 'null'] }
+        video_url: { type: [string, 'null'] }
+        condition: { type: [string, 'null'] }
+        size: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        attributes:
+          type: [object, 'null']
+          description: Luxury goods only. Key-value details that vary by item.
+          additionalProperties: true
+    PublicCard:
+      type: object
+      description: Named fields of the card object. No price or value of any kind, and no goods `attributes`. A field a card doesn't have is left out.
+      properties:
+        id: { type: string }
+        category: { $ref: '#/components/schemas/CardCategory' }
+        name: { type: [string, 'null'] }
+        set: { type: [string, 'null'] }
+        year: { type: [string, 'null'] }
+        number: { type: [string, 'null'] }
+        variant: { type: [string, 'null'] }
+        rarity: { type: [string, 'null'] }
+        card_type: { type: [string, 'null'] }
+        language: { type: [string, 'null'] }
+        slab_label: { type: [string, 'null'] }
+        grading_company: { type: [string, 'null'] }
+        grading_rank: { type: [number, 'null'] }
+        card_condition: { type: [string, 'null'] }
+        cert_number: { type: [string, 'null'] }
+        brand: { type: [string, 'null'] }
+        reference_number: { type: [string, 'null'] }
+        video_url: { type: [string, 'null'] }
+        condition: { type: [string, 'null'] }
+        size: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        sport: { type: [string, 'null'] }
+        player_name: { type: [string, 'null'] }
+        team: { type: [string, 'null'] }
+        manufacturer: { type: [string, 'null'] }
+        parallel: { type: [string, 'null'] }
+        is_rookie: { type: [boolean, 'null'] }
+        is_autograph: { type: [boolean, 'null'] }
+        is_memorabilia: { type: [boolean, 'null'] }
+        serial_numbered: { type: [string, 'null'] }
+        front_image: { type: [string, 'null'] }
+        back_image: { type: [string, 'null'] }
+        render_image: { type: [string, 'null'] }
+        image_url: { type: [string, 'null'] }
+    Pack:
+      type: object
+      required: [pack_type, name, price, available, max_quantity, risk_levels]
+      properties:
+        pack_type: { type: string, description: What Buy packs takes. }
+        name: { type: string }
+        price: { type: number, description: 'Price per pack in USD, the amount charged.' }
+        available: { type: boolean }
+        reason: { type: string, description: Why the pack is unavailable. Only when `available` is `false`. }
+        max_quantity: { type: integer, description: The most in one request. }
+        risk_levels:
+          type: array
+          items: { $ref: '#/components/schemas/RiskLevel' }
+    PackPool:
+      type: object
+      required: [pack_type, name, category, risk_level, price, available, kind, expected_value, bands, chase, total_cards, cards]
+      properties:
+        pack_type: { type: string }
+        name: { type: string }
+        category: { type: string }
+        risk_level: { type: string }
+        price: { type: number, description: Price per pack in USD. }
+        available: { type: boolean }
+        reason: { type: string, description: Why the pack is unavailable. Only when a sold-out slab pack's pool is empty. }
+        kind: { type: string, enum: [slab, sealed] }
+        expected_value: { type: [number, 'null'], description: Expected value of one pack in USD at this risk level. }
+        bands:
+          type: array
+          items:
+            type: object
+            required: [bucket_id, label, min_value, max_value, odds, is_consolation, hittable_cards]
+            properties:
+              bucket_id: { type: string, description: Band id. Each card's `bucket_id` points here. }
+              label: { type: [string, 'null'], description: 'Display range, e.g. `$5-$20`. For a sealed pack, the product''s name.' }
+              min_value: { type: number }
+              max_value: { type: number }
+              odds: { type: number, description: 'Probability of landing in this band, 0–1.' }
+              is_consolation: { type: boolean }
+              hittable_cards: { type: integer, description: How many cards in `cards` belong to this band. }
+        chase:
+          type: [object, 'null']
+          description: A hand-picked card hittable at fixed odds on top of the bands, or `null`.
+          properties:
+            card:
+              anyOf:
+                - $ref: '#/components/schemas/Card'
+                - type: 'null'
+            probability: { type: number }
+            odds_label: { type: string, description: 'e.g. `1 in 5,000`.' }
+            label: { type: string }
+            ends_at: { type: [string, 'null'] }
+        total_cards: { type: integer }
+        cards:
+          type: array
+          description: Every hittable card, highest value first. Empty for a sealed pack.
+          items:
+            allOf:
+              - $ref: '#/components/schemas/Card'
+              - type: object
+                required: [bucket_id]
+                properties:
+                  bucket_id: { type: string }
+        total_products: { type: integer, description: Sealed packs only. }
+        products:
+          type: array
+          description: Sealed packs only. Every in-stock product, highest value first.
+          items:
+            type: object
+            required: [id, bucket_id, market_value, in_stock, odds]
+            properties:
+              id: { type: string }
+              bucket_id: { type: string }
+              name: { type: [string, 'null'] }
+              set: { type: [string, 'null'] }
+              product_type: { type: [string, 'null'], description: 'e.g. `loose_pack`, `booster_bundle`.' }
+              language: { type: [string, 'null'] }
+              year: { type: [number, 'null'] }
+              image: { type: [string, 'null'] }
+              market_value: { type: number, description: USD. }
+              in_stock: { type: integer }
+              odds: { type: number, description: 'Probability of pulling this product, 0–1.' }
+    PullHit:
+      type: object
+      description: The band, odds and chase the pull hit.
+      properties:
+        rarity_tier: { type: [string, 'null'] }
+        bucket: { type: [string, 'null'] }
+        bucket_odds: { type: [number, 'null'] }
+        is_chase: { type: boolean }
+        chase_label: { type: [string, 'null'] }
+    SealedPackItem:
+      type: object
+      title: Sealed pack
+      properties:
+        id: { type: [string, 'null'] }
+        name: { type: [string, 'null'] }
+        set: { type: [string, 'null'] }
+        category: { type: [string, 'null'] }
+        image_url: { type: [string, 'null'] }
+    PackPurchase:
+      type: object
+      required: [checkout_id, pack_type, quantity, total_charged, remaining_balance, summary, pulls]
+      properties:
+        checkout_id: { type: string, description: Our id for the order. Get an order takes it. }
+        pack_type: { type: string }
+        quantity: { type: integer }
+        total_charged: { type: [number, 'null'] }
+        remaining_balance: { type: number }
+        summary:
+          type: object
+          required: [total_value, catchback_now_total, best_pull]
+          properties:
+            total_value: { type: number }
+            catchback_now_total: { type: number }
+            best_pull:
+              type: [object, 'null']
+              properties:
+                pull_id: { type: string }
+                name: { type: [string, 'null'] }
+                value: { type: [number, 'null'] }
+        pulls:
+          type: array
+          items:
+            type: object
+            required: [pull_id, kind, item, value, hit, catchback, proof]
+            properties:
+              pull_id: { type: string, description: The pull. Sell back and Verify a pull take it. }
+              kind: { type: string, enum: [card, sealed_pack] }
+              item:
+                description: The [card object](/partner-api/card-object), or a sealed pack.
+                anyOf:
+                  - $ref: '#/components/schemas/Card'
+                  - $ref: '#/components/schemas/SealedPackItem'
+              value: { type: [number, 'null'], description: Market value at the pull. }
+              hit: { $ref: '#/components/schemas/PullHit' }
+              catchback:
+                type: [object, 'null']
+                description: What CatchBack pays for it now and after the fresh window. `null` for a sealed pack.
+                properties:
+                  amount: { type: number }
+                  rate: { type: number }
+                  valid_until: { type: [string, 'null'] }
+                  after:
+                    type: [object, 'null']
+                    properties:
+                      amount: { type: number }
+                      rate: { type: number }
+                      valid_until: { type: [string, 'null'] }
+              proof:
+                type: [object, 'null']
+                description: The record to [check the draw](/partner-api/verify-a-pull) with. `null` for a guaranteed pull, which no roll chose.
+                properties:
+                  seed: { type: number }
+                  verification_hash: { type: [string, 'null'] }
+                  seed_commit_hash: { type: [string, 'null'] }
+                  timestamp: { type: [string, 'null'] }
+                  verify_path: { type: [string, 'null'], description: 'Send a `GET` to this path, with no key. `null` for a Steph Curry pull.' }
+        idempotent_replay: { type: boolean, description: This answers a retry of a finished order. Nothing was charged again. }
+    OrderType:
+      type: string
+      enum: [pack_purchase, card_purchase, sell_back, listing_sale]
+    Order:
+      type: object
+      required: [checkout_id, order_id, type, status, created_at, completed_at, amount, fee, balance_change, reconciled, pack_type, quantity, pull_ids, card_id, listing_id, transaction_id]
+      properties:
+        checkout_id: { type: string, description: The order's id. Get an order takes it. }
+        order_id: { type: [string, 'null'], description: 'The `Idempotency-Key` you sent with a purchase. `null` for a sell-back or a sale.' }
+        type: { $ref: '#/components/schemas/OrderType' }
+        status: { type: string, description: '`completed`, or `pending` while a purchase is still running or held for review.' }
+        created_at: { type: string }
+        completed_at: { type: [string, 'null'] }
+        amount: { type: [number, 'null'], description: 'What a purchase charged (a card buy includes its $1 fee), what a sell-back paid, or what a listing sold for, in USD.' }
+        fee: { type: [number, 'null'], description: 'The $1 buyer fee on a card buy or the $1 seller fee on a sale. `0` otherwise.' }
+        balance_change: { type: [number, 'null'], description: 'The order''s effect on your balance. `null` until something shows the order was charged.' }
+        reconciled: { type: boolean, description: 'The order went through but its response was lost, and we closed it from our own records.' }
+        pack_type: { type: [string, 'null'] }
+        quantity: { type: [integer, 'null'] }
+        pull_ids:
+          type: array
+          items: { type: string }
+        card_id: { type: [string, 'null'] }
+        listing_id: { type: [string, 'null'] }
+        transaction_id: { type: [string, 'null'], description: 'For a card buy, the `purchase_id` that Get vault and Sell back use.' }
+    OrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - type: object
+          required: [pulls, item, payout_rate, basis_value]
+          properties:
+            pulls:
+              type: array
+              description: A pack purchase's pulls. Empty for any other order.
+              items:
+                type: object
+                required: [pull_id, kind, item, value, hit]
+                properties:
+                  pull_id: { type: string }
+                  kind: { type: [string, 'null'], enum: [card, sealed_pack, null] }
+                  item:
+                    description: The card as it is now, a sealed pack, or `null` if we can't load it.
+                    anyOf:
+                      - $ref: '#/components/schemas/Card'
+                      - $ref: '#/components/schemas/SealedPackItem'
+                      - type: 'null'
+                  value: { type: [number, 'null'], description: Market value at the pull. }
+                  hit:
+                    anyOf:
+                      - $ref: '#/components/schemas/PullHit'
+                      - type: 'null'
+            item:
+              description: The card, for a card buy, a sell-back or a sale.
+              anyOf:
+                - $ref: '#/components/schemas/Card'
+                - type: 'null'
+            payout_rate: { type: [number, 'null'], description: Sell-backs only. }
+            basis_value: { type: [number, 'null'], description: Sell-backs only. }
+    ShipmentCardIds:
+      type: array
+      minItems: 1
+      maxItems: 10
+      uniqueItems: true
+      description: Card ids from Get vault, cards you hold in the vault. A listed card has to be delisted first.
+      items: { type: string, format: uuid }
+    ShipmentAddress:
+      type: object
+      description: Your customer's address. Stored only with a shipment, never in logs or on your account.
+      required: [name, address1, city, country]
+      properties:
+        name: { type: string, maxLength: 100, description: Recipient name. }
+        address1: { type: string, maxLength: 100 }
+        address2: { type: string, maxLength: 100 }
+        city: { type: string, maxLength: 100 }
+        state: { type: string, maxLength: 100, description: 'State or region, where the country has one.' }
+        zip: { type: string, maxLength: 20, description: 'Postal code, where the country has one.' }
+        country: { type: string, description: 'ISO 3166 alpha-2, e.g. `US`. Shipping countries lists where we ship.' }
+        phone: { type: string, maxLength: 20, description: Required outside the US. }
+    ShipmentStatus:
+      type: string
+      description: |-
+        - `pending`: the shipment hasn't reached an order yet.
+        - `needs_review`: we couldn't confirm the charge, and it's with our team.
+        - `processing`: the order is queued for fulfillment.
+        - `shipped`, `delivered`: the carrier has it, or has delivered it.
+        - `cancelled`: the order was cancelled or resolved outside shipping.
+      enum: [pending, needs_review, processing, shipped, delivered, cancelled]
+    ShipmentEvent:
+      type: object
+      description: A shipment as a webhook sends it. It has nothing from the customer's address.
+      required: [id, status, card_ids, carrier, service, service_token, cost, tracking_number, tracking_url, created_at, status_updated_at, shipped_at, expected_delivery, delivered_at]
+      properties:
+        id: { type: string, description: The shipment's id. Get a shipment takes it. }
+        status: { $ref: '#/components/schemas/ShipmentStatus' }
+        card_ids:
+          type: array
+          items: { type: string }
+        carrier: { type: [string, 'null'], description: '`null` until we''ve confirmed a rate.' }
+        service: { type: [string, 'null'] }
+        service_token: { type: [string, 'null'] }
+        cost: { type: [number, 'null'], description: 'What the shipment charges in USD. `null` until we''ve confirmed a rate.' }
+        tracking_number: { type: [string, 'null'], description: '`null` until there''s a label.' }
+        tracking_url: { type: [string, 'null'] }
+        created_at: { type: string }
+        status_updated_at: { type: [string, 'null'], description: When the order's status last changed. }
+        shipped_at: { type: [string, 'null'] }
+        expected_delivery: { type: [string, 'null'] }
+        delivered_at: { type: [string, 'null'] }
+        needs_review: { type: boolean, description: 'Present and `true` while `status` is `needs_review`.' }
+    Shipment:
+      allOf:
+        - $ref: '#/components/schemas/ShipmentEvent'
+        - type: object
+          required: [destination_country]
+          properties:
+            destination_country: { type: string }
+            address_removed: { type: boolean, description: Present and `true` once we've removed the address. }
+    ShipmentDetail:
+      allOf:
+        - $ref: '#/components/schemas/Shipment'
+        - type: object
+          required: [items, address]
+          properties:
+            items:
+              type: array
+              description: The cards in the shipment. Empty until the order exists.
+              items:
+                type: object
+                required: [card_id, name, grade, grading_company, value]
+                properties:
+                  card_id: { type: string }
+                  name: { type: [string, 'null'] }
+                  grade: { type: [number, 'null'] }
+                  grading_company: { type: [string, 'null'] }
+                  value: { type: [number, 'null'], description: The card's market value in USD when you created the shipment. }
+            address:
+              type: [object, 'null']
+              description: Where it ships to. `null` until the order exists, and after we've removed the address.
+              properties:
+                name: { type: [string, 'null'] }
+                address1: { type: string }
+                address2: { type: [string, 'null'] }
+                city: { type: string }
+                state: { type: [string, 'null'] }
+                zip: { type: [string, 'null'] }
+                country: { type: string }
+                phone: { type: [string, 'null'] }
+    TestAccount:
+      type: object
+      required: [user_id, email, username, balance, created_at, expires_at, active]
+      properties:
+        user_id: { type: string, description: The account's id. }
+        email: { type: string, description: 'The login, a made-up address nobody reads.' }
+        username: { type: [string, 'null'] }
+        balance: { type: [number, 'null'], description: The test balance in dollars. It isn't money and can't be withdrawn. }
+        created_at: { type: string }
+        expires_at: { type: string, description: 30 days after it was created. }
+        active: { type: boolean, description: '`false` from its `expires_at`, or once it has been turned off.' }
+    WebhookEnvelope:
+      type: object
+      required: [id, type, created_at, data]
+      properties:
+        id: { type: string, description: 'The event''s id, `evt_` and 32 hex characters. It never changes, including across retries, so dedupe on it.' }
+        type: { type: string, description: 'More event types will be added without notice, so ignore a `type` you don''t recognize.' }
+        created_at: { type: string, format: date-time, description: 'When the thing happened, not when we sent the event.' }
+        data: { type: object }
