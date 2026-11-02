@@ -30,9 +30,10 @@ To change the price later, [change it in place](/partner-api/endpoints/update-li
 | `400` | | The price is below $5 (`"Listings must be priced at least $5"`) or above the cap (the message gives this card's maximum) |
 | `400` | | The card can't be listed: it has shipped, it's archived, it's an energy card, or it's a luxury goods item or raw single (those sell back or ship only) |
 | `400` | `CARD_ON_PACK_HOLD` | The card came from a pack that holds its cards: sell it back. It can't ship through the API either |
-| `403` | | The key lacks `write:listings` or isn't linked to an account, the account needs a verified phone number (`"Phone verification required"`), or it can't list cards |
+| `403` | | The key lacks `write:listings` or isn't linked to an account, the account needs a verified phone number (`"Phone verification required"`), it can't list cards, or the card isn't yours (`"You do not own this card"`), which is also what a card that left your account a moment earlier can answer |
 | `403` | `FEATURE_RESTRICTED` | The marketplace is switched off for your account (`capability: "marketplace"`). Contact us |
-| `404` | | The card was gone by the time we created the listing, e.g. it left your account a moment earlier. Read your vault and try again |
+| `404` | | The card was gone by the time we created the listing. Read your vault and try again |
+| `503` | | We couldn't read your account just then. Nothing was listed. Retry shortly |
 | `409` | | The card changed while we were listing it. Read your vault and try again |
 | `500` | | We couldn't create the listing. Retry with backoff |
 
@@ -41,7 +42,7 @@ To change the price later, [change it in place](/partner-api/endpoints/update-li
 curl -X POST https://catchbackcards.com/api/partner/v1/listings \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "card_id": "0e94dc61-…", "price": 45 }'
+  -d '{ "card_id": "0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e", "price": 45 }'
 ```
 </RequestExample>
 

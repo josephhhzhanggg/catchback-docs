@@ -45,7 +45,7 @@ paths:
       description: |-
         **Scope:** `read:catalog`
 
-        Exactly the packs [Buy packs](/partner-api/endpoints/buy-packs) will sell this key's account, at the price it charges, with live availability. A pack that is only out of stock stays in the list with `available: false` and a `reason`. A key with no linked account sees the public packs.
+        Exactly the packs [Buy packs](/partner-api/endpoints/buy-packs) will sell this key's account, at the price it charges, with live availability. A pack that is only out of stock stays in the list with `available: false` and a `reason`. A key with no linked account sees the public packs. A sealed product isn't in your vault: the Starter and the sealed mystery packs pay out sealed products, which aren't in Get vault, and the API can't sell them back, list them or ship them.
       security:
         - bearerAuth: ['read:catalog']
       parameters:
@@ -66,19 +66,19 @@ paths:
               example:
                 category: pokemon
                 packs:
+                  - pack_type: starter
+                    name: Starter Pack
+                    price: 8
+                    available: false
+                    reason: Out of stock
+                    max_quantity: 1
+                    risk_levels: [standard]
                   - pack_type: bronze
                     name: Bronze Pack
                     price: 25
                     available: true
                     max_quantity: 10
                     risk_levels: [chill, standard, aggressive]
-                  - pack_type: starter
-                    name: Starter Pack
-                    price: 8
-                    available: false
-                    reason: Starter pack temporarily out of stock
-                    max_quantity: 1
-                    risk_levels: [standard]
         '400':
           description: Unknown `category`.
           content:
@@ -182,9 +182,11 @@ paths:
       description: |-
         **Scope:** `rip:packs` (needs a linked account). **Moves money.**
 
-        Opens 1–10 packs with your CatchCoins at list price. No promo codes, add-ons or bonus balance apply. The cards land in your vault, and every hit comes back with its CatchBack offer and a proof you can [check](/partner-api/verify-a-pull).
+        Opens 1–10 packs with your CatchCoins at list price. No promo codes, add-ons or bonus balance apply. Cards land in your vault, and every hit comes back with its CatchBack offer and a proof you can [check](/partner-api/verify-a-pull). A sealed product doesn't land in your vault: it isn't in Get vault, and the API can't sell it back, list it or ship it. Don't buy the Starter or a sealed mystery pack from an API-only flow.
 
         **All or nothing:** if any pack fails to open, the whole order is refunded and none of its pulls stand.
+
+        **Refused before any charge:** a `pack_type` that List packs doesn't offer this key is a `404`; a pack with `available: false` is a `409 PACK_UNAVAILABLE`, with the `reason` List packs shows; a `risk_level` outside the pack's `risk_levels` is a `400`. A refused order charges nothing, and its order id is free to use again.
 
         **`needs_review: true` on an error means the order may have been charged and we are settling it.** Never place it again under a new key. Follow it with [Get an order](/partner-api/endpoints/get-order). See [Idempotency](/partner-api/idempotency) and [Rate limits](/partner-api/rate-limits#pack-purchases).
       security:
@@ -203,7 +205,7 @@ paths:
                   type: string
                   maxLength: 100
                   description: A `pack_type` from List packs.
-                category: { $ref: '#/components/schemas/StorefrontCategory' }
+                category: { $ref: '#/components/schemas/PackCategory' }
                 quantity:
                   type: integer
                   minimum: 1
@@ -214,7 +216,7 @@ paths:
             example: { pack_type: bronze, category: pokemon, quantity: 2, risk_level: standard }
       responses:
         '200':
-          description: 'The order and every pull in it. A retry of a finished order returns the same body with `idempotent_replay: true`, and charges nothing.'
+          description: 'The order and every pull in it. A retry of a finished order returns the original body with `idempotent_replay: true`, and charges nothing. If we closed the order after its response was lost, the retry returns a shorter body with `reconciled: true` and no `pulls`, `summary` or `remaining_balance`: see Idempotency.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PackPurchase' }
@@ -260,7 +262,7 @@ paths:
                       timestamp: '2026-09-29T20:19:55.418Z'
                       verify_path: /api/verify-pull?transaction_id=fe04349b-…&card_source=pokemon
         '400':
-          description: A missing or malformed `Idempotency-Key`, a body that isn't JSON, a bad `pack_type`, `category`, `quantity` or `risk_level`, not enough balance, or a pack that can't be bought in multiples.
+          description: A missing or malformed `Idempotency-Key`, a body that isn't JSON, a missing or malformed `pack_type`, a bad `category` (`goods` included), `quantity` or `risk_level`, a `risk_level` outside the pack's `risk_levels`, not enough balance, or a pack that can't be bought in multiples. Nothing was charged.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -272,7 +274,6 @@ paths:
 
             - The key lacks `rip:packs` or isn't linked to an account.
             - `Partner account unavailable`: the account is deleted.
-            - The account can't open this pack.
             - `FEATURE_RESTRICTED`: opening packs is switched off for the account (`capability: "open_packs"`). Contact us.
 
             We also answer "not linked" or "unavailable" when we couldn't read your key or account just then, so one retry is worth it.
@@ -280,9 +281,15 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/RestrictedError' }
               example: { error: "Your account can't open packs right now. Contact support if you think this is a mistake.", code: FEATURE_RESTRICTED, capability: open_packs }
+        '404':
+          description: '`pack_type` is not one List packs offers this key, including one this account can''t open or one sent under the wrong `category`. Nothing was charged, and the order id is free to use again.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '409':
           description: |-
-            - `IDEMPOTENCY_IN_PROGRESS`: an order with this key is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body has its `checkout_id` and `started_at`. Follow it with Get an order, or retry later with the same key. Don't retry in a tight loop.
+            - `PACK_UNAVAILABLE`: the pack has `available: false`. The body has the `reason`. Nothing was charged, and the order id is free to use again.
+            - `IDEMPOTENCY_IN_PROGRESS`: an order with this key is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body usually has its `checkout_id` and `started_at`. Follow it with Get an order, or retry later with the same key. Don't retry in a tight loop.
             - `IDEMPOTENCY_RETRY`: an earlier attempt with this key failed just as this one arrived. Retry with the same key.
           content:
             application/json:
@@ -291,7 +298,8 @@ paths:
                   - $ref: '#/components/schemas/OrderError'
                   - type: object
                     properties:
-                      code: { type: string, enum: [IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_RETRY] }
+                      code: { type: string, enum: [PACK_UNAVAILABLE, IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_RETRY] }
+                      reason: { type: string, description: 'Only on `PACK_UNAVAILABLE`: why the pack is unavailable, in plain text.' }
               example:
                 error: A purchase with this idempotency key is still in progress.
                 code: IDEMPOTENCY_IN_PROGRESS
@@ -355,7 +363,7 @@ paths:
                 needs_review: true
                 checkout_id: c8baa66a-…
         '503':
-          description: We couldn't record the order, count today's packs or take the payment, so the order didn't go through. Retry shortly with the same key.
+          description: We couldn't record the order, count today's packs, check the pack or take the payment. This attempt charged nothing, but an earlier attempt with the same key may have gone through, so retry shortly with the same key, never a new one.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -454,9 +462,8 @@ paths:
                             - `CARD_LISTED_ON_MARKETPLACE`: the card is listed. Delist it first.
                             - `GOODS_SELLBACK_WINDOW_CLOSED`: a luxury goods item, more than 5 minutes after its pull.
                             - `CARD_IN_BATTLE`: the card is held by a pack battle that hasn't finished.
-                            - `NO_PURCHASE_RECORD`: a sealed pack with no purchase on record.
                             - `SHOP_PURCHASE_NOT_SELLABLE`: an item bought from a partner shop, which ships but doesn't sell back.
-                          enum: [CARD_LISTED_ON_MARKETPLACE, GOODS_SELLBACK_WINDOW_CLOSED, CARD_IN_BATTLE, NO_PURCHASE_RECORD, SHOP_PURCHASE_NOT_SELLABLE]
+                          enum: [CARD_LISTED_ON_MARKETPLACE, GOODS_SELLBACK_WINDOW_CLOSED, CARD_IN_BATTLE, SHOP_PURCHASE_NOT_SELLABLE]
               example:
                 total_paid: 16.2
                 remaining_balance: 189937
@@ -523,7 +530,7 @@ paths:
                         created_at: { type: string }
                         amount: { type: number, description: USD. }
                         source: { type: string }
-                        pack_type: { type: [string, 'null'] }
+                        pack_type: { type: [string, 'null'], description: 'The pack''s display name, for example `Bronze Pack`. It isn''t the `pack_type` id that List packs returns.' }
               example:
                 since: '2026-10-01T00:00:00.000Z'
                 until: '2026-10-31T00:00:00.000Z'
@@ -531,7 +538,7 @@ paths:
                 per_page: 500
                 total: 1
                 pulls:
-                  - { user_id: 6f1c0000-…, created_at: '2026-10-20T04:54:57.373+00:00', amount: 25, source: pokemon, pack_type: bronze }
+                  - { user_id: 6f1c0000-…, created_at: '2026-10-20T04:54:57.373+00:00', amount: 25, source: pokemon, pack_type: Bronze Pack }
         '400':
           description: A malformed or inverted window, or a window over 31 days.
           content:
@@ -593,7 +600,10 @@ paths:
                     description: |-
                       - `provably_fair`: the draw is replayed from the seed, and `verified` is `true` only when every step matches.
                       - `hash_only`: the Starter or a sealed mystery pack, whose seed is random. The result hash is recomputed.
-                      - `legacy_hash`, `none`: a pull from before full proofs, or with no record.
+                      - `legacy_hash`: an older pull, or a pull from a custom pack. Nothing is recomputed: `verified: true` only means a record exists, so don't treat it as a check.
+                      - `none`: a pull with no record.
+
+                      Read `verification_type` before `verified`.
                   algorithm: { type: string, description: 'The draw''s version, e.g. `shuffle-scaled-v3`.' }
                   summary:
                     type: object
@@ -777,12 +787,12 @@ paths:
             example: { card_id: 0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e, max_price: 1450 }
       responses:
         '200':
-          description: 'The card is yours. A retry of a finished order returns the same body with `idempotent_replay: true`, and charges nothing.'
+          description: 'The card is yours. A retry of a finished order returns the original body with `idempotent_replay: true`, and charges nothing. If we closed the order after its response was lost, the retry returns a shorter body with `reconciled: true` and no `fee`, `remaining_balance` or `item`: see Idempotency.'
           content:
             application/json:
               schema:
                 type: object
-                required: [checkout_id, transaction_id, card_id, source, listing_id, price, fee, total_charged, remaining_balance, item]
+                required: [checkout_id, transaction_id, card_id, source, listing_id, price, total_charged]
                 properties:
                   checkout_id: { type: string, description: Our id for the order. }
                   transaction_id:
@@ -803,6 +813,8 @@ paths:
                     type: boolean
                     description: The sale went through and the card is yours, but our bookkeeping needs a manual check. Don't retry under a new key.
                   idempotent_replay: { type: boolean }
+                  reconciled: { type: boolean, description: 'Present and `true` on the shorter body we return when we closed the order after its response was lost.' }
+                  message: { type: string, description: Present with `reconciled`. }
               example:
                 checkout_id: 5d1c…
                 transaction_id: a17e…
@@ -848,7 +860,7 @@ paths:
             - `CARD_NO_LONGER_AVAILABLE`: sold, pulled from a pack, delisted or shipped, or an item that is only sold in packs. Search again.
             - `CARD_MOVED_TO_AUCTION`: the card is now in an auction, not sold at a fixed price. The body has `listing_id` and `listing_type`.
             - `OWN_LISTING`: the card is your own listing.
-            - `IDEMPOTENCY_IN_PROGRESS`: an order with this key is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body has its `checkout_id`: follow it with Get an order, or retry later with the same key. Don't retry in a tight loop.
+            - `IDEMPOTENCY_IN_PROGRESS`: an order with this key is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body usually has its `checkout_id`: follow it with Get an order, or retry later with the same key. Don't retry in a tight loop.
             - `IDEMPOTENCY_RETRY`: an earlier attempt with this key failed just as this one arrived. Retry with the same key.
           content:
             application/json:
@@ -964,7 +976,7 @@ paths:
                       properties:
                         listing_id: { type: string }
                         card_id: { type: string }
-                        category: { type: string }
+                        category: { type: [string, 'null'], description: The card's catalog. `null` on some older listings. }
                         listing_type: { type: string, enum: [fixed_price, dutch_auction] }
                         price: { type: number, description: 'What a buy would charge right now, in USD.' }
                         seller_fee: { type: number, description: 'What a sale takes from your payout, $1.' }
@@ -1062,6 +1074,7 @@ paths:
             - The key lacks `write:listings` or isn't linked to an account.
             - `Phone verification required`.
             - The account can't list cards.
+            - `You do not own this card`: the card isn't yours, which is also what a card that left your account a moment earlier can answer.
             - `FEATURE_RESTRICTED`: the marketplace is switched off for the account (`capability: "marketplace"`). Contact us.
           content:
             application/json:
@@ -1073,6 +1086,11 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '409':
           description: The card changed while we were listing it. Read your vault and try again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: We couldn't read your account just then. Nothing was listed. Retry shortly.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1233,7 +1251,7 @@ paths:
           description: |-
             Nothing was written.
 
-            - `LISTING_NOT_ACTIVE`: the listing sold, was taken down or expired, or its card left your account. Once the listing has closed, the body has its `status`.
+            - `LISTING_NOT_ACTIVE`: the listing sold, was taken down or expired, or its card left your account. An active listing whose `category` is `null` gets it too. Once the listing has closed, the body has its `status`.
             - `LISTING_CHANGED`: another change to the listing landed first, and the listing is still active. Read it again and retry.
           content:
             application/json:
@@ -1246,6 +1264,11 @@ paths:
                       status: { type: string }
         '500':
           description: A database error. Send the same price again. That finishes the change, or writes nothing if it had already landed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: We couldn't read your account just then. Nothing was written. Retry shortly.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1263,7 +1286,8 @@ paths:
       parameters:
         - name: category
           in: query
-          schema: { $ref: '#/components/schemas/StorefrontCategory' }
+          description: Any value outside the five catalogs, `goods` included, is a `400`.
+          schema: { $ref: '#/components/schemas/PackCategory' }
         - $ref: '#/components/parameters/Page'
         - name: per_page
           in: query
@@ -1593,7 +1617,7 @@ paths:
 
         Any card's metadata and image URLs, by id. **It carries no price or value of any kind.** Call it from a server: it sends no CORS header, so another site's browser JavaScript can't read the response.
 
-        A `200` is sent with `Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=60`, so a response can be up to about 7 minutes old. Errors are `no-store`. The limit is 60 requests a minute per IP address (an IPv4 address or an IPv6 /64), and a response from the CDN doesn't count. Send only `category` as a query parameter: anything else misses the CDN and counts against your limit.
+        Our CDN caches a `200` for up to 5 minutes and can serve it for up to a minute more while it refreshes, so a response can be up to about 7 minutes old. Errors are never cached. The limit is 60 requests a minute per IP address (an IPv4 address or an IPv6 /64), and a response from the CDN doesn't count. Send only `category` as a query parameter: anything else misses the CDN and counts against your limit.
       security:
         - {}
       parameters:
@@ -1602,10 +1626,6 @@ paths:
       responses:
         '200':
           description: The card.
-          headers:
-            Cache-Control:
-              schema: { type: string }
-              example: public, max-age=0, s-maxage=300, stale-while-revalidate=60
           content:
             application/json:
               schema:
@@ -1669,7 +1689,7 @@ paths:
       description: |-
         **Scope:** `ship:cards`, opt-in, granted on request (needs a linked account).
 
-        Live carrier rates for shipping cards you hold to a customer's address, at the full rate you would pay. Send `cover_amount` to price insurance as well: each rate then adds its premium and total. It stores nothing, and it is a `POST` so the address never lands in a URL. Create a shipment takes the `carrier` and `token` of the rate you choose. The account needs a verified phone number. 60 estimates a minute per key. Read [Shipping cards](/partner-api/shipping) first.
+        Live carrier rates for shipping cards you hold to a customer's address, at the full rate you would pay. Send `cover_amount` to price insurance as well: each rate then adds its premium and total. It stores nothing on our side: the address goes to our carrier services, normally Shippo, to get the rates. It is a `POST` so the address never lands in a URL. Create a shipment takes the `carrier` and `token` of the rate you choose. The account needs a verified phone number. 60 estimates a minute per key. Read [Shipping cards](/partner-api/shipping) first.
       security:
         - bearerAuth: ['ship:cards']
       requestBody:
@@ -1724,9 +1744,9 @@ paths:
                   - { carrier: USPS, service: Priority Mail, token: usps_priority, amount: 12.85, estimated_days: 2 }
         '400':
           description: |-
-            - No `code`: the body isn't JSON, `card_ids` isn't 1–10 card ids or lists one twice, the address is invalid, or `cover_amount` isn't a dollar amount with at most two decimals. An address error is `"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value.
+            - No `code`: the body isn't JSON, `card_ids` isn't 1–10 card ids or lists one twice, the address is invalid, or `cover_amount` isn't a dollar amount with at most two decimals or is 0 or negative. An address error is `"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value.
             - `COVER_NOT_ALLOWED`: `cover_amount` is outside the range: from $100 up to the cards' value, capped at $10,000. The body has `order_value`, `min_cover` and `max_cover`.
-            - `COUNTRY_NOT_SUPPORTED`: we don't ship to this country.
+            - `COUNTRY_NOT_SUPPORTED`: we don't ship to this country. A country code we don't recognize is a plain `400` (`Invalid address`, with `fields.country`).
             - `OVER_CUSTOMS_CAP`: an international shipment worth over $2,500, or with a card we have no value for.
             - `PARTNER_GOODS`: a partner's own goods ship from that partner.
           content:
@@ -1845,7 +1865,7 @@ paths:
             - No `code`: a missing or malformed `Idempotency-Key`, a body that isn't JSON, `card_ids` that aren't 1–10 card ids or list one twice, an invalid address (`"error": "Invalid address"` with `fields`), a `rate` that isn't a carrier and token, a missing or out-of-range `max_cost`, or a `cover_amount` that isn't a dollar amount with at most two decimals.
             - `INSUFFICIENT_BALANCE`: your balance is below the rate, plus the premium if you chose insurance. The body has the `amount`. Nothing was charged.
             - `COVER_NOT_ALLOWED`: `cover_amount` is outside the range: from $100 up to the cards' value, capped at $10,000. The body has `order_value`, `min_cover` and `max_cover`. Nothing was charged.
-            - `COUNTRY_NOT_SUPPORTED`: we don't ship to this country.
+            - `COUNTRY_NOT_SUPPORTED`: we don't ship to this country. A country code we don't recognize is a plain `400` (`Invalid address`, with `fields.country`).
             - `OVER_CUSTOMS_CAP`: an international shipment worth over $2,500, or with a card we have no value for.
             - `PARTNER_GOODS`: a partner's own goods ship from that partner.
           content:
@@ -2212,7 +2232,7 @@ paths:
       description: |-
         **Scope:** `read:account` (needs a linked account).
 
-        Cards in your vault or listed on the marketplace, one catalog per request. Each names its latest acquisition: a pull (`pull_id`) or a buy (`purchase_id`). The other is `null`, and Sell back takes whichever is set. A pull can land in a different catalog from its pack's, so sync every category you might hold.
+        Cards in your vault or listed on the marketplace, one catalog per request. A sealed product (a pull from the Starter or a sealed mystery pack) isn't listed, and the API can't sell it back, list it or ship it. Each names its latest acquisition: a pull (`pull_id`) or a buy (`purchase_id`). One is set and the other is `null`, and Sell back takes whichever is set. Both can be `null` for a card that reached your account another way: read the vault again, or contact us. A pull can land in a different catalog from its pack's, so sync every category you might hold.
       security:
         - bearerAuth: ['read:account']
       parameters:
@@ -2255,7 +2275,7 @@ paths:
                         listing_price: { type: [number, 'null'] }
                         catchback:
                           type: [object, 'null']
-                          description: The sell-back offer right now. `null` while the card is listed.
+                          description: The sell-back offer right now. `null` while the card is listed, and for a luxury goods item once its 5-minute sell-back window has closed. A card we have no value for shows an `amount` of `0`.
                           properties:
                             amount: { type: number }
                             rate: { type: number }
@@ -2298,7 +2318,7 @@ paths:
       description: |-
         **Scope:** `read:account` (needs a linked account).
 
-        Everything that moved your balance through the API, newest first, so you can reconcile your records against ours: pack purchases, card purchases, sell-backs (one order per card) and sales of your listings. The history belongs to the account, not the key. Purchases and sell-backs made in our app are left out.
+        Your pack purchases, card purchases, sell-backs (one order per card) and sales of your listings, newest first. Shipment charges aren't here: read `cost` in List shipments. Money we credit to your account isn't here either, so this alone won't reconcile your balance. The history belongs to the account, not the key. Purchases and sell-backs made in our app are left out.
 
         The window is capped at 31 days. Page with `next_cursor`: see [Pagination](/partner-api/pagination#cursor-pages).
       security:
@@ -2449,7 +2469,7 @@ paths:
 
         Makes a separate CatchBack login, already confirmed and phone-verified, with a $10,000 test balance that lasts 30 days. Each key can have 5 active at a time. There's no body, and the key doesn't have to be linked to an account. **The password is shown once.**
 
-        **A test account is a login, not a key.** Sign in with it to use it: your API calls keep acting on your key's account and spending its real balance. It can open packs up to the Diamond tier, other than sealed mystery and Steph Curry packs, and sell back. It can't use the marketplace, gifts, drops, battles, shipping, chat or DMs, or withdraw. Pulls come from the live pool, and anything it still holds returns there daily at 10:00 UTC. See [Testing](/partner-api/testing).
+        **A test account is a login, not a key.** Sign in with it to use it: your API calls keep acting on your key's account and spending its real balance. It can open packs up to the Diamond tier, other than the Starter, the sealed mystery packs and the Steph Curry pack, and sell back. It can't use the marketplace, gifts, drops, battles, shipping, chat or DMs, or withdraw. Pulls come from the live pool, and anything it still holds returns there daily at 10:00 UTC. See [Testing](/partner-api/testing).
       security:
         - bearerAuth: ['create:test_accounts']
       responses:
@@ -2908,11 +2928,6 @@ components:
       description: A catalog that has packs and listings.
       enum: [pokemon, onepiece, sports, riftbound, watches]
       default: pokemon
-    StorefrontCategory:
-      type: string
-      description: A catalog with a storefront.
-      enum: [pokemon, onepiece, sports, riftbound, watches, goods]
-      default: pokemon
     CardCategory:
       type: string
       description: A card's catalog. `goods` is luxury goods and `singles` is raw singles.
@@ -2965,7 +2980,7 @@ components:
           additionalProperties: true
     PublicCard:
       type: object
-      description: Named fields of the card object. No price or value of any kind, and no goods `attributes`. A field a card doesn't have is left out.
+      description: Named fields of the card object. No price or value of any kind, and no goods `attributes`. A field a card's catalog doesn't have is left out. A field it has but we don't know is `null`.
       properties:
         id: { type: string }
         category: { $ref: '#/components/schemas/CardCategory' }
@@ -3008,8 +3023,8 @@ components:
         pack_type: { type: string, description: What Buy packs takes. }
         name: { type: string }
         price: { type: number, description: 'Price per pack in USD, the amount charged.' }
-        available: { type: boolean }
-        reason: { type: string, description: Why the pack is unavailable. Only when `available` is `false`. }
+        available: { type: boolean, description: 'Whether the pack can be opened right now. Buy packs refuses one that can''t, with `409 PACK_UNAVAILABLE`, before charging anything.' }
+        reason: { type: string, description: 'One of `Out of stock`, `Odds maintenance in progress`, `Restocking` or `Not available right now`. Only when `available` is `false`.' }
         max_quantity: { type: integer, description: The most in one request. }
         risk_levels:
           type: array
@@ -3095,14 +3110,14 @@ components:
       type: object
       title: Sealed pack
       properties:
-        id: { type: [string, 'null'] }
+        id: { type: [string, integer, 'null'], description: A sealed product's id is a number. }
         name: { type: [string, 'null'] }
         set: { type: [string, 'null'] }
         category: { type: [string, 'null'] }
         image_url: { type: [string, 'null'] }
     PackPurchase:
       type: object
-      required: [checkout_id, pack_type, quantity, total_charged, remaining_balance, summary, pulls]
+      required: [checkout_id, pack_type, quantity, total_charged]
       properties:
         checkout_id: { type: string, description: Our id for the order. Get an order takes it. }
         pack_type: { type: string }
@@ -3159,6 +3174,9 @@ components:
                   timestamp: { type: [string, 'null'] }
                   verify_path: { type: [string, 'null'], description: 'Send a `GET` to this path, with no key. `null` for a Steph Curry pull.' }
         idempotent_replay: { type: boolean, description: This answers a retry of a finished order. Nothing was charged again. }
+        reconciled: { type: boolean, description: 'Present and `true` on the shorter body we return when we closed the order after its response was lost. It has `pull_ids` and a `message`, and no `pulls`, `summary` or `remaining_balance`.' }
+        pull_ids: { type: array, items: { type: string }, description: Present with `reconciled`. The pulls in the order, which are in your vault. }
+        message: { type: string, description: Present with `reconciled`. }
     OrderType:
       type: string
       enum: [pack_purchase, card_purchase, sell_back, listing_sale]
@@ -3228,7 +3246,7 @@ components:
       type: number
       minimum: 100
       maximum: 10000
-      description: 'Optional insurance: the dollars of cover, with at most two decimals, from $100 up to `max_cover` from the estimate. Leave it out and the parcel has only the carrier''s automatic cover, up to $100. You carry any loss above your cover.'
+      description: 'Optional insurance: the dollars of cover, with at most two decimals, from $100 up to `max_cover` from the estimate. Leave it out and the only cover is what the carrier includes automatically: up to $100 on USPS and UPS labels. Other carriers may include less or none. You carry any loss above your cover.'
     ShipmentAddress:
       type: object
       description: Your customer's address. Stored only with a shipment, never in logs or on your account.

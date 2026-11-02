@@ -38,7 +38,7 @@ Charges your balance the rate's full amount, plus the premium if you choose insu
   The most you'll pay for this shipment, in dollars, with any insurance: more than 0 and at most 10,000. Normally the `amount` from the estimate, or its `total` if you chose insurance.
 </ParamField>
 <ParamField body="cover_amount" type="number">
-  Optional insurance: the dollars of cover you want, with at most two decimals, from \$100 up to `max_cover` from the estimate. Leave it out and the parcel has only the carrier's automatic cover, up to \$100. You carry any loss above your cover: [how insurance works](/partner-api/shipping#insurance).
+  Optional insurance: the dollars of cover you want, with at most two decimals, from \$100 up to `max_cover` from the estimate. Leave it out and the only cover is what the carrier includes automatically: up to \$100 on USPS and UPS labels. Other carriers may include less or none. You carry any loss above your cover: [how insurance works](/partner-api/shipping#insurance).
 </ParamField>
 
 ## Response
@@ -51,10 +51,10 @@ Charges your balance the rate's full amount, plus the premium if you choose insu
 
 | Status | Code | When |
 |---|---|---|
-| `400` | | A missing or malformed `Idempotency-Key`, a body that isn't JSON, `card_ids` that aren't 1–10 card ids (or list one twice), an invalid address (`"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value), a `rate` that isn't a carrier and token, a missing or out-of-range `max_cost`, or a `cover_amount` that isn't a dollar amount with at most two decimals |
+| `400` | | A missing or malformed `Idempotency-Key`, a body that isn't JSON, `card_ids` that aren't 1–10 card ids (or list one twice), an invalid address (`"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value), a `rate` that isn't a carrier and token, a missing or out-of-range `max_cost`, or a `cover_amount` that isn't a dollar amount with at most two decimals or is 0 or negative |
 | `400` | `INSUFFICIENT_BALANCE` | Your balance is below the rate, plus the premium if you chose insurance. The body has the `amount`. Nothing was charged |
 | `400` | `COVER_NOT_ALLOWED` | `cover_amount` is outside the range: from \$100 up to the cards' value, capped at \$10,000. The body has `order_value`, `min_cover` and `max_cover`. Nothing was charged |
-| `400` | `COUNTRY_NOT_SUPPORTED` | We don't ship to this country |
+| `400` | `COUNTRY_NOT_SUPPORTED` | We don't ship to this country. A country code we don't recognize is a plain `400` (`"Invalid address"`, with `fields.country`) |
 | `400` | `OVER_CUSTOMS_CAP` | An international shipment worth over $2,500, or with a card we have no value for |
 | `400` | `PARTNER_GOODS` | A partner's own goods ship from that partner |
 | `403` | | The key lacks `ship:cards` or isn't linked to an account, the account needs a verified phone number (`"Phone verification required"`), the account is deleted (`"Partner account unavailable"`), or it can't request shipping |

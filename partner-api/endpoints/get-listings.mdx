@@ -25,13 +25,13 @@ Scope: `read:account` · MCP tool: `get_listings`
   <Expandable title="listing">
     <ResponseField name="listing_id" type="string">Send it to [Change a listing's price](/partner-api/endpoints/update-listing-price).</ResponseField>
     <ResponseField name="card_id" type="string" />
-    <ResponseField name="category" type="string | null">The card's catalog. `null` on some older listings.</ResponseField>
+    <ResponseField name="category" type="string | null">The card's catalog. `null` on some older listings, which [Change a listing's price](/partner-api/endpoints/update-listing-price) answers with `409 LISTING_NOT_ACTIVE`.</ResponseField>
     <ResponseField name="listing_type" type="string">`fixed_price`, or `dutch_auction` for a Dutch auction started in our app.</ResponseField>
     <ResponseField name="price" type="number">The listing's price right now, in USD: what a buyer is charged for the card, before the $1 buyer fee. For a Dutch auction, its current auction price.</ResponseField>
     <ResponseField name="seller_fee" type="number">What a sale takes from your payout: $1.</ResponseField>
     <ResponseField name="payout" type="number">What your balance is credited if it sells at `price`: `price` − `seller_fee`.</ResponseField>
     <ResponseField name="listed_at" type="string">When you listed it.</ResponseField>
-    <ResponseField name="updated_at" type="string">When the listing last changed, a price change included.</ResponseField>
+    <ResponseField name="updated_at" type="string | null">When the listing last changed, a price change included.</ResponseField>
     <ResponseField name="item" type="object | null">A [card object](/partner-api/card-object), or `null` if we can't load the card.</ResponseField>
   </Expandable>
 </ResponseField>
@@ -52,7 +52,7 @@ curl "https://catchbackcards.com/api/partner/v1/listings?page=1&per_page=100" \
 </RequestExample>
 
 <ResponseExample>
-```json 200
+```json 200 (abridged)
 {
   "page": 1,
   "per_page": 100,

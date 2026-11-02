@@ -3,11 +3,13 @@ title: "Authentication"
 description: "API keys, scopes, which endpoint each scope unlocks, and keeping your key safe."
 ---
 
-Every request sends your API key as a bearer token, except [Public card metadata](/partner-api/endpoints/get-public-card), which takes no key:
+Every `/api/partner/v1/` request sends your API key as a bearer token:
 
 ```http
 Authorization: Bearer cb_live_...
 ```
+
+A few read-only endpoints take no key: [Public card metadata](/partner-api/endpoints/get-public-card), [Verify a pull](/partner-api/verify-a-pull) and the list of countries we ship to ([Shipping cards](/partner-api/shipping#where-you-can-ship)).
 
 A key is `cb_live_` followed by 48 hexadecimal characters. We store only a hash of it, so we can't show it to you again: keep it safe when you receive it.
 

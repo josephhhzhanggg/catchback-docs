@@ -12,10 +12,10 @@ These take `page` (1-based) and `per_page`, and echo back the values they used.
 | Endpoint | Default `per_page` | Most per page | Most pages | Order | How you know there's more |
 |---|---|---|---|---|---|
 | [Search cards](/partner-api/endpoints/search-cards) | 50 | 100 | 20 | `price` (your `sort`); at an equal price, user listings before shop stock, each by id | `has_more` |
-| [Your listings](/partner-api/endpoints/get-listings) | 100 | 200 | no limit | newest first, then listing id | `total` and `has_more` |
-| [Get vault](/partner-api/endpoints/get-vault) | 100 | 200 | no limit | card id, ascending | `total` |
+| [Your listings](/partner-api/endpoints/get-listings) | 100 | 200 | no limit | newest first, then listing id | `total`, which is `null` on a page past the end, and `has_more` |
+| [Get vault](/partner-api/endpoints/get-vault) | 100 | 200 | no limit | card id, ascending | `total`, which is `null` on a page past the end |
 | [List shipments](/partner-api/endpoints/list-shipments) | 50 | 100 | 100,000 | newest first | `total`, which is `null` on a page past the end |
-| [Card catalog export](/partner-api/endpoints/card-catalog) | 500 | 1000 | no limit | card id, ascending | `total` |
+| [Card catalog export](/partner-api/endpoints/card-catalog) | 500 | 1000 | no limit | card id, ascending | `total`, which is `null` on a page past the end |
 | [Purchase report](/partner-api/endpoints/purchase-report) | 500 | 1000 | no limit | `created_at`, then `user_id`, `source`, `pack_type` and `amount` | `total` |
 
 So Search cards reaches at most 20 pages of 100 (2,000 results), Your listings and Get vault return up to 200 a page, List shipments up to 100, and the catalog export and purchase report up to 1,000 rows a page.
@@ -43,7 +43,7 @@ Read `page` and `per_page` back from the response rather than assuming what you 
 
 ## Reaching the end
 
-- **Get vault, Card catalog export and Purchase report** return `total`, the number of rows across all pages. Keep incrementing `page` until you've fetched `total` rows; a page past the end is an empty list. **Your listings** returns `total` and `has_more`.
+- **Get vault, Card catalog export and Purchase report** return `total`, the number of rows across all pages. Keep incrementing `page` until you've fetched `total` rows. A page past the end is an empty list, and on Get vault and Card catalog export its `total` is `null`, so keep the last number you read. **Your listings** returns `total` and `has_more`.
 - **Search cards** returns `has_more` instead. It is `true` when at least one more result follows the page, and always `false` on page 20, the last page you can ask for: a `page` above 20 returns page 20 again. To see further, narrow the price range: set `min_price` to the last result's price (`max_price` with `price_desc`) and start again from page 1, skipping the results at that price you already have. A search can also stop at its read ceiling, with `truncated: true`: see [How far a search reaches](/partner-api/endpoints/search-cards#how-far-a-search-reaches).
 - **List orders** returns `has_more` and `next_cursor`: see [Cursor pages](#cursor-pages).
 

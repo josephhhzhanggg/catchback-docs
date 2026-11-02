@@ -23,7 +23,7 @@ Each entry in a Buy packs response's `pulls` has a `proof` object, or `null` for
   The check that replays this pull, on `https://catchbackcards.com`. `null` for a pull from the Steph Curry pack, which this check doesn't cover.
 </ResponseField>
 
-Keep the `proof` with the pull: [Get an order](/partner-api/endpoints/get-order) doesn't return it. The `verification_hash` you were sent at purchase is what lets you show later that the record hasn't changed.
+Keep the `proof` with the pull: [Get an order](/partner-api/endpoints/get-order) doesn't return it. The `verification_hash` you were sent at purchase lets you show later that the seed, bucket, place and card haven't changed. It doesn't cover the odds or the card list, and a passing check can be cached for up to a day.
 
 ## Ask us to check it
 
@@ -54,15 +54,20 @@ The response replays the draw step by step. Trimmed to the fields this guide use
 }
 ```
 
-Read `verified`. `verification_type` says what was checked:
+Read `verification_type` first, then `verified`: `verification_type` says what was checked.
 
 | `verification_type` | The pull | What is checked |
 |---|---|---|
 | `provably_fair` | A card, or a consolation pull (a sealed pack instead of a card) | The draw is replayed from the seed. Every step is in the response, and `verified` is `true` only when all of them match |
 | `hash_only` | The Starter or a sealed mystery pack | Its seed is random, not taken from the pull id, so the draw can't be replayed from the id. The result hash is recomputed from the recorded seed, pick and time; `result_hash.formula` names the inputs |
-| `legacy_hash`, `none` | A pull from before full proofs, or with no record | Only a stored hash, or nothing. A pull from Buy packs has a full proof |
+| `legacy_hash` | An older pull, or a pull from a custom pack | Nothing is recomputed. `verified: true` here only means a record exists, so don't treat it as a check |
+| `none` | A pull with no record | Nothing. A pull from Buy packs has a full proof |
 
 `algorithm` names the draw: `shuffle-scaled-v3` is the current one, and older pulls name the version they were drawn with.
+
+For a consolation pull, the check confirms only that the seed's draw falls under the recorded consolation odds. It has no result hash.
+
+We don't record whether a consolation roll or an armed chase came before the bucket roll, so the check infers it from the pack's history. A pull on a pack whose consolation was removed can come back `verified: false`. Contact us if yours does.
 
 | Status | When |
 |---|---|
@@ -137,13 +142,19 @@ export async function checkPull(pull) {
   const card = Math.floor((draws[before + n] / M) * n);
 
   // The result hash binds the bucket, the place and the card you received.
-  const delivered = v.step5_result_verification.delivered_card_id;
+  const delivered = pull.item.id;
   const hash = createHash('sha256').update(`result:${seed}:${bucket}:${card}:${delivered}`).digest('hex');
+
+  // Unless a chase draw or a collision re-roll replaced it, the card you received
+  // is the one at that place in the recorded list.
+  const by = v.step5_result_verification.delivered_by;
+  const atPlace = v.step4_card_selection.available_cards[card]?.id === delivered;
 
   return {
     seed: seed === pull.proof.seed,
     bucket: bucket === v.step3_bucket_selection.stored_bucket_index,
     card: card === v.step4_card_selection.stored_card_index,
+    delivered: by === 'seed' ? atPlace : null,
     hash: hash === pull.proof.verification_hash,
   };
 }
@@ -153,4 +164,4 @@ Two things can make the card you received differ from the one at that place, and
 
 ## What the check shows
 
-It shows that the card you received is the one the pull's seed selects, from the bucket and odds recorded with the pull, and, against the `verification_hash` you were sent, that the record hasn't changed since. The seed is the pull id, which CatchBack generates when the pull is made.
+It shows that the seed lands on this bucket and this place in the recorded list, and that the card you received is at that place. The list's order is only confirmed when `step4_card_selection.shuffle.restores_card_id_order` is `true`. Against the `verification_hash` you were sent, it also shows that the seed, bucket, place and card haven't changed since. The seed is the pull id, which CatchBack generates when the pull is made.

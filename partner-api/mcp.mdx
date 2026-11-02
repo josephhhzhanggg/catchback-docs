@@ -65,7 +65,7 @@ The agent only sees the tools your key has scopes for, plus `whoami`, which ever
 | `create_test_account` | [Create a test account](/partner-api/endpoints/create-test-account) | `create:test_accounts` |
 | `list_test_accounts` | [List test accounts](/partner-api/endpoints/list-test-accounts) | `create:test_accounts` |
 
-`buy_packs`, `buy_card` and `create_shipment` take an `order_id` argument, which is sent as the `Idempotency-Key`. Have your agent generate one per order and reuse it when retrying that order. A retry of a purchase under a new `order_id` is a new order: a second set of packs, or a second card. `buy_card` also needs `max_price`, normally the `price` that `search_cards` returned, and `create_shipment` needs `max_cost`, normally the `amount` that `estimate_shipment` returned.
+`buy_packs`, `buy_card` and `create_shipment` take an `order_id` argument, which is sent as the `Idempotency-Key`. Have your agent generate one per order and reuse it when retrying that order. A retry of a purchase under a new `order_id` is a new order: a second set of packs, or a second card. `buy_card` also needs `max_price`, normally the `price` that `search_cards` returned, and `create_shipment` needs `max_cost`, normally the `amount` that `estimate_shipment` returned, or its `total` if you send `cover_amount`.
 
 A tool whose endpoint has an id in its path takes that id as an argument: `card_id` for `get_card`, `get_price_history` and `get_card_activity`, `listing_id` for `update_listing_price`, `checkout_id` for `get_order`, and `shipment_id` for `get_shipment`. Every other argument is the endpoint's query parameter or body field of the same name.
 

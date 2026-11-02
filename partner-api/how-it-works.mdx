@@ -28,7 +28,7 @@ flowchart LR
 
 ## 2. Every request
 
-Send your key as `Authorization: Bearer cb_live_…`. Every endpoint except Who am I requires one scope; a key without it gets a `403`. Anything that touches your balance or cards also needs the key to be linked to your account. Details: [Authentication](/partner-api/authentication).
+Send your key as `Authorization: Bearer cb_live_…`. Every endpoint except Who am I requires one scope; a key without it gets a `403`. Anything that touches your balance or cards also needs the key to be linked to your account. [Public card metadata](/partner-api/endpoints/get-public-card), [Verify a pull](/partner-api/verify-a-pull) and the list of countries we ship to take no key. Details: [Authentication](/partner-api/authentication).
 
 ## 3. Decide what to buy
 
@@ -99,7 +99,7 @@ Everything you pull or buy is held by CatchBack in your vault. [Get vault](/part
     Sell it to CatchBack for CatchCoins at our guaranteed rates.
   </Card>
   <Card title="List" icon="tag" href="/partner-api/endpoints/list-card">
-    Put it on the marketplace at a fixed price, and change the price in place. Delist to sell it back.
+    Put it on the marketplace at a fixed price, and change the price in place. A sale pays you the price less a $1 seller fee. Delist to sell it back.
   </Card>
   <Card title="Ship" icon="truck" href="/partner-api/shipping">
     Send it to your customer's address, paid from your balance at the carrier's full rate.
@@ -115,6 +115,10 @@ What a sell-back pays, the same as any customer:
 
 A card bought from another user's listing can instead carry over that seller's 7-day lock, if it is lower and still running ([Buy a card](/partner-api/endpoints/buy-card)).
 
+Luxury goods sell back only within 5 minutes of the pull.
+
+A card from a pack that holds its cards pays a flat 90% for the hold, can't be kept, listed or shipped through the API, and is sold back automatically when the hold ends.
+
 The fresh 90% window is why the pack response includes the offer: decide on each pull right away. Sell-backs have no rate limit per key, and each card pays out once, so retrying a sell-back is safe. See [Liquidity](/about-catchback/liquidity) for the full rules.
 
 ## 8. A typical bot loop
@@ -129,7 +133,7 @@ for each pull:
 wait until next_purchase_at    -> repeat
 ```
 
-To reconcile against your own records, [List orders](/partner-api/endpoints/list-orders) gives every pack purchase, card buy, sell-back and sale of your listings in a window, each with its effect on your balance. To hear about them without polling, use a [webhook](/partner-api/webhooks).
+To reconcile against your own records, [List orders](/partner-api/endpoints/list-orders) gives every pack purchase, card buy, sell-back and sale of your listings in a window, each with its effect on your balance. Shipment charges are on [List shipments](/partner-api/endpoints/list-shipments) (`cost`), and money we credit to your account is on neither, so include both when you reconcile your balance. To hear about them without polling, use a [webhook](/partner-api/webhooks).
 
 ## Doing it with an AI agent
 

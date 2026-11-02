@@ -3,11 +3,11 @@ title: "Shipping cards"
 description: "Ship cards you hold to your customers, paid from your balance: what you pay, which cards can ship, how we handle your customers' addresses, and how to track a shipment."
 ---
 
-You can ship cards in your vault to your customers, paid from your CatchCoins balance at the carrier's full rate, plus a premium if you choose insurance. It takes the `ship:cards` scope, which we grant on request: [contact us](mailto:catchbackcards@gmail.com).
+You can ship cards in your vault to your customers, paid from your CatchCoins balance at the carrier's full rate, plus a premium if you choose insurance. It takes the `ship:cards` scope, which we grant on request: [contact us](mailto:catchbackcards@gmail.com). The account needs a verified phone number.
 
 <Steps>
   <Step title="Get rates">
-    [Estimate a shipment](/partner-api/endpoints/estimate-shipment) with the card ids and your customer's address. It returns live carrier rates, charges nothing and stores nothing.
+    [Estimate a shipment](/partner-api/endpoints/estimate-shipment) with the card ids and your customer's address. It returns live carrier rates and charges nothing. We store nothing: the address goes to our carrier services, normally Shippo, to get the rates.
   </Step>
   <Step title="Create the shipment">
     [Create a shipment](/partner-api/endpoints/create-shipment) with the same cards and address, the rate you chose and a `max_cost`, under your own id for the shipment. We quote again and charge the fresh amount, up to `max_cost`.
@@ -22,7 +22,7 @@ You can ship cards in your vault to your customers, paid from your CatchCoins ba
 The carrier's full rate for the service you pick, plus the premium if you choose [insurance](#insurance). There are no promo codes on a shipment, and no free or subsidized tier.
 
 <Warning>
-  **Without insurance, the only cover on a parcel is the carrier's automatic cover, up to $100.** Keep that in mind before you ship a card worth more. There's no signature option on a shipment.
+  **Without insurance, the only cover on a parcel is what the carrier includes automatically: up to $100 on USPS and UPS labels. Other carriers may include less or none.** Keep that in mind before you ship a card worth more. There's no signature option on a shipment.
 </Warning>
 
 ## Insurance
@@ -71,9 +71,9 @@ Outside the US, the address needs a phone number, and a shipment worth more than
 Each shipment carries its customer's address, because we hold no list of your customers.
 
 - **Where we keep it:** only with the shipment's order, which is what we buy the label from. It doesn't go on your account or in your address book. We never ask for your customer's email address.
-- **Who sees it:** you, through [Get a shipment](/partner-api/endpoints/get-shipment) (the list has no addresses, and no [event](/partner-api/webhook-events) carries any part of one), our staff who fulfill the order, and our carrier partner, Shippo, which quotes and labels it.
-- **Logs:** we don't write the address to our logs.
-- **How long:** we remove the address, phone number and label links **90 days after the shipment closes**, or 180 days after it shipped if the carrier never reported an end. An order still waiting to ship keeps its address. After that, `address` is `null` and `address_removed` is `true`, and the order stays with its cards, cost and tracking. Shippo keeps its own copy under its own terms.
+- **Who sees it:** you, through [Get a shipment](/partner-api/endpoints/get-shipment) (the list has no addresses, and no [event](/partner-api/webhook-events) carries any part of one), our staff who fulfill the order, and the carrier services we buy labels through, normally Shippo, which quote and label it.
+- **Logs:** Our partner API doesn't write the address to our logs.
+- **How long:** we remove the address, phone number and label links **90 days after the shipment closes**, or 180 days after it shipped if the carrier never reported an end. An order still waiting to ship keeps its address. After that, `address` is `null` and `address_removed` is `true`, and the order stays with its cards, cost and tracking. `destination_country` stays on the shipment. The carrier services keep their own copies under their own terms.
 - **Your customer hears nothing from us.** We don't email or text them, so tell them about their tracking yourself.
 
 ## Status
@@ -106,8 +106,8 @@ Rarely, we can't tell whether a shipment's charge went through. You get a `500 S
 
 | What you see | What it means | What to do |
 |---|---|---|
-| `status: "needs_review"`, or `409 IDEMPOTENCY_IN_PROGRESS` with `needs_review: true` on a resend | We're still checking | Wait. A resend with the same id can't charge twice. Don't resend it under a new id until you hear from us |
-| Any other status, or the shipment with `idempotent_replay: true` on a resend | It went through, and was charged once | Track it as usual |
+| `status: "needs_review"` or `"pending"`, or `409 IDEMPOTENCY_IN_PROGRESS` with `needs_review: true` on a resend | We're still checking | Wait. A resend with the same id can't charge twice. Don't resend it under a new id until you hear from us |
+| `processing`, `shipped`, `delivered` or `cancelled`, or the shipment with `idempotent_replay: true` on a resend | It went through, and was charged once | Track it as usual |
 | `404` from Get a shipment | We found nothing was charged, and removed it | The id is free to send again. Check your balance before you do |
 
 Quote the `shipment_id` if you contact us.

@@ -6,7 +6,7 @@ description: "The cards you hold, each with how you got it and its CatchBack off
 
 Scope: `read:account` · MCP tool: `get_vault`
 
-Cards in your vault or listed on the marketplace. Cards that have shipped are not included. Each card names its latest acquisition: a pull (`pull_id`) or a buy (`purchase_id`). The other is `null`, and [Sell back](/partner-api/endpoints/sell-back) takes whichever is set.
+Cards in your vault or listed on the marketplace. Cards that have shipped are not included. A sealed product (a pull from the Starter or a sealed mystery pack) isn't listed here, and the API can't sell it back, list it or ship it. Each card names its latest acquisition: a pull (`pull_id`) or a buy (`purchase_id`). One is set and the other is `null`, and [Sell back](/partner-api/endpoints/sell-back) takes whichever is set. Both can be `null` for a card that reached your account another way: read the vault again, or contact us.
 
 <ParamField query="category" type="string" default="pokemon">
   `pokemon`, `onepiece`, `sports`, `riftbound`, `watches`, `goods` (luxury goods) or `singles` (raw singles). A pull can land in a different catalog from its pack's (a raw single from a Pokémon pack, for example), and the item's `category` says which, so sync every category you might hold.
@@ -33,7 +33,7 @@ Cards in your vault or listed on the marketplace. Cards that have shipped are no
     <ResponseField name="listing_id" type="string | null">The card's active listing while it is listed, the id [Change a listing's price](/partner-api/endpoints/update-listing-price) takes. `null` otherwise.</ResponseField>
     <ResponseField name="listing_price" type="number | null">That listing's price right now, in USD. `null` when the card isn't listed.</ResponseField>
     <ResponseField name="catchback" type="object | null">
-      The sell-back offer right now: `amount`, `rate`, `basis_value` (the value the offer is based on) and `locked_value_until`. `null` while the card is listed. Delist it first.
+      The sell-back offer right now: `amount`, `rate`, `basis_value` (the value the offer is based on) and `locked_value_until` (`null` when no lock applies). `null` while the card is listed (delist it first), and for a luxury goods item once its 5-minute sell-back window has closed. A card we have no value for shows an `amount` of `0`.
     </ResponseField>
   </Expandable>
 </ResponseField>

@@ -6,7 +6,7 @@ description: "Your account's order history, newest first: pack and card purchase
 
 Scope: `read:account` · MCP tool: `list_orders`
 
-Everything that moved your balance through the API, newest first, so you can reconcile your records against ours. There are four kinds of order:
+Your pack and card purchases, sell-backs and listing sales, newest first. Shipment charges aren't here: read `cost` in [List shipments](/partner-api/endpoints/list-shipments). Money we credit to your account isn't here either, so this alone won't reconcile your balance. There are four kinds of order:
 
 | `type` | What it is | Its `checkout_id` |
 |---|---|---|

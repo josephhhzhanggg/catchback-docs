@@ -21,7 +21,7 @@ Four limits are settings on your key: the time between pack purchases, packs per
 | [Estimate a shipment](/partner-api/endpoints/estimate-shipment) | 60 estimates per minute, where one with `cover_amount` counts as two | No | `429 RATE_LIMITED`, with a `Retry-After` header |
 | [Estimate a shipment](/partner-api/endpoints/estimate-shipment), [Create a shipment](/partner-api/endpoints/create-shipment) | Up to 10 cards per request | No | `400` |
 | [Create a test account](/partner-api/endpoints/create-test-account) | 5 active test accounts, 30 days each | No | `409` |
-| [Public card metadata](/partner-api/endpoints/get-public-card) | 60 requests per minute per IP address; a CDN hit doesn't count | No | `429 RATE_LIMITED`, with a `Retry-After` header |
+| [Public card metadata](/partner-api/endpoints/get-public-card) | 60 requests per minute per IP address; a CDN hit doesn't count. The count is kept per server, so the exact point you're refused can vary | No | `429 RATE_LIMITED`, with a `Retry-After` header |
 | [List a card](/partner-api/endpoints/list-card), [Change a listing's price](/partner-api/endpoints/update-listing-price), [Delist a card](/partner-api/endpoints/delist-card) | No per-key rate limit | | |
 | Every read endpoint | No per-key rate limit; page sizes are capped (see [Pagination](/partner-api/pagination)) | | |
 | Everything under `/api/` | 300 requests per minute per IP address, shared | No | See [Shared limit per IP](#shared-limit-per-ip) |

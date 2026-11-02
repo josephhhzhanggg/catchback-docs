@@ -53,9 +53,9 @@ Live carrier rates, at the full rate you'd pay. Send `cover_amount` to price [in
 
 | Status | Code | When |
 |---|---|---|
-| `400` | | The body isn't JSON, `card_ids` isn't 1–10 card ids (or lists one twice), the address is invalid, or `cover_amount` isn't a dollar amount with at most two decimals. An address error is `"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value |
+| `400` | | The body isn't JSON, `card_ids` isn't 1–10 card ids (or lists one twice), the address is invalid, or `cover_amount` isn't a dollar amount with at most two decimals or is 0 or negative. An address error is `"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value |
 | `400` | `COVER_NOT_ALLOWED` | `cover_amount` is outside the range: from \$100 up to the cards' value, capped at \$10,000. The body has `order_value`, `min_cover` and `max_cover` |
-| `400` | `COUNTRY_NOT_SUPPORTED` | We don't ship to this country |
+| `400` | `COUNTRY_NOT_SUPPORTED` | We don't ship to this country. A country code we don't recognize is a plain `400` (`"Invalid address"`, with `fields.country`) |
 | `400` | `OVER_CUSTOMS_CAP` | An international shipment worth over $2,500, or with a card we have no value for |
 | `400` | `PARTNER_GOODS` | A partner's own goods ship from that partner |
 | `403` | | The key lacks `ship:cards` or isn't linked to an account, the account needs a verified phone number (`"Phone verification required"`), the account is deleted (`"Partner account unavailable"`), or it can't request shipping |

@@ -6,7 +6,7 @@ description: "Completed pack purchases in a time window, for revenue-share repor
 
 Scope: `read:pulls` · REST only, not an MCP tool
 
-Every completed pack purchase in a window, priced the same way our own revenue reporting is, so your totals reconcile with ours. Purchases with an `amount` of 0 (comped packs) and our own internal accounts are excluded.
+Every completed pack purchase in a window, priced the same way our own revenue reporting is, so your totals reconcile with ours. Purchases with an `amount` of 0 (comped packs) and our own internal accounts are excluded. A purchase can take a moment to appear here.
 
 It returns nothing about what was pulled and nothing about the buyer beyond an opaque id: no cards, no email, username, phone, address or balance. That is permanent for this scope.
 
@@ -38,7 +38,7 @@ The window is capped at **31 days**, and a malformed or inverted window is a `40
     <ResponseField name="source" type="string">
       Where the sale is booked: a catalog (`pokemon`, `onepiece`, `sports`, `riftbound`, `watches`, `goods` or `singles`) or a pack line (`custom` for custom packs, `loose` for sealed product packs, `steph` for the Steph Curry pack). A raw single is booked to the catalog of the pack it came from, so `singles` appears only when that catalog isn't recorded. New values can be added, so don't fail on one you don't know.
     </ResponseField>
-    <ResponseField name="pack_type" type="string">The tier or named pack. Base packs report `Base` or `Mega Base`.</ResponseField>
+    <ResponseField name="pack_type" type="string | null">The pack's display name, for example `Bronze Pack`. It isn't the `pack_type` id that [List packs](/partner-api/endpoints/list-packs) returns, and it can be `null`. Base packs report `Base` or `Mega Base`.</ResponseField>
   </Expandable>
 </ResponseField>
 
@@ -63,7 +63,7 @@ curl "https://catchbackcards.com/api/partner/v1/pulls?since=2026-08-01T00:00:00Z
       "created_at": "2026-08-01T04:12:09.481Z",
       "amount": 25,
       "source": "pokemon",
-      "pack_type": "bronze"
+      "pack_type": "Bronze Pack"
     }
   ]
 }
