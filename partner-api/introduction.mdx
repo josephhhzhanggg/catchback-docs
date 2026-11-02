@@ -1,6 +1,6 @@
 ---
 title: "Partner API"
-description: "Build on CatchBack's graded-card inventory: browse packs and cards, open packs, buy cards, and manage what you hold."
+description: "Build on CatchBack's graded-card inventory: browse packs and cards, open packs, buy cards, manage what you hold, and ship it to your customers."
 ---
 
 The Partner API lets companies, bots and AI agents work with CatchBack programmatically. A partner is a normal CatchBack account with an API key linked to it, so every action runs through the same code and the same rules as our own app.
@@ -21,6 +21,12 @@ The Partner API lets companies, bots and AI agents work with CatchBack programma
   <Card title="Look up any card" icon="id-card" href="/partner-api/endpoints/get-card">
     Any card by id or by the cert on its slab, with its price history and recent sales.
   </Card>
+  <Card title="Ship to your customers" icon="truck" href="/partner-api/shipping">
+    Ship cards you hold to your customers' addresses, paid from your balance, and track them.
+  </Card>
+  <Card title="Get webhooks" icon="bell" href="/partner-api/webhooks">
+    A signed `POST` when an order finishes, a listing sells or a shipment moves.
+  </Card>
   <Card title="Connect an AI agent" icon="robot" href="/partner-api/mcp">
     The same actions as MCP tools, with the same key.
   </Card>
@@ -28,9 +34,10 @@ The Partner API lets companies, bots and AI agents work with CatchBack programma
 
 ## Basics
 
-- **Base URL:** `https://catchbackcards.com`. All endpoints live under `/api/partner/v1/`.
+- **Base URL:** `https://catchbackcards.com`. Every endpoint that takes a key lives under `/api/partner/v1/`. [Public card metadata](/partner-api/endpoints/get-public-card) needs no key and lives under `/api/public/v1/`.
 - **Auth:** every request sends your key as a bearer token. See [Authentication](/partner-api/authentication).
 - **Format:** JSON in and out, UTF-8. Money is in **US dollars** as numbers (not cents). Your CatchCoins balance is also in dollars.
+- **Where you call from:** a key doesn't get around our sanctions list. See [Where you can call from](/partner-api/errors-and-limits#where-you-can-call-from).
 - **Versioning:** breaking changes ship under a new version prefix. A `v1` response may gain new fields at any time, so build your parser to ignore fields it doesn't know. What changed and when: [Changelog](/partner-api/changelog).
 
 ## How a partner account works
@@ -48,7 +55,7 @@ The whole flow, step by step: [How it works](/partner-api/how-it-works).
 
 ## Quick start
 
-The three calls below show the shape of the API. The [Quickstart](/partner-api/quickstart) goes the whole way, from a new key to selling a pull back.
+The three calls below show the shape of the API. The [Quickstart](/partner-api/quickstart) goes the whole way, from a new key to selling a pull back. The third call spends real CatchCoins: to try packs on a test balance first, see [Testing](/partner-api/testing).
 
 <Steps>
   <Step title="See what you can buy">

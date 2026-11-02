@@ -8,6 +8,8 @@ Scope: `read:catalog` · MCP tool: `get_card`
 
 Looks one card up by id, wherever it is now: in the shop, in a pack's pool, in someone's vault, listed or shipped. You get the [card object](/partner-api/card-object) only, with nothing about who holds the card, how they got it, or whether it's for sale. To find cards you can buy, use [Search cards](/partner-api/endpoints/search-cards).
 
+To show a card's metadata and images with no key and no prices, use [Public card metadata](/partner-api/endpoints/get-public-card).
+
 <ParamField path="id" type="string" required>
   A card id: `item.id` or `card_id` from any other endpoint.
 </ParamField>

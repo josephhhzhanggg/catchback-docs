@@ -1,0 +1,65 @@
+---
+title: "Testing"
+description: "How to try the Partner API before you spend real money: test accounts, what they can't do, and how to test trading."
+---
+
+Your API key acts on its account's real balance, and every card in our inventory is real. There are two ways to test:
+
+- **A test account** to try packs and sell-backs on a test balance.
+- **Small real orders on a real key** for everything else, including trading.
+
+Reads never spend anything, so [Who am I](/partner-api/endpoints/get-me), [List packs](/partner-api/endpoints/list-packs), [Search cards](/partner-api/endpoints/search-cards) and the other `GET` endpoints are safe to call on any key.
+
+## Test accounts
+
+[Create a test account](/partner-api/endpoints/create-test-account) makes a separate CatchBack login with a $10,000 test balance. It needs the `create:test_accounts` scope, which we grant on request: [contact us](mailto:catchbackcards@gmail.com).
+
+<Warning>
+  **A test account is a login, not a key.** Sign in with it on the web or in the app. Your API calls and MCP tools keep acting on your key's account, so they spend your key's real balance, even after you've made a test account.
+</Warning>
+
+To drive a test account through the API, [ask us](mailto:catchbackcards@gmail.com) to link a separate key to it. That key then acts on the test account and spends its test balance. Everything below still applies, and we turn that key off when the test account ends.
+
+### What a test account can do
+
+- Open packs up to the Diamond tier, other than the packs listed below.
+- Sell back what it pulls.
+
+### What a test account can't do
+
+| It can't | |
+|---|---|
+| Use the marketplace | No buying or listing cards. To test trading, see [below](#testing-trading) |
+| Use gifts | |
+| Enter drops or battles | |
+| Request shipping | To test shipping, see [below](#testing-shipments) |
+| Use chat or DMs | |
+| Withdraw | The test balance isn't money and can't leave CatchBack |
+| Open Starter, sealed or Steph Curry packs | Nor any pack above the Diamond tier |
+| Win a chase card | A pull from its pack can never be the chase |
+
+### What to expect
+
+- **Pulls are real cards from the live pool.** While a test account holds a card, nobody else can pull it. What it still holds goes back to the pool at 10:00 UTC every day, so sell back or finish your test before then.
+- **Limits:** 5 active test accounts per key, 30 days each. A sixth is a `409`. To end one early so you can make another, [contact us](mailto:catchbackcards@gmail.com).
+- **The password is shown once.** We can't show it again or reset it, so keep it when you create the account. [List test accounts](/partner-api/endpoints/list-test-accounts) shows the rest.
+- **How it ends:** when it reaches its `expires_at`, or when your key is turned off. It shows as `active: false` from that date, and its slot frees within about 2 hours, when our job ends it. Then it can't sign in, and a session already open lasts only until its access token expires.
+
+## Testing trading
+
+A test account can't use the marketplace, so test trading with small real orders on a real key:
+
+1. [Search cards](/partner-api/endpoints/search-cards) with `sort=price_asc` to find a cheap card.
+2. [Buy a card](/partner-api/endpoints/buy-card) with `max_price` set to the price you saw. It charges the price plus the $1 buyer fee.
+3. [List it](/partner-api/endpoints/list-card), [change its price](/partner-api/endpoints/update-listing-price) and [delist it](/partner-api/endpoints/delist-card).
+4. [Sell it back](/partner-api/endpoints/sell-back) to close the loop.
+
+These are real orders. They spend and credit real CatchCoins, and the card is a real card that someone else could have bought. A card you buy and sell back pays less than you paid: see [what a sell-back pays](/partner-api/how-it-works#7-decide-what-to-do-with-each-card). The [Quickstart](/partner-api/quickstart) does the same for packs.
+
+## Testing shipments
+
+[Estimate a shipment](/partner-api/endpoints/estimate-shipment) charges nothing and stores nothing, so you can try it on a real key with a card in your vault. [Create a shipment](/partner-api/endpoints/create-shipment) charges your balance and sends a real parcel, so make your first one for a card you mean to ship.
+
+## Testing webhooks
+
+Check your signature code against the [test vector](/partner-api/webhooks#test-your-code), which needs no webhook at all. A small real order on a key with a webhook then sends you a real [`order.completed`](/partner-api/webhook-events#order-completed).

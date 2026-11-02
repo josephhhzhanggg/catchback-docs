@@ -15,7 +15,7 @@ A missing or malformed key is a `401` with `"error": "Missing or malformed API k
 
 ## Scopes
 
-Each key carries a set of scopes, and every endpoint except [Who am I](/partner-api/endpoints/get-me) requires exactly one. Calling an endpoint your key has no scope for is a `403` (`"error": "API key lacks required scope: <scope>"`). We grant scopes per key; ask us if you need one you don't have.
+Each key carries a set of scopes, and every endpoint except [Who am I](/partner-api/endpoints/get-me) and [Public card metadata](/partner-api/endpoints/get-public-card) requires exactly one. Calling an endpoint your key has no scope for is a `403` (`"error": "API key lacks required scope: <scope>"`). We grant scopes per key; ask us if you need one you don't have.
 
 | Scope | Lets you | Moves money | Granted |
 |---|---|---|---|
@@ -25,11 +25,13 @@ Each key carries a set of scopes, and every endpoint except [Who am I](/partner-
 | `buy:cards` | Buy cards from the shop and user listings with your CatchCoins | **Yes** | Standard |
 | `sell:cards` | Sell cards back to CatchBack for CatchCoins | **Yes** | Standard |
 | `write:listings` | List held cards on the marketplace at a fixed price, change a listing's price, and take listings down | No | Standard |
+| `ship:cards` | Ship cards you hold to your customers with your CatchCoins, and track those shipments. Each shipment stores its customer's address | **Yes** | **Opt-in** |
 | `read:pulls` | Revenue-share report of completed pack purchases | No | **Opt-in** |
+| `create:test_accounts` | Create test logins with a test balance, and see the ones you made | No: test balance only | **Opt-in** |
 
-Standard scopes are the usual set for a partner key; we may leave out any you don't need. `read:pulls` is opt-in: it's never on a new key by default, and we grant it on request for revenue-share reporting.
+Standard scopes are the usual set for a partner key; we may leave out any you don't need. `ship:cards`, `read:pulls` and `create:test_accounts` are opt-in: they're never on a new key by default, and we grant them on request.
 
-Account actions (`read:account`, `rip:packs`, `buy:cards`, `sell:cards`, `write:listings`) also need the key to be linked to a CatchBack account. An unlinked key gets a `403` on them (`"error": "This API key is not linked to a CatchBack account"`). If we can't read the link just then, the answer is the same `403`, so one retry is worth it. [Who am I](/partner-api/endpoints/get-me) shows whether your key is linked, and to which account.
+Account actions (`read:account`, `rip:packs`, `buy:cards`, `sell:cards`, `write:listings`, `ship:cards`) also need the key to be linked to a CatchBack account. An unlinked key gets a `403` on them (`"error": "This API key is not linked to a CatchBack account"`). If we can't read the link just then, the answer is the same `403`, so one retry is worth it. [Who am I](/partner-api/endpoints/get-me) shows whether your key is linked, and to which account.
 
 ## Which scope each endpoint needs
 
@@ -55,14 +57,20 @@ Account actions (`read:account`, `rip:packs`, `buy:cards`, `sell:cards`, `write:
 | [`POST /listings`](/partner-api/endpoints/list-card) | `write:listings` | `list_card` | Yes |
 | [`PATCH /listings/{listing_id}`](/partner-api/endpoints/update-listing-price) | `write:listings` | `update_listing_price` | Yes |
 | [`DELETE /listings`](/partner-api/endpoints/delist-card) | `write:listings` | `delist_card` | Yes |
+| [`POST /shipments/estimate`](/partner-api/endpoints/estimate-shipment) | `ship:cards` | `estimate_shipment` | Yes |
+| [`POST /shipments`](/partner-api/endpoints/create-shipment) | `ship:cards` | `create_shipment` | Yes |
+| [`GET /shipments`](/partner-api/endpoints/list-shipments) | `ship:cards` | `list_shipments` | Yes |
+| [`GET /shipments/{id}`](/partner-api/endpoints/get-shipment) | `ship:cards` | `get_shipment` | Yes |
 | [`GET /pulls`](/partner-api/endpoints/purchase-report) | `read:pulls` | none | No |
+| [`POST /test-accounts`](/partner-api/endpoints/create-test-account) | `create:test_accounts` | `create_test_account` | No |
+| [`GET /test-accounts`](/partner-api/endpoints/list-test-accounts) | `create:test_accounts` | `list_test_accounts` | No |
 
-Every path is under `https://catchbackcards.com/api/partner/v1`. The [MCP server](/partner-api/mcp) shows an agent only the tools its key has scopes for.
+Every path is under `https://catchbackcards.com/api/partner/v1`. [Public card metadata](/partner-api/endpoints/get-public-card) is the exception: it's under `/api/public/v1` and takes no key. The [MCP server](/partner-api/mcp) shows an agent only the tools its key has scopes for.
 
 ## Keeping your key safe
 
 <Warning>
-  A key with `rip:packs`, `buy:cards` or `sell:cards` can move your balance. Treat it like a bank credential.
+  A key with `rip:packs`, `buy:cards`, `sell:cards` or `ship:cards` can move your balance. Treat it like a bank credential.
 </Warning>
 
 - Keep it **server-side only**. Never put it in browser, mobile or other client code.

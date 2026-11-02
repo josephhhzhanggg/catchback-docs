@@ -1,0 +1,56 @@
+---
+title: "List test accounts"
+api: "GET /api/partner/v1/test-accounts"
+description: "The test accounts this key has made, newest first. Passwords are never shown again."
+---
+
+Scope: `create:test_accounts`, granted on request · MCP tool: `list_test_accounts`
+
+The test accounts this key made, the newest 100, including ones that have ended. Another key's accounts aren't listed, even on the same account, and a password is only ever shown when an account is [created](/partner-api/endpoints/create-test-account).
+
+## Response
+
+<ResponseField name="accounts" type="object[]">
+  Newest first.
+  <Expandable title="account">
+    <ResponseField name="user_id" type="string" />
+    <ResponseField name="email" type="string">The login.</ResponseField>
+    <ResponseField name="username" type="string | null" />
+    <ResponseField name="balance" type="number | null">The test balance left, in dollars.</ResponseField>
+    <ResponseField name="created_at" type="string" />
+    <ResponseField name="expires_at" type="string" />
+    <ResponseField name="active" type="boolean">`false` from its `expires_at`, or once it has been turned off.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `403` | The key lacks `create:test_accounts` |
+| `500` | We couldn't read the list. Retry with backoff |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v1/test-accounts \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "accounts": [
+    {
+      "user_id": "3b0e…",
+      "email": "acme-9f2c41ab@test.catchbackcards.com",
+      "username": "swiftFalcon4821",
+      "balance": 9875,
+      "created_at": "2026-11-02T18:00:00.000+00:00",
+      "expires_at": "2026-12-02T18:00:00.000+00:00",
+      "active": true
+    }
+  ]
+}
+```
+</ResponseExample>

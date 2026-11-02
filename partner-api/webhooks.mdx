@@ -1,0 +1,140 @@
+---
+title: "Webhooks"
+description: "Get a signed POST when something happens on your account, instead of polling: setup, checking the signature, retries, and what to do after an outage."
+---
+
+Instead of polling [List orders](/partner-api/endpoints/list-orders), your key can have a webhook: an https URL that gets a signed `POST` when something happens on your account. What each event carries: [Webhook events](/partner-api/webhook-events).
+
+## Setup
+
+We set the webhook up for you. [Contact us](mailto:catchbackcards@gmail.com) with your key's name and your URL, and we give you a signing secret, **once**. It starts `whsec_`. Keep it in a secret manager, like your API key.
+
+- **The URL** has to be `https` on port 443, on a public hostname: no IP addresses and no private or internal addresses. We check it when we set it up and again on every delivery.
+- **The key** has to be linked to an account and hold `read:account`, because events carry what your order history shows. [`shipment.updated`](/partner-api/webhook-events#shipment-updated) also needs `ship:cards`.
+- **One webhook per key.** Events start when the webhook is set up, and nothing earlier is replayed.
+
+To change the URL, pause the webhook, or get a new secret, contact us:
+
+- **Pausing** holds events, and turning it back on sends what happened meanwhile. Disabling the key does the same.
+- **A new secret** replaces the old one at once, with no overlap. Deliveries fail your check until you install it, and retry until then.
+- **Linking the key to another account** stops the webhook until we remove it and set it up again, so one account's events never reach another's URL.
+
+## What you receive
+
+```http
+POST /your-webhook-path HTTP/1.1
+Content-Type: application/json
+User-Agent: CatchBack-Webhooks/1.0
+X-CatchBack-Signature: t=1793404225,v1=d93da821be64a143bbacb3c0e47e37a90f72c6747b8b9bc3571abf03fcabf66c
+X-CatchBack-Event: order.completed
+X-CatchBack-Event-Id: evt_0123456789abcdef0123456789abcdef
+X-CatchBack-Attempt: 1
+```
+
+| Header | What it is |
+|---|---|
+| `X-CatchBack-Signature` | The signature to check: see below |
+| `X-CatchBack-Event` | The event's `type` |
+| `X-CatchBack-Event-Id` | The event's `id`, which stays the same on every retry |
+| `X-CatchBack-Attempt` | Which try this is, from 1 to 8 |
+
+We look for new events every 2 minutes, or up to 18 minutes apart at our busy times, and longer while a webhook is paused.
+
+## Answer quickly
+
+Return any `2xx` within **5 seconds**, and do slow work after you've answered. Anything else counts as a failure, including a redirect, which we don't follow. We never read the response body.
+
+## Check the signature
+
+Every request carries `X-CatchBack-Signature: t=<unix seconds>,v1=<hex>`. `v1` is the HMAC-SHA256 of `<t>.<raw request body>`, keyed with your whole secret, `whsec_` included.
+
+1. Take the raw bytes of the body, from before any JSON parsing. A framework that parses JSON for you throws them away, so read the body first.
+2. Compute the HMAC and compare it to `v1` in constant time.
+3. Refuse a `t` more than 5 minutes from your clock. This stops a replay. Each retry carries a new `t`, so a retry never ages out.
+
+<CodeGroup>
+```js Node.js
+const { createHmac, timingSafeEqual } = require('node:crypto');
+const http = require('node:http');
+
+function verify(secret, header, rawBody, nowSeconds = Math.floor(Date.now() / 1000)) {
+  const parts = Object.fromEntries((header ?? '').split(',').map((p) => p.split('=')));
+  const t = Number(parts.t);
+  if (!Number.isInteger(t) || Math.abs(nowSeconds - t) > 300 || !/^[0-9a-f]{64}$/.test(parts.v1 ?? '')) return false;
+  const expected = createHmac('sha256', secret).update(`${t}.${rawBody}`).digest();
+  return timingSafeEqual(expected, Buffer.from(parts.v1, 'hex'));
+}
+
+const secret = process.env.CATCHBACK_WEBHOOK_SECRET;
+
+const server = http.createServer((req, res) => {
+  const chunks = [];
+  req.on('data', (chunk) => chunks.push(chunk));
+  req.on('end', () => {
+    const rawBody = Buffer.concat(chunks).toString('utf8');
+    if (!verify(secret, req.headers['x-catchback-signature'], rawBody)) {
+      res.writeHead(401).end();
+      return;
+    }
+    res.writeHead(200).end();
+    const event = JSON.parse(rawBody);
+    // Answered. Now dedupe on event.id and do the slow work.
+  });
+});
+
+server.listen(process.env.PORT || 3000);
+```
+
+```python Python
+import hashlib, hmac, re, time
+
+def verify(secret, header, raw_body, now=None):
+    parts = dict(p.split('=', 1) for p in (header or '').split(',') if '=' in p)
+    if not parts.get('t', '').isdigit() or not re.fullmatch(r'[0-9a-f]{64}', parts.get('v1', '')):
+        return False
+    if abs((now or time.time()) - int(parts['t'])) > 300:
+        return False
+    signed = parts['t'].encode() + b'.' + raw_body
+    return hmac.compare_digest(hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest(), parts['v1'])
+```
+</CodeGroup>
+
+In Python, `raw_body` is `bytes`.
+
+### Test your code
+
+Run your check against this vector, with your clock check off or with your clock set to `t` (the functions above take the current time as their last argument). It should pass, and fail if you change one character of the body.
+
+| | |
+|---|---|
+| Secret | `whsec_test_0123456789abcdef` |
+| Body | `{"id":"evt_0123456789abcdef0123456789abcdef","type":"order.completed"}` |
+| Header | `t=1793404225,v1=d93da821be64a143bbacb3c0e47e37a90f72c6747b8b9bc3571abf03fcabf66c` |
+
+## Retries
+
+A failure is retried on this schedule, counted from the failure before it:
+
+| Attempt | Wait before it |
+|---|---|
+| 1 | The first delivery |
+| 2 | 1 minute |
+| 3 | 5 minutes |
+| 4 | 30 minutes |
+| 5 | 2 hours |
+| 6 | 6 hours |
+| 7 | 12 hours |
+| 8 | 24 hours |
+
+That's about 45 hours in all. After the eighth attempt the event stops and shows as failed on our side. [Contact us](mailto:catchbackcards@gmail.com) and we can send failed events again.
+
+If your endpoint is down, answers `429` or a `5xx`, or doesn't answer, we stop sending that run's other events, so one outage doesn't use up the attempts on everything queued behind it.
+
+[List orders](/partner-api/endpoints/list-orders) always has the full record and [List shipments](/partner-api/endpoints/list-shipments) the current statuses, so reconcile against them after an outage.
+
+## Duplicates and order
+
+Delivery is at-least-once and unordered. The same event can arrive twice, and a later event can arrive first.
+
+- **Dedupe on `id`.** It never changes for an event, including across retries.
+- **Don't rely on order.** For two events about one shipment, the later `status_updated_at` is the newer.

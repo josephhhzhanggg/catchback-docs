@@ -90,10 +90,14 @@ A reconciled pack order has no `pulls`, no `summary` and no `remaining_balance`.
 
 The 10-minute close above doesn't apply to an order held for review. When we can't confirm a charge (`500 PAYMENT_OUTCOME_UNKNOWN`, and the `409` after it carries `needs_review: true`), nothing was delivered, so our records can't prove the charge and there is nothing to close the order from. It stays in progress until a person settles it, and the id is then free to send again.
 
-You don't have to resend an order to learn where it stands. [Get an order](/partner-api/endpoints/get-order) takes its `checkout_id` (the `409` body carries it): it shows the order as `pending` until it completes or we close it, a pack order's pulls as soon as they have landed, and `reconciled: true` on an order we closed. [List orders](/partner-api/endpoints/list-orders) shows the same for every order in a window.
+You don't have to resend an order to learn where it stands. [Get an order](/partner-api/endpoints/get-order) takes its `checkout_id` (the `409` body carries it): it shows the order as `pending` until it completes or we close it, a pack order's pulls as soon as they have landed, and `reconciled: true` on an order we closed. [List orders](/partner-api/endpoints/list-orders) shows the same for every order in a window. An order held for review stays `pending` until we settle it. Settling removes it, so Get an order then answers `404` and List orders no longer shows it.
 
 If an order still answers `409` after 30 minutes, we couldn't prove from our records that it went through. Contact us with the order id and the `checkout_id`.
 
 ## Purchases that need review
 
 A purchase can return `"needs_review": true`. On a card buy's `200` the card is yours and only our bookkeeping needs a check. On an error, you were, or may have been, charged and the order didn't finish cleanly, so it stays in progress and we're alerted to settle it by hand. Either way, don't retry under a new order id. Details: [Errors](/partner-api/errors-and-limits#when-a-purchase-needs-review).
+
+## Shipments
+
+[Create a shipment](/partner-api/endpoints/create-shipment) takes the same header in the same format, with some differences. Its ids are a separate set from your pack and card order ids, a retry of a finished shipment returns the shipment as it stands now rather than a stored response, and one we couldn't confirm stays with our team until we've checked it. See [its retry table](/partner-api/endpoints/create-shipment#retries).

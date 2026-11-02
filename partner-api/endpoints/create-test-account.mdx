@@ -1,0 +1,80 @@
+---
+title: "Create a test account"
+api: "POST /api/partner/v1/test-accounts"
+description: "Make a test login with a $10,000 test balance. The password is shown once."
+---
+
+Scope: `create:test_accounts`, granted on request · MCP tool: `create_test_account`
+
+Makes a separate CatchBack login, already confirmed and phone-verified, with a $10,000 test balance that lasts 30 days. There's no body, and the key doesn't have to be linked to an account.
+
+<Warning>
+  A test account is a login, not a key. Sign in with it to use it: your API calls keep acting on your key's account and spending its real balance. [Testing](/partner-api/testing) says what a test account can't do, and how to drive one through the API.
+</Warning>
+
+Each key can have 5 active test accounts at a time.
+
+## Response
+
+`201`, with:
+
+<ResponseField name="account" type="object">
+  <Expandable title="account">
+    <ResponseField name="user_id" type="string">The account's id.</ResponseField>
+    <ResponseField name="email" type="string">The login: `<key name>-<8 hex digits>@test.catchbackcards.com`. It's a made-up address that nobody reads.</ResponseField>
+    <ResponseField name="password" type="string">Shown only in this response. We can't show it again or reset it, so keep it.</ResponseField>
+    <ResponseField name="username" type="string | null" />
+    <ResponseField name="balance" type="number">The test balance in dollars, `10000`. It isn't money and can't be withdrawn.</ResponseField>
+    <ResponseField name="created_at" type="string" />
+    <ResponseField name="expires_at" type="string">30 days after it was created.</ResponseField>
+    <ResponseField name="active" type="boolean">`true` on a new account.</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="sign_in" type="object">
+  <Expandable title="sign_in">
+    <ResponseField name="web" type="string">The page to sign in on.</ResponseField>
+    <ResponseField name="note" type="string">How to sign in, for a person reading the response.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `403` | The key lacks `create:test_accounts`, or it was turned off just then (`"This key is disabled"`) |
+| `409` | The key already has 5 active test accounts. Reuse one, or [ask us](mailto:catchbackcards@gmail.com) to end one |
+| `500` | We couldn't set the account up, and removed the login we'd started. Try again |
+| `502` | We couldn't create the login. Try again |
+| `503` | Test accounts are unavailable right now, and nothing was created. Try again later |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v1/test-accounts \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201
+{
+  "account": {
+    "user_id": "3b0e…",
+    "email": "acme-9f2c41ab@test.catchbackcards.com",
+    "password": "x7Qe…",
+    "username": "swiftFalcon4821",
+    "balance": 10000,
+    "created_at": "2026-11-02T18:00:00.000Z",
+    "expires_at": "2026-12-02T18:00:00.000Z",
+    "active": true
+  },
+  "sign_in": {
+    "web": "https://catchbackcards.com/auth",
+    "note": "Sign in with email and password. The account is confirmed and phone-verified already."
+  }
+}
+```
+
+```json 409
+{ "error": "This key already has 5 active test accounts. Reuse one, or ask CatchBack to disable one." }
+```
+</ResponseExample>

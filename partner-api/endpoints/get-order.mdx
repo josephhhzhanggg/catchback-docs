@@ -8,7 +8,7 @@ Scope: `read:account` · MCP tool: `get_order`
 
 One order on your account, with the same fields as in [List orders](/partner-api/endpoints/list-orders) plus what it contains: a pack purchase's pulls, or the card for any other order.
 
-It answers while an order is still running. After a timeout, or a `409 IDEMPOTENCY_IN_PROGRESS` that carries the order's `checkout_id`, follow the order here rather than resending it in a tight loop: it shows `pending` until the order completes or we close it, and a pack order's pulls as soon as they have landed. See [Idempotency](/partner-api/idempotency).
+It answers while an order is still running. After a timeout, or a `409 IDEMPOTENCY_IN_PROGRESS` that carries the order's `checkout_id`, follow the order here rather than resending it in a tight loop: it shows `pending` until the order completes or we close it, and a pack order's pulls as soon as they have landed. An order [held for review](/partner-api/idempotency#purchases-that-need-review) stays `pending` until we settle it. Settling removes it, so this then answers `404` and the order id is free to send again: check your balance before you do. See [Idempotency](/partner-api/idempotency).
 
 <ParamField path="checkout_id" type="string" required>
   The `checkout_id` that [Buy packs](/partner-api/endpoints/buy-packs) or [Buy a card](/partner-api/endpoints/buy-card) returned, the `transaction_id` of a [sell-back](/partner-api/endpoints/sell-back), or any order's `checkout_id` from List orders. A UUID.
@@ -39,7 +39,7 @@ A pull here has no `catchback` offer and no `proof`. For a card's offer right no
 | Status | When |
 |---|---|
 | `403` | The key lacks `read:account` or isn't linked to an account |
-| `404` | No order with this id on your account. An unknown id, a malformed one and another account's order all look the same |
+| `404` | No order with this id on your account. An unknown id, a malformed one, another account's order and a held order we've since settled all look the same |
 | `500` | We couldn't load the order. Retry with backoff |
 
 <RequestExample>

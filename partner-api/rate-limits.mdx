@@ -3,9 +3,9 @@ title: "Rate limits"
 description: "Every limit on the Partner API, per endpoint: how often, how many per day, how many per request, and what you get back when you hit one."
 ---
 
-The limits protect the inventory that every CatchBack customer shares. They are counted per API key, and a day is a UTC day, from midnight to midnight UTC.
+The limits protect the inventory that every CatchBack customer shares. Most are counted per API key, and a day is a UTC day, from midnight to midnight UTC. On top of them, everything under `/api/` has a [shared limit per IP address](#shared-limit-per-ip).
 
-Four limits are settings on your key: the time between pack purchases, packs per day, cards per day and card spend per day. The numbers below are the defaults, and we can change any of them for your key on request: [contact us](mailto:catchbackcards@gmail.com) if yours don't fit your volume. The limits on a single request are the same for every key.
+Four limits are settings on your key: the time between pack purchases, packs per day, cards per day and card spend per day. The numbers below are the defaults, and we can change any of them for your key on request: [contact us](mailto:catchbackcards@gmail.com) if yours don't fit your volume. The limits on a single request, on shipments and on test accounts are the same for every key.
 
 ## Per endpoint
 
@@ -17,12 +17,22 @@ Four limits are settings on your key: the time between pack purchases, packs per
 | [Buy a card](/partner-api/endpoints/buy-card) | 25 cards per UTC day | Yes (default) | `429 DAILY_CARD_LIMIT_REACHED` |
 | [Buy a card](/partner-api/endpoints/buy-card) | $50,000 of spend per UTC day, the $1 fees included | Yes (default) | `429 DAILY_CARD_LIMIT_REACHED` |
 | [Sell back cards](/partner-api/endpoints/sell-back) | Up to 10 items per request | No | `400` |
-| [List a card](/partner-api/endpoints/list-card), [Change a listing's price](/partner-api/endpoints/update-listing-price), [Delist a card](/partner-api/endpoints/delist-card) | No rate limit | | |
-| Every read endpoint | No rate limit; page sizes are capped (see [Pagination](/partner-api/pagination)) | | |
+| [Create a shipment](/partner-api/endpoints/create-shipment) | 50 shipments per UTC day | No | `429 DAILY_SHIPMENT_LIMIT_REACHED` |
+| [Estimate a shipment](/partner-api/endpoints/estimate-shipment) | 60 estimates per minute | No | `429 RATE_LIMITED`, with a `Retry-After` header |
+| [Estimate a shipment](/partner-api/endpoints/estimate-shipment), [Create a shipment](/partner-api/endpoints/create-shipment) | Up to 10 cards per request | No | `400` |
+| [Create a test account](/partner-api/endpoints/create-test-account) | 5 active test accounts, 30 days each | No | `409` |
+| [Public card metadata](/partner-api/endpoints/get-public-card) | 60 requests per minute per IP address; a CDN hit doesn't count | No | `429 RATE_LIMITED`, with a `Retry-After` header |
+| [List a card](/partner-api/endpoints/list-card), [Change a listing's price](/partner-api/endpoints/update-listing-price), [Delist a card](/partner-api/endpoints/delist-card) | No per-key rate limit | | |
+| Every read endpoint | No per-key rate limit; page sizes are capped (see [Pagination](/partner-api/pagination)) | | |
+| Everything under `/api/` | 300 requests per minute per IP address, shared | No | See [Shared limit per IP](#shared-limit-per-ip) |
 
-Card buys have no per-minute limit, and sell-backs aren't rate-limited. Reads aren't either, but keys are monitored: a full catalog sync a few times an hour is fine; polling every few seconds is not.
+Card buys have no per-minute limit, and sell-backs have no per-key rate limit. Reads don't either, but keys are monitored: a full catalog sync a few times an hour is fine; polling every few seconds is not. To hear about your own orders without polling, use a [webhook](/partner-api/webhooks).
 
 Card lookups ([Get a card](/partner-api/endpoints/get-card), [Find a card by cert](/partner-api/endpoints/find-card-by-cert) and [Card activity](/partner-api/endpoints/get-card-activity)) are cached for up to a minute, and [Price history](/partner-api/endpoints/get-price-history) for up to five minutes, so asking more often than that returns the same answer.
+
+## Shared limit per IP
+
+Everything under `/api/` has a shared limit of **300 requests a minute per IP address**, on top of the per-key limits on this page. That covers every partner endpoint, the [MCP server](/partner-api/mcp) and [Public card metadata](/partner-api/endpoints/get-public-card). It counts by IP address, not by key, so several keys behind one address share it. Keep your traffic well under it, and back off if requests start being refused.
 
 ## Pack purchases
 
@@ -69,6 +79,23 @@ Both count the shop and user listings together. A finished order counts what it 
 }
 ```
 
+## Shipments
+
+- **Per day:** 50 shipments per key per UTC day. A shipment we refused doesn't count, and a refused shipment charges nothing and frees its id.
+- **Estimates:** 60 per key per minute, because each one is a live call to the carrier. The count is kept per server, so the exact point you're refused can vary.
+- **Per request:** 1–10 cards to one address, and a `max_cost` of at most $10,000.
+
+These are the same for every key. More on [Shipping cards](/partner-api/shipping#limits).
+
+```json 429 DAILY_SHIPMENT_LIMIT_REACHED
+{
+  "error": "Daily shipment limit reached: 50 per key per UTC day.",
+  "code": "DAILY_SHIPMENT_LIMIT_REACHED",
+  "limit": 50,
+  "resets_at": "2026-11-03T00:00:00.000Z"
+}
+```
+
 ## Which 429s send Retry-After
 
 | Code | `Retry-After` header | When to try again |
@@ -76,11 +103,12 @@ Both count the shop and user listings together. A finished order counts what it 
 | `RATE_LIMITED` | Yes, the same number of seconds as `retry_after_seconds` | After that many seconds |
 | `DAILY_LIMIT_REACHED` | No | After `resets_at`, the next midnight UTC |
 | `DAILY_CARD_LIMIT_REACHED` | No | After `resets_at`, the next midnight UTC |
+| `DAILY_SHIPMENT_LIMIT_REACHED` | No | After `resets_at`, the next midnight UTC |
 
 ## When we can't count
 
-If we can't read your usage for today, a purchase is refused with a `503` and nothing is charged: the limit checks fail closed rather than let an order through uncounted. Retry with backoff, with the same order id.
+If we can't read your usage for today, a purchase or shipment is refused with a `503` and nothing is charged: the limit checks fail closed rather than let an order through uncounted. Retry with backoff, with the same id.
 
 ## Check where you stand
 
-[Get account](/partner-api/endpoints/get-account) returns your pack usage (`limits`, including `next_purchase_at`, the earliest your next pack purchase is allowed) and your card usage (`card_limits`), so a bot can plan its next purchase without hitting a `429`.
+[Get account](/partner-api/endpoints/get-account) returns your pack usage (`limits`, including `next_purchase_at`, the earliest your next pack purchase is allowed) and your card usage (`card_limits`), so a bot can plan its next purchase without hitting a `429`. It doesn't count shipments.

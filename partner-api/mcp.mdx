@@ -58,11 +58,19 @@ The agent only sees the tools your key has scopes for, plus `whoami`, which ever
 | `list_card` | [List a card](/partner-api/endpoints/list-card) | `write:listings` |
 | `update_listing_price` | [Change a listing's price](/partner-api/endpoints/update-listing-price) | `write:listings` |
 | `delist_card` | [Delist a card](/partner-api/endpoints/delist-card) | `write:listings` |
+| `estimate_shipment` | [Estimate a shipment](/partner-api/endpoints/estimate-shipment) | `ship:cards` |
+| `create_shipment` | [Create a shipment](/partner-api/endpoints/create-shipment) | `ship:cards` |
+| `list_shipments` | [List shipments](/partner-api/endpoints/list-shipments) | `ship:cards` |
+| `get_shipment` | [Get a shipment](/partner-api/endpoints/get-shipment) | `ship:cards` |
+| `create_test_account` | [Create a test account](/partner-api/endpoints/create-test-account) | `create:test_accounts` |
+| `list_test_accounts` | [List test accounts](/partner-api/endpoints/list-test-accounts) | `create:test_accounts` |
 
-`buy_packs` and `buy_card` take an `order_id` argument, which is sent as the `Idempotency-Key`. Have your agent generate one per order and reuse it when retrying that order. A retry under a new `order_id` is a new order: a second set of packs, or a second card. `buy_card` also needs `max_price`, normally the `price` that `search_cards` returned.
+`buy_packs`, `buy_card` and `create_shipment` take an `order_id` argument, which is sent as the `Idempotency-Key`. Have your agent generate one per order and reuse it when retrying that order. A retry of a purchase under a new `order_id` is a new order: a second set of packs, or a second card. `buy_card` also needs `max_price`, normally the `price` that `search_cards` returned, and `create_shipment` needs `max_cost`, normally the `amount` that `estimate_shipment` returned.
 
-A tool whose endpoint has an id in its path takes that id as an argument: `card_id` for `get_card`, `get_price_history` and `get_card_activity`, `listing_id` for `update_listing_price`, and `checkout_id` for `get_order`. Every other argument is the endpoint's query parameter or body field of the same name.
+A tool whose endpoint has an id in its path takes that id as an argument: `card_id` for `get_card`, `get_price_history` and `get_card_activity`, `listing_id` for `update_listing_price`, `checkout_id` for `get_order`, and `shipment_id` for `get_shipment`. Every other argument is the endpoint's query parameter or body field of the same name.
 
-[Card catalog export](/partner-api/endpoints/card-catalog) and [Purchase report](/partner-api/endpoints/purchase-report) are REST only, with no MCP tool.
+`create_test_account` returns a login for a person to sign in with. It doesn't move your agent onto that account: your other tools keep acting on your key's account and its real balance. See [Testing](/partner-api/testing).
+
+[Card catalog export](/partner-api/endpoints/card-catalog), [Purchase report](/partner-api/endpoints/purchase-report) and [Public card metadata](/partner-api/endpoints/get-public-card) are REST only, with no MCP tool.
 
 An error comes back as a tool result with `isError: true` and the HTTP status in the text, so the agent can read it and react.
