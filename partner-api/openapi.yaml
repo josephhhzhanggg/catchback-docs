@@ -378,6 +378,8 @@ paths:
 
         CatchBack up to 10 cards for CatchCoins, at the same rate a customer gets. A pulled card: the pull's fresh rate (90%) within 5 minutes of the pull, then 80% of the value at pull for 7 days, then 80% of market value. A bought card: 80% of the lower of the price you paid and its market value at purchase for 7 days, then 80% of market value.
 
+        An energy card from a base pack pays 100% of its value. A card from a pack with a hold pays 90% until the hold ends. To see every amount and when it changes before you sell, use Quote a sell-back.
+
         Items run in order, and one failing doesn't stop the rest. A pull or purchase pays out only once: selling it again returns `already_sold` with the earlier sale, so a retry is always safe. A sealed pack can't be sold back through the API.
       security:
         - bearerAuth: ['sell:cards']
@@ -412,9 +414,13 @@ paths:
                         type: string
                         format: uuid
                         description: For a card you bought, the `purchase_id` from Get vault (Buy a card's `transaction_id`).
+                      min_payout:
+                        type: number
+                        minimum: 0
+                        description: The least you'll accept, in USD, usually a quote's `amount`. If the sell-back would pay less, nothing is sold and the item fails with `PRICE_CHANGED` and what it would pay now.
             example:
               items:
-                - { card_id: 0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e, pull_id: 873deb80-0000-4000-8000-000000000001 }
+                - { card_id: 0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e, pull_id: 873deb80-0000-4000-8000-000000000001, min_payout: 18 }
       responses:
         '200':
           description: 'One result per item, in the order you sent them. A `200` can carry failed items: check each `status`.'
@@ -447,10 +453,10 @@ paths:
                           description: The sell-back; for `already_sold`, the earlier one. Not on `failed`. Get an order takes it.
                         payout_amount:
                           type: number
-                          description: What the sell-back paid. Not on `failed`.
+                          description: What the sell-back paid. On `PRICE_CHANGED`, what it would pay now. Not on other `failed` items.
                         payout_rate:
                           type: number
-                          description: The rate it paid at. Only on `sold`.
+                          description: The rate it paid at. Only on `sold`, and on `PRICE_CHANGED`.
                         error:
                           type: string
                           description: Why it failed. Only on `failed`.
@@ -463,7 +469,8 @@ paths:
                             - `GOODS_SELLBACK_WINDOW_CLOSED`: a luxury goods item, more than 5 minutes after its pull.
                             - `CARD_IN_BATTLE`: the card is held by a pack battle that hasn't finished.
                             - `SHOP_PURCHASE_NOT_SELLABLE`: an item bought from a partner shop, which ships but doesn't sell back.
-                          enum: [CARD_LISTED_ON_MARKETPLACE, GOODS_SELLBACK_WINDOW_CLOSED, CARD_IN_BATTLE, SHOP_PURCHASE_NOT_SELLABLE]
+                            - `PRICE_CHANGED`: it would pay less than your `min_payout`. Nothing was sold; `payout_amount` is what it pays now.
+                          enum: [CARD_LISTED_ON_MARKETPLACE, GOODS_SELLBACK_WINDOW_CLOSED, CARD_IN_BATTLE, SHOP_PURCHASE_NOT_SELLABLE, PRICE_CHANGED]
               example:
                 total_paid: 16.2
                 remaining_balance: 189937
@@ -472,7 +479,7 @@ paths:
                   - { card_id: e3d7148d-…, pull_id: e9d27918-…, status: already_sold, transaction_id: 2fa30a7d-…, payout_amount: 18 }
                   - { card_id: 4a51bc92-…, purchase_id: e22855d2-…, status: failed, error: No purchase of this card by this account with that purchase_id }
         '400':
-          description: The body isn't JSON, `items` is missing, empty or longer than 10, an item lacks a UUID `card_id` or doesn't have exactly one of `pull_id` and `purchase_id`, or the same pull or purchase of a card is listed twice.
+          description: The body isn't JSON, `items` is missing, empty or longer than 10, an item lacks a UUID `card_id` or doesn't have exactly one of `pull_id` and `purchase_id`, a `min_payout` isn't a non-negative number, or the same pull or purchase of a card is listed twice.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -485,6 +492,127 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '500':
           description: An error on our side, and the body may not be JSON. Some items may already have sold. Send the same items again to find out, because a pull or purchase pays out only once and the retry answers `already_sold` for those.
+  /api/partner/v1/cards/sell-back/quote:
+    post:
+      tags: [Gacha]
+      operationId: quoteSellBack
+      summary: Quote a sell-back
+      description: |-
+        **Scope:** `sell:cards` (needs a linked account). Moves no money.
+
+        What a sell-back pays for each card you hold, now and at every point after, with the exact UTC time each amount starts and stops. It reserves nothing: a quote holds while the card stays in your vault, and the last phase follows the market. To act on it safely, send its `amount` as `min_payout` on Sell back cards.
+      security:
+        - bearerAuth: ['sell:cards']
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                category:
+                  allOf:
+                    - $ref: '#/components/schemas/HoldingCategory'
+                  default: pokemon
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  description: Cards of one `category`. Each may also name the `pull_id` or `purchase_id` you'll sell it back by (at most one); the item fails if that's no longer the card's latest acquisition. The same card can't be listed twice.
+                  items:
+                    type: object
+                    required: [card_id]
+                    properties:
+                      card_id: { type: string, format: uuid }
+                      pull_id: { type: string, format: uuid }
+                      purchase_id: { type: string, format: uuid }
+            example:
+              category: pokemon
+              items:
+                - { card_id: bee48cce-3d1f-4c2a-8b7e-5a9d0c4f1e62 }
+      responses:
+        '200':
+          description: One result per item, in the order you sent them.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [category, quoted_at, results]
+                properties:
+                  category: { $ref: '#/components/schemas/HoldingCategory' }
+                  quoted_at: { type: string, format: date-time }
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      required: [card_id, status]
+                      properties:
+                        card_id: { type: string }
+                        pull_id: { type: [string, 'null'], description: The card's latest acquisition, when it's a pull. }
+                        purchase_id: { type: [string, 'null'], description: The card's latest acquisition, when it's a buy. }
+                        status:
+                          type: string
+                          enum: [quoted, not_offered, failed]
+                        reason:
+                          type: string
+                          enum: [listed, fresh_window_closed]
+                          description: 'Only on `not_offered`: `listed` (delist it first), or `fresh_window_closed` for a luxury goods item past its 5-minute window.'
+                        error: { type: string, description: Only on `failed`. }
+                        catchback:
+                          type: object
+                          description: Only on `quoted`.
+                          required: [amount, rate, valid_until, schedule, auto_sold_at]
+                          properties:
+                            amount: { type: number, description: What a sell-back pays right now. }
+                            rate: { type: number }
+                            valid_until: { type: [string, 'null'], format: date-time, description: When the current amount ends. `null` when it doesn't. }
+                            schedule:
+                              type: array
+                              description: Every phase from now on, back to back. A sell-back sent between `valid_from` and `valid_until` pays `amount`.
+                              items:
+                                type: object
+                                required: [amount, rate, basis, basis_value, fixed, valid_from, valid_until]
+                                properties:
+                                  amount: { type: number }
+                                  rate: { type: number }
+                                  basis: { type: string, enum: [value_at_acquisition, market_value] }
+                                  basis_value: { type: number }
+                                  fixed: { type: boolean, description: '`true`: locked to the value when you got the card, so the amount won''t change. `false`: follows the market, so `amount` is today''s estimate.' }
+                                  valid_from: { type: string, format: date-time }
+                                  valid_until: { type: [string, 'null'], format: date-time }
+                            auto_sold_at: { type: [string, 'null'], format: date-time, description: For a card from a pack with a hold, when we sell it back for you. }
+              example:
+                category: pokemon
+                quoted_at: '2026-11-02T18:01:00.000Z'
+                results:
+                  - card_id: bee48cce-…
+                    pull_id: 873deb80-…
+                    purchase_id: null
+                    status: quoted
+                    catchback:
+                      amount: 18
+                      rate: 0.9
+                      valid_until: '2026-11-02T18:05:00.000Z'
+                      schedule:
+                        - { amount: 18, rate: 0.9, basis: value_at_acquisition, basis_value: 20, fixed: true, valid_from: '2026-11-02T18:01:00.000Z', valid_until: '2026-11-02T18:05:00.000Z' }
+                        - { amount: 16, rate: 0.8, basis: value_at_acquisition, basis_value: 20, fixed: true, valid_from: '2026-11-02T18:05:00.000Z', valid_until: '2026-11-09T18:00:00.000Z' }
+                        - { amount: 17.6, rate: 0.8, basis: market_value, basis_value: 22, fixed: false, valid_from: '2026-11-09T18:00:00.000Z', valid_until: null }
+                      auto_sold_at: null
+                  - { card_id: 4a51bc92-…, pull_id: null, purchase_id: e22855d2-…, status: not_offered, reason: listed }
+        '400':
+          description: The body isn't JSON, the category is unknown, `items` is missing, empty or longer than 100, an item lacks a UUID `card_id` or names both a `pull_id` and a `purchase_id`, or the same card is listed twice.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `sell:cards` or isn't linked to an account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: We couldn't read the cards or their offers. Nothing changed; retry.
   /api/partner/v1/pulls:
     get:
       tags: [Gacha]
@@ -2240,7 +2368,7 @@ paths:
           in: query
           schema:
             allOf:
-              - $ref: '#/components/schemas/CardCategory'
+              - $ref: '#/components/schemas/HoldingCategory'
             default: pokemon
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPageVault'
@@ -2932,6 +3060,10 @@ components:
       type: string
       description: A card's catalog. `goods` is luxury goods and `singles` is raw singles.
       enum: [pokemon, onepiece, sports, riftbound, watches, goods, singles]
+    HoldingCategory:
+      type: string
+      description: A catalog you can hold cards in. `goods` is luxury goods, `singles` is raw singles and `energy` is the energy cards from base packs.
+      enum: [pokemon, onepiece, sports, riftbound, watches, goods, singles, energy]
     Card:
       type: object
       description: The [card object](/partner-api/card-object). Other fields appear only on the catalogs that have them.

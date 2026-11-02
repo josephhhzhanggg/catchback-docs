@@ -5,6 +5,13 @@ description: "What changed in the Partner API, newest first."
 
 Changes to `v1` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. A breaking change would ship under a new version prefix. Dates are US Pacific time.
 
+<Update label="November 2, 2026" description="Sell-back quotes, min_payout, energy cards">
+  - New: [Quote a sell-back](/partner-api/endpoints/quote-sell-back) (`POST /cards/sell-back/quote`, scope `sell:cards`, MCP tool `quote_sell_back`): what a sell-back pays for up to 100 cards, now and later, as a schedule of phases with the exact UTC time each starts and ends. It moves no money.
+  - [Sell back cards](/partner-api/endpoints/sell-back) takes an optional `min_payout` per item. If the sell-back would pay less, nothing is sold and the item fails with `PRICE_CHANGED` and what it pays now.
+  - [Get vault](/partner-api/endpoints/get-vault) and the quote take `category=energy`: the energy cards from base packs, which sell back at 100% of their value with no 5-minute window and no lock.
+  - The vault's `catchback` offer now includes insurance or a boost bought on the pull, as the sell-back pays it.
+</Update>
+
 <Update label="November 2, 2026" description="Buy packs refusals">
   - [Buy packs](/partner-api/endpoints/buy-packs) now refuses an order before it charges anything when the pack can't be bought: a `pack_type` that [List packs](/partner-api/endpoints/list-packs) doesn't offer your key is a `404`, and a pack with `available: false` is a `409 PACK_UNAVAILABLE`, with its `reason`. A `risk_level` outside the pack's `risk_levels`, and the category `goods`, are a `400`. A refused order charges nothing and frees its order id. A retry of a finished order is unaffected.
   - [Card catalog export](/partner-api/endpoints/card-catalog) now lists only what [Buy a card](/partner-api/endpoints/buy-card) can sell, and `category=goods` is a `400`.

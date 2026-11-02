@@ -115,11 +115,11 @@ What a sell-back pays, the same as any customer:
 
 A card bought from another user's listing can instead carry over that seller's 7-day lock, if it is lower and still running ([Buy a card](/partner-api/endpoints/buy-card)).
 
-Luxury goods sell back only within 5 minutes of the pull.
+Luxury goods sell back only within 5 minutes of the pull. Energy cards from base packs pay 100% of their value, with no window and no lock.
 
 A card from a pack that holds its cards pays a flat 90% for the hold, can't be kept, listed or shipped through the API, and is sold back automatically when the hold ends.
 
-The fresh 90% window is why the pack response includes the offer: decide on each pull right away. Sell-backs have no rate limit per key, and each card pays out once, so retrying a sell-back is safe. See [Liquidity](/about-catchback/liquidity) for the full rules.
+The fresh 90% window is why the pack response includes the offer: decide on each pull right away. [Quote a sell-back](/partner-api/endpoints/quote-sell-back) gives every amount ahead of time, with the exact UTC time each one ends. Sell-backs have no rate limit per key, and each card pays out once, so retrying a sell-back is safe. See [Liquidity](/about-catchback/liquidity) for the full rules.
 
 ## 8. A typical bot loop
 

@@ -127,6 +127,7 @@
               "partner-api/endpoints/get-me",
               "partner-api/endpoints/get-account",
               "partner-api/endpoints/get-vault",
+              "partner-api/endpoints/quote-sell-back",
               "partner-api/endpoints/sell-back"
             ]
           },
