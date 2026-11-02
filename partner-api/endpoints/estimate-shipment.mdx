@@ -6,7 +6,7 @@ description: "Live carrier rates for shipping cards you hold to a customer's add
 
 Scope: `ship:cards`, granted on request · MCP tool: `estimate_shipment`
 
-Live carrier rates, at the full rate you'd pay. It charges nothing and stores nothing: the address only goes to our carrier partner for the quote. Take the `carrier` and `token` of the rate you choose to [Create a shipment](/partner-api/endpoints/create-shipment). See [Shipping cards](/partner-api/shipping) for how shipping works.
+Live carrier rates, at the full rate you'd pay. Send `cover_amount` to price [insurance](/partner-api/shipping#insurance) as well. It charges nothing and stores nothing: the address only goes to our carrier partner for the quote. Take the `carrier` and `token` of the rate you choose to [Create a shipment](/partner-api/endpoints/create-shipment). See [Shipping cards](/partner-api/shipping) for how shipping works.
 
 <ParamField body="card_ids" type="string[]" required>
   1–10 card ids from [Get vault](/partner-api/endpoints/get-vault), each once. A listed card has to be [delisted](/partner-api/endpoints/delist-card) first.
@@ -24,19 +24,28 @@ Live carrier rates, at the full rate you'd pay. It charges nothing and stores no
     <ParamField body="phone" type="string">At most 20 characters. Required outside the US.</ParamField>
   </Expandable>
 </ParamField>
+<ParamField body="cover_amount" type="number">
+  Optional. The dollars of insurance to price, with at most two decimals: from $100 up to the `max_cover` for these cards. It counts as two estimates. [How insurance works](/partner-api/shipping#insurance).
+</ParamField>
 
 ## Response
 
 <ResponseField name="destination_country" type="string">The `country` you sent, in capitals.</ResponseField>
 <ResponseField name="package_type" type="string">The parcel we'd use, e.g. `mailer`.</ResponseField>
+<ResponseField name="order_value" type="number">Our valuation of the cards, in USD.</ResponseField>
+<ResponseField name="max_cover" type="number | null">The most you can insure: `order_value`, capped at \$10,000. `null` when the order is worth \$100 or less, which can't be insured.</ResponseField>
+<ResponseField name="cover_amount" type="number">The amount you sent. Present only when you sent `cover_amount`.</ResponseField>
 <ResponseField name="rates" type="object[]">
   Cheapest first. Can be empty.
   <Expandable title="rate">
     <ResponseField name="carrier" type="string">e.g. `USPS`. Send it back as `rate.carrier`.</ResponseField>
     <ResponseField name="service" type="string">The service's name, e.g. `Priority Mail`.</ResponseField>
     <ResponseField name="token" type="string">e.g. `usps_priority`. Send it back as `rate.token`.</ResponseField>
-    <ResponseField name="amount" type="number">The full rate in USD. Normally what you send as `max_cost`.</ResponseField>
+    <ResponseField name="amount" type="number">The full rate in USD, without any premium. Normally what you send as `max_cost`.</ResponseField>
     <ResponseField name="estimated_days" type="number | null">The carrier's estimate, in days.</ResponseField>
+    <ResponseField name="cover_available" type="boolean">Present when you sent `cover_amount`. `false` when no premium is quoted for this service.</ResponseField>
+    <ResponseField name="insurance_premium" type="number | null">Present when you sent `cover_amount`. `null` when `cover_available` is `false`.</ResponseField>
+    <ResponseField name="total" type="number | null">Present when you sent `cover_amount`: `amount` plus `insurance_premium`, which is what you send as `max_cost` to insure this rate. `null` when `cover_available` is `false`.</ResponseField>
   </Expandable>
 </ResponseField>
 
@@ -44,14 +53,15 @@ Live carrier rates, at the full rate you'd pay. It charges nothing and stores no
 
 | Status | Code | When |
 |---|---|---|
-| `400` | | The body isn't JSON, `card_ids` isn't 1–10 card ids (or lists one twice), or the address is invalid. An address error is `"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value |
+| `400` | | The body isn't JSON, `card_ids` isn't 1–10 card ids (or lists one twice), the address is invalid, or `cover_amount` isn't a dollar amount with at most two decimals. An address error is `"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value |
+| `400` | `COVER_NOT_ALLOWED` | `cover_amount` is outside the range: from \$100 up to the cards' value, capped at \$10,000. The body has `order_value`, `min_cover` and `max_cover` |
 | `400` | `COUNTRY_NOT_SUPPORTED` | We don't ship to this country |
 | `400` | `OVER_CUSTOMS_CAP` | An international shipment worth over $2,500, or with a card we have no value for |
 | `400` | `PARTNER_GOODS` | A partner's own goods ship from that partner |
 | `403` | | The key lacks `ship:cards` or isn't linked to an account, the account needs a verified phone number (`"Phone verification required"`), the account is deleted (`"Partner account unavailable"`), or it can't request shipping |
 | `403` | `FEATURE_RESTRICTED` | The account is restricted from the marketplace or from withdrawals (`capability` is `marketplace` or `withdraw`). Contact us |
 | `409` | `CARDS_NOT_SHIPPABLE` | A card can't ship. `cards[]` gives each refused `card_id` and its `reason`: [what they mean](/partner-api/shipping#which-cards-can-ship) |
-| `429` | `RATE_LIMITED` | More than 60 estimates a minute on this key. Wait `retry_after_seconds`, also sent as a `Retry-After` header |
+| `429` | `RATE_LIMITED` | More than 60 estimates a minute on this key, where one with `cover_amount` counts as two. Wait `retry_after_seconds`, also sent as a `Retry-After` header |
 | `502` | | The carrier quote failed. Try again |
 | `503` | | We couldn't check the account or the cards. Try again |
 
@@ -79,6 +89,8 @@ curl -X POST https://catchbackcards.com/api/partner/v1/shipments/estimate \
 {
   "destination_country": "US",
   "package_type": "mailer",
+  "order_value": 410,
+  "max_cover": 410,
   "rates": [
     { "carrier": "USPS", "service": "Ground Advantage", "token": "usps_ground_advantage", "amount": 5.4, "estimated_days": 3 },
     { "carrier": "USPS", "service": "Priority Mail", "token": "usps_priority", "amount": 12.85, "estimated_days": 2 }
@@ -86,8 +98,27 @@ curl -X POST https://catchbackcards.com/api/partner/v1/shipments/estimate \
 }
 ```
 
+```json 200 with cover_amount
+{
+  "destination_country": "US",
+  "package_type": "mailer",
+  "order_value": 410,
+  "max_cover": 410,
+  "cover_amount": 400,
+  "rates": [
+    { "carrier": "USPS", "service": "Ground Advantage", "token": "usps_ground_advantage", "amount": 5.4, "estimated_days": 3, "cover_available": true, "insurance_premium": 5.07, "total": 10.47 },
+    { "carrier": "USPS", "service": "Priority Mail", "token": "usps_priority", "amount": 12.85, "estimated_days": 2, "cover_available": true, "insurance_premium": 5.16, "total": 18.01 },
+    { "carrier": "DHL Express", "service": "Express Worldwide", "token": "dhl_express_worldwide", "amount": 46.16, "estimated_days": 3, "cover_available": false, "insurance_premium": null, "total": null }
+  ]
+}
+```
+
 ```json 400
 { "error": "Invalid address", "fields": { "zip": "Required", "phone": "Required for international shipments" } }
+```
+
+```json 400 COVER_NOT_ALLOWED
+{ "error": "cover_amount must be between $100 and $410.", "code": "COVER_NOT_ALLOWED", "order_value": 410, "max_cover": 410, "min_cover": 100 }
 ```
 
 ```json 409

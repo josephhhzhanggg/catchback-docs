@@ -5,6 +5,12 @@ description: "What changed in the Partner API, newest first."
 
 Changes to `v1` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. A breaking change would ship under a new version prefix. Dates are US Pacific time.
 
+<Update label="November 2, 2026" description="Optional shipping insurance">
+  - [Estimate a shipment](/partner-api/endpoints/estimate-shipment) and [Create a shipment](/partner-api/endpoints/create-shipment) take an optional `cover_amount`, so you can [insure a shipment](/partner-api/shipping#insurance) from \$100 up to the cards' value, at most \$10,000. You pay the rate plus the premium, and `max_cost` applies to the total. New codes: `400 COVER_NOT_ALLOWED` and `409 COVER_UNAVAILABLE`.
+  - Every estimate now returns `order_value` and `max_cover`. A shipment, in responses and in `shipment.updated`, now has `cover_amount` and `insurance_cost`.
+  - An estimate with `cover_amount` counts as two against the limit of 60 a minute.
+</Update>
+
 <Update label="November 1, 2026" description="Test accounts, public card metadata, shipments, webhooks, orders held for review">
   - New: [Create a test account](/partner-api/endpoints/create-test-account) (`POST /test-accounts`, MCP tool `create_test_account`) and [List test accounts](/partner-api/endpoints/list-test-accounts) (`GET /test-accounts`, MCP tool `list_test_accounts`), scope `create:test_accounts`, granted on request: test logins with a $10,000 test balance. A test account is a login, not a key, and it can't use the marketplace, gifts, drops, battles, shipping, chat, DMs or withdrawals. New guide: [Testing](/partner-api/testing).
   - New: [Public card metadata](/partner-api/endpoints/get-public-card) (`GET /api/public/v1/cards/{id}`): a card's metadata and image URLs with no key and no prices, cached for 5 minutes at the CDN.
