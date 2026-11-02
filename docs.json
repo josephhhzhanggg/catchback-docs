@@ -117,7 +117,8 @@
               "partner-api/endpoints/find-card-by-cert",
               "partner-api/endpoints/get-price-history",
               "partner-api/endpoints/get-card-activity",
-              "partner-api/endpoints/card-catalog"
+              "partner-api/endpoints/card-catalog",
+              "partner-api/endpoints/get-public-card"
             ]
           },
           {
@@ -130,10 +131,35 @@
             ]
           },
           {
+            "group": "Shipping",
+            "pages": [
+              "partner-api/shipping",
+              "partner-api/endpoints/estimate-shipment",
+              "partner-api/endpoints/create-shipment",
+              "partner-api/endpoints/list-shipments",
+              "partner-api/endpoints/get-shipment"
+            ]
+          },
+          {
             "group": "Orders",
             "pages": [
               "partner-api/endpoints/list-orders",
               "partner-api/endpoints/get-order"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "partner-api/webhooks",
+              "partner-api/webhook-events"
+            ]
+          },
+          {
+            "group": "Testing",
+            "pages": [
+              "partner-api/testing",
+              "partner-api/endpoints/create-test-account",
+              "partner-api/endpoints/list-test-accounts"
             ]
           },
           {

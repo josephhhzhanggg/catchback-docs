@@ -1,0 +1,86 @@
+---
+title: "List shipments"
+api: "GET /api/partner/v1/shipments"
+description: "Your account's shipments, newest first, with their status and tracking. No addresses."
+---
+
+Scope: `ship:cards`, granted on request · MCP tool: `list_shipments`
+
+Every shipment on your account, newest first, across every key linked to it. No address appears here: [Get a shipment](/partner-api/endpoints/get-shipment) has that.
+
+<ParamField query="page" type="integer" default="1">1-based.</ParamField>
+<ParamField query="per_page" type="integer" default="50">1–100.</ParamField>
+
+Unlike the other list endpoints, this one doesn't clamp: a `page` or `per_page` out of range is a `400`. See [Pagination](/partner-api/pagination).
+
+## Response
+
+<ResponseField name="page" type="integer" />
+<ResponseField name="per_page" type="integer" />
+<ResponseField name="total" type="integer | null">Shipments across all pages. `null` on a page past the end, which has no shipments.</ResponseField>
+<ResponseField name="shipments" type="object[]">
+  Newest first.
+  <Expandable title="shipment">
+    <ResponseField name="id" type="string">The shipment's id. [Get a shipment](/partner-api/endpoints/get-shipment) takes it.</ResponseField>
+    <ResponseField name="status" type="string">`pending`, `needs_review`, `processing`, `shipped`, `delivered` or `cancelled`: [what they mean](/partner-api/shipping#status).</ResponseField>
+    <ResponseField name="card_ids" type="string[]">The cards in the shipment.</ResponseField>
+    <ResponseField name="carrier" type="string | null">`null` until we've confirmed a rate.</ResponseField>
+    <ResponseField name="service" type="string | null" />
+    <ResponseField name="service_token" type="string | null" />
+    <ResponseField name="cost" type="number | null">What the shipment charges in USD. `null` until we've confirmed a rate.</ResponseField>
+    <ResponseField name="destination_country" type="string" />
+    <ResponseField name="tracking_number" type="string | null">`null` until there's a label.</ResponseField>
+    <ResponseField name="tracking_url" type="string | null">The carrier's tracking page. `null` until there's a label, or if we don't recognize the carrier.</ResponseField>
+    <ResponseField name="created_at" type="string" />
+    <ResponseField name="status_updated_at" type="string | null">When the order's status last changed. `null` until it first changes after the order is created. Between two [`shipment.updated`](/partner-api/webhook-events#shipment-updated) events, the later one is the newer.</ResponseField>
+    <ResponseField name="shipped_at" type="string | null" />
+    <ResponseField name="expected_delivery" type="string | null" />
+    <ResponseField name="delivered_at" type="string | null" />
+    <ResponseField name="needs_review" type="boolean">Present and `true` while `status` is `needs_review`.</ResponseField>
+    <ResponseField name="address_removed" type="boolean">Present and `true` once we've removed the address: [how long we keep it](/partner-api/shipping#customer-addresses).</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | `page` isn't a positive number, or `per_page` isn't 1–100 |
+| `403` | The key lacks `ship:cards` or isn't linked to an account |
+| `500` | We couldn't load your shipments. Retry with backoff |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/shipments?page=1&per_page=50" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "page": 1,
+  "per_page": 50,
+  "total": 1,
+  "shipments": [
+    {
+      "id": "7c1e0000-…",
+      "status": "shipped",
+      "card_ids": ["0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e"],
+      "carrier": "USPS",
+      "service": "Priority Mail",
+      "service_token": "usps_priority",
+      "cost": 12.85,
+      "destination_country": "US",
+      "tracking_number": "9400100000000000000000",
+      "tracking_url": "https://tools.usps.com/go/TrackConfirmAction?tRef=fullpage&tLc=2&text28777=&tLabels=9400100000000000000000",
+      "created_at": "2026-11-02T18:04:11.000Z",
+      "status_updated_at": "2026-11-03T16:20:00.000Z",
+      "shipped_at": "2026-11-03T16:20:00.000Z",
+      "expected_delivery": null,
+      "delivered_at": null
+    }
+  ]
+}
+```
+</ResponseExample>

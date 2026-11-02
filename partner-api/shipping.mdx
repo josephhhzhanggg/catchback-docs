@@ -1,0 +1,92 @@
+---
+title: "Shipping cards"
+description: "Ship cards you hold to your customers, paid from your balance: what you pay, which cards can ship, how we handle your customers' addresses, and how to track a shipment."
+---
+
+You can ship cards in your vault to your customers, paid from your CatchCoins balance at the carrier's full rate. It takes the `ship:cards` scope, which we grant on request: [contact us](mailto:catchbackcards@gmail.com).
+
+<Steps>
+  <Step title="Get rates">
+    [Estimate a shipment](/partner-api/endpoints/estimate-shipment) with the card ids and your customer's address. It returns live carrier rates, charges nothing and stores nothing.
+  </Step>
+  <Step title="Create the shipment">
+    [Create a shipment](/partner-api/endpoints/create-shipment) with the same cards and address, the rate you chose and a `max_cost`, under your own id for the shipment. We quote again and charge the fresh amount, up to `max_cost`.
+  </Step>
+  <Step title="Track it">
+    [List shipments](/partner-api/endpoints/list-shipments) and [Get a shipment](/partner-api/endpoints/get-shipment) show its status and tracking. With a [webhook](/partner-api/webhooks), [`shipment.updated`](/partner-api/webhook-events#shipment-updated) tells you when it moves.
+  </Step>
+</Steps>
+
+## What you pay
+
+The carrier's full rate for the service you pick, and nothing else. There are no promo codes on a shipment, and no free or subsidized tier.
+
+<Warning>
+  **The only cover on a parcel is the carrier's automatic cover, up to $100.** There's no insurance or signature option on a shipment. Keep that in mind before you ship a card worth more.
+</Warning>
+
+## Which cards can ship
+
+Up to 10 cards per shipment, all to one address. A card has to be in your vault, and not:
+
+| `reason` in `cards[]` | Why it can't ship | What to do |
+|---|---|---|
+| `not_in_vault` | It isn't in your vault: not yours, not found, or not a kind of card [Get vault](/partner-api/endpoints/get-vault) lists, such as an energy or Steph Curry card | Check the id |
+| `listed` | It's listed on the marketplace | [Delist it](/partner-api/endpoints/delist-card) first |
+| `shipping` | It's already in a shipping request or on its way, or it's otherwise unavailable | Read [Get vault](/partner-api/endpoints/get-vault) again |
+| `on_hold` | It came from a pack that holds its cards | Sell it back |
+| `not_a_card` | The id is a sealed pack | Sealed packs don't ship through the API |
+
+Any refused card is a `409 CARDS_NOT_SHIPPABLE` that lists every refused card. A partner's own goods ship from that partner, not through this API (`400 PARTNER_GOODS`).
+
+## Where you can ship
+
+`GET https://catchbackcards.com/api/shipping-countries` lists the countries we ship to, with no key. Elsewhere is a `400 COUNTRY_NOT_SUPPORTED`.
+
+Outside the US, the address needs a phone number, and a shipment worth more than $2,500 in total can't ship through the API (`400 OVER_CUSTOMS_CAP`). Neither can one with a card we have no value for.
+
+## Customer addresses
+
+Each shipment carries its customer's address, because we hold no list of your customers.
+
+- **Where we keep it:** only with the shipment's order, which is what we buy the label from. It doesn't go on your account or in your address book. We never ask for your customer's email address.
+- **Who sees it:** you, through [Get a shipment](/partner-api/endpoints/get-shipment) (the list has no addresses, and no [event](/partner-api/webhook-events) carries any part of one), our staff who fulfill the order, and our carrier partner, Shippo, which quotes and labels it.
+- **Logs:** we don't write the address to our logs.
+- **How long:** we remove the address, phone number and label links **90 days after the shipment closes**, or 180 days after it shipped if the carrier never reported an end. An order still waiting to ship keeps its address. After that, `address` is `null` and `address_removed` is `true`, and the order stays with its cards, cost and tracking. Shippo keeps its own copy under its own terms.
+- **Your customer hears nothing from us.** We don't email or text them, so tell them about their tracking yourself.
+
+## Status
+
+| `status` | Meaning |
+|---|---|
+| `pending` | We've taken the request and the order doesn't exist yet |
+| `needs_review` | We couldn't confirm the charge: [see below](#unconfirmed-shipments) |
+| `processing` | Charged and waiting for us to buy the label and send it |
+| `shipped` | On its way. A parcel that bounces stays `shipped` until someone resolves it |
+| `delivered` | Delivered |
+| `cancelled` | We closed the order or removed it. Contact us if you didn't expect this |
+
+New values can be added, so handle one you don't know.
+
+## Limits
+
+| Limit | Set per key | When you go over |
+|---|---|---|
+| 50 shipments per key per UTC day | No | `429 DAILY_SHIPMENT_LIMIT_REACHED`, with `limit` and `resets_at` |
+| 60 estimates per key per minute | No | `429 RATE_LIMITED`, with `retry_after_seconds` and a `Retry-After` header |
+| 1–10 cards per request | No | `400` |
+| `max_cost` up to $10,000 | No | `400` |
+
+All of them: [Rate limits](/partner-api/rate-limits#shipments). The address field limits are on [Estimate a shipment](/partner-api/endpoints/estimate-shipment).
+
+## Unconfirmed shipments
+
+Rarely, we can't tell whether a shipment's charge went through. You get a `500 SHIPMENT_OUTCOME_UNKNOWN` with `needs_review: true` and the `shipment_id`, and it's with our team to check. Follow it with [Get a shipment](/partner-api/endpoints/get-shipment), which takes the `shipment_id`. No [event](/partner-api/webhook-events) tells you the outcome.
+
+| What you see | What it means | What to do |
+|---|---|---|
+| `status: "needs_review"`, or `409 IDEMPOTENCY_IN_PROGRESS` with `needs_review: true` on a resend | We're still checking | Wait. A resend with the same id can't charge twice. Don't resend it under a new id until you hear from us |
+| Any other status, or the shipment with `idempotent_replay: true` on a resend | It went through, and was charged once | Track it as usual |
+| `404` from Get a shipment | We found nothing was charged, and removed it | The id is free to send again. Check your balance before you do |
+
+Quote the `shipment_id` if you contact us.

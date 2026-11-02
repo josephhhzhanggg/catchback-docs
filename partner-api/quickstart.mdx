@@ -6,7 +6,7 @@ description: "From a new API key to opening a pack and selling a pull back, end 
 This walk-through takes a new key from its first call to opening one pack and selling a card from it back to CatchBack. Every command runs as-is in bash or zsh; the last steps use [`jq`](https://jqlang.org) to read the purchase response.
 
 <Warning>
-  There's no sandbox: steps 5 and 6 spend and credit real CatchCoins on your account. Use a cheap pack the first time.
+  Steps 5 and 6 spend and credit real CatchCoins: your key acts on its account's real balance. Use a cheap pack the first time. To try packs on a test balance first, see [Testing](/partner-api/testing).
 </Warning>
 
 ## Before you start
@@ -145,5 +145,11 @@ export CB="https://catchbackcards.com/api/partner/v1"
   </Card>
   <Card title="Connect an AI agent" icon="robot" href="/partner-api/mcp">
     The same flow as MCP tools, with the same key.
+  </Card>
+  <Card title="Test accounts" icon="flask" href="/partner-api/testing">
+    Try packs on a test balance, and how to test everything else.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/partner-api/webhooks">
+    Hear when an order finishes or a listing sells, instead of polling.
   </Card>
 </CardGroup>
