@@ -5,6 +5,10 @@ description: "What changed in the Partner API, newest first."
 
 Changes to `v1` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. A breaking change would ship under a new version prefix. Dates are US Pacific time.
 
+<Update label="November 2, 2026" description="Buy packs refusals">
+  - [Buy packs](/partner-api/endpoints/buy-packs) now refuses an order before it charges anything when the pack can't be bought: a `pack_type` that [List packs](/partner-api/endpoints/list-packs) doesn't offer your key is a `404`, and a pack with `available: false` is a `409 PACK_UNAVAILABLE`, with its `reason`. A `risk_level` outside the pack's `risk_levels`, and the category `goods`, are a `400`. A refused order charges nothing and frees its order id. A retry of a finished order is unaffected.
+</Update>
+
 <Update label="November 2, 2026" description="Optional shipping insurance">
   - [Estimate a shipment](/partner-api/endpoints/estimate-shipment) and [Create a shipment](/partner-api/endpoints/create-shipment) take an optional `cover_amount`, so you can [insure a shipment](/partner-api/shipping#insurance) from \$100 up to the cards' value, at most \$10,000. You pay the rate plus the premium, and `max_cost` applies to the total. New codes: `400 COVER_NOT_ALLOWED` and `409 COVER_UNAVAILABLE`.
   - Every estimate now returns `order_value` and `max_cover`. A shipment, in responses and in `shipment.updated`, now has `cover_amount` and `insurance_cost`.
@@ -20,7 +24,7 @@ Changes to `v1` are additive: a response can gain fields, an enum can gain value
   - [Rate limits](/partner-api/rate-limits#shared-limit-per-ip) now says that everything under `/api/` has a shared limit of 300 requests a minute per IP address, on top of the per-key limits.
   - [Buy packs](/partner-api/endpoints/buy-packs) and [Buy a card](/partner-api/endpoints/buy-card): when we can't confirm whether a purchase was charged, the answer is now `500 PAYMENT_OUTCOME_UNKNOWN` with `needs_review: true` and the order's `checkout_id`, not a `503`. Nothing is delivered and the order is held for us to settle: stop retrying, never place it again under a new order id, and follow it with [Get an order](/partner-api/endpoints/get-order).
   - A resend with the same order id answers `409 IDEMPOTENCY_IN_PROGRESS` with `needs_review: true` until we settle the order, and nothing is charged twice. Once we settle it, [Get an order](/partner-api/endpoints/get-order) answers `404` and the id is free to send again. See [Purchases that need review](/partner-api/idempotency#purchases-that-need-review).
-  - A `503` on a purchase now only means the order certainly didn't go through, so retrying it with the same order id is safe.
+  - A `503` on a purchase means that attempt didn't charge anything. An earlier attempt with the same order id may have gone through, so retry with the same order id, never a new one.
 </Update>
 
 <Update label="October 29, 2026" description="Pull proofs, one-step price changes, partner accounts">

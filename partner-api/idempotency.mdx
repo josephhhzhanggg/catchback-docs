@@ -22,7 +22,7 @@ description: "Order ids make every purchase safe to retry: how to choose one, wh
 |---|---|---|
 | Is new | The order runs | Once |
 | Belongs to an order that finished | The stored response, with its original status, plus `"idempotent_replay": true` | No, not again |
-| Belongs to an order that is still running | `409 IDEMPOTENCY_IN_PROGRESS`, with the order's `checkout_id` and `started_at`. Resend later, or follow it with [Get an order](/partner-api/endpoints/get-order) | No, not again |
+| Belongs to an order that is still running | `409 IDEMPOTENCY_IN_PROGRESS`, usually with the order's `checkout_id` and `started_at`. Resend later, or follow it with [Get an order](/partner-api/endpoints/get-order) | No, not again |
 | Belongs to an order held for review, because we couldn't confirm its charge | `409 IDEMPOTENCY_IN_PROGRESS` with `needs_review: true`, plus the order's `checkout_id` and `started_at`. Resending won't help until we settle it: follow it with [Get an order](/partner-api/endpoints/get-order) | No, not again |
 | Belongs to an attempt that failed just as you sent this one | `409 IDEMPOTENCY_RETRY`. Resend it | No |
 | Belongs to an order that failed earlier | The order runs again: a failed order refunds itself and frees its id | Once, if it succeeds this time |

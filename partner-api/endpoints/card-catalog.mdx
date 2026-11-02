@@ -11,7 +11,7 @@ A full sync of shop stock, for keeping your own copy of our inventory. It has no
 The purchasable inventory: the same pool our storefront and pack openings draw from. Paginate by incrementing `page` until you've fetched `total` cards ([Pagination](/partner-api/pagination)). Ordering is stable (`id` ascending) within a sync, but the set changes between syncs, because the inventory is [point-in-time](/partner-api/errors-and-limits#inventory-is-point-in-time).
 
 <ParamField query="category" type="string" default="pokemon">
-  `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
+  `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`. Any other value, `goods` included, is a `400`.
 </ParamField>
 <ParamField query="page" type="integer" default="1">1-based.</ParamField>
 <ParamField query="per_page" type="integer" default="500">1–1000.</ParamField>

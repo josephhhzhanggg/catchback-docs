@@ -7,7 +7,7 @@ description: "Cryptographically secure randomness that you can verify for comple
 
 **Every pack opening uses provably fair technology that you can verify yourself.**
 
-CatchBack's provably fair system ensures that every pack opening is truly random and cannot be manipulated. Our cryptographic approach gives you mathematical proof that your pack results are fair and unbiased.
+You can check that your result follows from its seed and that the record hasn't changed. CatchBack generates the seed when the pull is made.
 
 
 ### Two-Stage Selection Process
@@ -24,7 +24,7 @@ CatchBack's provably fair system ensures that every pack opening is truly random
     title="Stage 2: Card Selection"
     icon="cards"
   >
-    Secondary calculation using your UUID determines which specific card within that bucket
+    A shuffle of the bucket's cards and a final draw from the same seed determine which specific card within that bucket
   </Card>
 </CardGroup>
 
@@ -136,137 +136,26 @@ def calculate_optimized_probabilities_generic(bucket_data, target_probs, bucket_
     return optimized_probabilities
 ```
 
-Below is the card selection algorithm that runs when you open a pack:
+A pull's card is chosen in these steps:
 
-```javascript
-// 1. Fetch latest pack stats
-const { data: statsRows, error: statsError } = await serviceSupabase
-  .from('REDACTED_TABLE_NAME')
-  .select('*')
-  .eq('pack_type', 'silver')
-  .order('created_at', { ascending: false })
-  .limit(1);
-if (statsError || !statsRows || statsRows.length === 0)
-  return NextResponse.json({ error: 'No silver pack stats found' }, { status: 500 });
-const buckets = statsRows[0].data?.buckets || {};
+1. **Seed.** The first 8 hex digits of the pull's id are read as an integer.
+2. **Draws.** A Linear Congruential Generator started from the seed produces the draws, one per step: `state = (0x41C64E6D × state + 0x6073) mod 2^32`.
+3. **Bucket.** One draw picks the value bucket, using the bucket odds.
+4. **Shuffle.** For a bucket of `n` cards, `n − 1` more draws shuffle its cards.
+5. **Card.** The next draw picks a place in the shuffled list.
+6. **Result hash.** A SHA-256 hash of the seed, bucket, place and card id is recorded with the pull.
 
-// 2. Get bucket keys and probabilities
-const bucketKeys = Object.keys(buckets).filter((k) => k.startsWith('P'));
-const bucketProbs = bucketKeys.map((k) => buckets[k].current_probability || 0);
-
-// Log bucket odds for this pull
-const bucketOddsDisplay = bucketKeys.map((key, i) => {
-  const bucketNum = key.replace('P', '');
-  const percentage = (bucketProbs[i] * 100).toFixed(1);
-  return `bucket${bucketNum}: ${percentage}%`;
-}).join(', ');
-
-// 3. Fetch all trading cards available for packs
-const { data: cardsData, error: cardsError } = await serviceSupabase
-  .from('REDACTED_TABLE_NAME')
-  .select('*')
-  .eq('REDACTED_FILTER', true);
-if (cardsError || !cardsData || cardsData.length === 0)
-  return NextResponse.json({ error: 'No cards available for Silver Pack' }, { status: 500 });
-
-// 4. Assign cards to buckets in-memory (matching logic from pack-stats endpoint)
-const assignCardToBucket = (card) => {
-  const value = card.market_value ?? card.price ?? 0;
-  for (const [bucketKey, bucketData] of Object.entries(buckets)) {
-    const data = bucketData;
-    if (bucketKey === 'P_NO_BUCKET') continue;
-    const min = data.card_min_value || 0;
-    const max = data.card_max_value || 0;
-    if (value >= min && value <= max) {
-      return bucketKey;
-    }
-  }
-  return 'P_NO_BUCKET';
-};
-
-// Group cards by bucket
-const cardsByBucket = {};
-bucketKeys.forEach((bucketKey) => { cardsByBucket[bucketKey] = []; });
-for (const card of cardsData) {
-  const bucket = assignCardToBucket(card);
-  if (cardsByBucket[bucket]) {
-    cardsByBucket[bucket].push(card);
-  }
-}
-
-// 5. Generate UUIDs
-const transaction_uuid = uuidv4();
-const pack_state_uuid = uuidv4();
-
-// 6. Prepare PRNG
-const seed = parseInt(transaction_uuid.replace(/-/g, '').slice(0, 16), 16) % LCG_M;
-const rand = lcg(seed);
-
-// 7. Select bucket (weighted by probability)
-const selectedBucketIdx = weightedRandomIndex(bucketProbs, rand);
-const selectedBucket = bucketKeys[selectedBucketIdx];
-const cardsInBucket = cardsByBucket[selectedBucket] || [];
-if (cardsInBucket.length === 0) {
-  return NextResponse.json({ error: 'No cards available in bucket' }, { status: 500 });
-}
-
-// 8. Use first character of UUID to select card within bucket
-const firstChar = transaction_uuid.replace(/-/g, '').charAt(0);
-const hexValue = parseInt(firstChar, 16);
-const cardIdx = hexValue % cardsInBucket.length;
-const selectedCard = cardsInBucket[cardIdx];
-
-// 9. Store transaction
-const pack_card_ids = cardsInBucket.map((c) => c.id);
-const pack_market_values = cardsInBucket.map((c) => c.market_value);
-
-const transactionData = {
-  // REDACTED_DATA
-};
-
-const { data: insertedData, error: txError } = await serviceSupabase
-  .from('REDACTED_TABLE_NAME')
-  .insert(transactionData)
-  .select('id');
-
-if (txError) {
-  console.error('Transaction insertion failed:', {
-    error: txError,
-    code: txError.code,
-    message: txError.message,
-    details: txError.details,
-    hint: txError.hint
-  });
-  return NextResponse.json({ 
-    error: 'Failed to record transaction', 
-    details: txError,
-    debug_info: {
-      error_code: txError.code,
-      error_message: txError.message,
-      transaction_id: transaction_uuid
-    }
-  }, { status: 500 });
-} else {
-  console.log('Transaction inserted successfully:', {
-    transaction_id: transaction_uuid,
-    inserted_data: insertedData
-  });
-}
-```
+The current algorithm is named `shuffle-scaled-v3`. The full steps, with code you can run, are in [Verify a pull](/partner-api/verify-a-pull).
 
 ## Card Pulling Process
 
 ### How Individual Cards Are Selected
 
-Once our optimization system has calculated the fair probabilities for each value bucket, the actual card selection process begins. When you click "Open Pack," our system generates a unique cryptographic seed using a UUID (Universally Unique Identifier). This isn't just any random number—it's created using industry-standard cryptographic functions that are impossible to predict or manipulate.
-
-This UUID becomes the foundation for a Linear Congruential Generator (LCG) using the same mathematical constants that Microsoft Visual C++ uses for randomness. We extract the first 16 characters from your transaction UUID, convert them to a numerical seed, and feed it into our LCG algorithm: `state = (A × state + C) mod M`. This ensures that given the same seed, the exact same result will always occur—making every pack opening completely auditable.
+Once our optimization system has calculated the fair probabilities for each value bucket, the actual card selection process begins. When you open a pack, CatchBack generates the pull's id, a UUID, and the first 8 hex digits of it, read as a number, are the seed. The seed feeds a Linear Congruential Generator (LCG): `state = (0x41C64E6D × state + 0x6073) mod 2^32`. Given the same seed, the same draws always follow, so a pull can be replayed and checked.
 
 ### Permanent Audit Trail
 
-Every transaction is permanently recorded with its UUID seed, selected card, timestamp, and all calculation details. You can verify any pack opening by taking the UUID we provide, running it through our published algorithm, and confirming you got exactly the card you should have received. It's mathematical proof that your pack opening was fair, random, and cannot be manipulated by anyone—including us.
+Every pull is recorded with its seed, selected card, timestamp and a result hash. You can check any pull by taking the id we provide, running it through the algorithm above and confirming you got the card you should have received, or by using [Verify a pull](/partner-api/verify-a-pull). You can check that your result follows from its seed and that the record hasn't changed. CatchBack generates the seed when the pull is made.
 
 
 ---
-
-*Provably fair technology provides mathematical proof that every pack opening is fair, transparent, and verifiable.*

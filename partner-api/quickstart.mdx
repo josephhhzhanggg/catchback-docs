@@ -88,7 +88,7 @@ export CB="https://catchbackcards.com/api/partner/v1"
 
     The pack is charged at list price and every pull is already in your vault. Each entry in `pulls` has its `pull_id`, the card as `item`, its `value`, and its CatchBack offer: `catchback.amount` if you sell it back before `catchback.valid_until` (5 minutes after the pull), and `catchback.after` once that window closes. Its `proof` lets you check the draw: [Verify a pull](/partner-api/verify-a-pull).
 
-    If the request times out or fails with a `5xx`, run the same `curl` again with the same `$ORDER_ID`. If the order went through you get it back; if it didn't, it runs again. Either way it's never charged twice. A `429 RATE_LIMITED` tells you how many seconds to wait. See [Idempotency](/partner-api/idempotency) and [Rate limits](/partner-api/rate-limits).
+    If the request times out or fails with a `5xx`, run the same `curl` again with the same `$ORDER_ID`. If the order went through you get it back; if it didn't, it runs again. Either way it's never charged twice. If you get a `409 IDEMPOTENCY_IN_PROGRESS`, or a `500` with `needs_review: true`, stop and follow the order with [Get an order](/partner-api/endpoints/get-order). A `429 RATE_LIMITED` tells you how many seconds to wait. See [Idempotency](/partner-api/idempotency) and [Rate limits](/partner-api/rate-limits).
   </Step>
   <Step title="Sell the pull back">
     To take the fresh rate, sell within 5 minutes of the pull. [Sell back cards](/partner-api/endpoints/sell-back) takes the card's id and its `pull_id`, both from the purchase response:

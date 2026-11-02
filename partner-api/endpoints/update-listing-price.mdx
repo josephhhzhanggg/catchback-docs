@@ -39,13 +39,14 @@ Changing a price runs the same seller checks as listing a card. Sending the pric
 | `403` | | The key lacks `write:listings` or isn't linked to an account, the account needs a verified phone number (`"Phone verification required"`), or it can't list cards |
 | `403` | `FEATURE_RESTRICTED` | The marketplace is switched off for your account (`capability: "marketplace"`). Contact us |
 | `404` | `LISTING_NOT_FOUND` | No listing with this id belongs to your account |
-| `409` | `LISTING_NOT_ACTIVE` | The listing sold, was taken down or expired, or its card left your account, including a buy or a delist that landed while you were changing the price. Once the listing has closed, the body has its `status`. Nothing was written |
+| `409` | `LISTING_NOT_ACTIVE` | The listing sold, was taken down or expired, or its card left your account, including a buy or a delist that landed while you were changing the price. An active listing whose `category` is `null` (see [Your listings](/partner-api/endpoints/get-listings)) gets it too. Once the listing has closed, the body has its `status`. Nothing was written |
 | `409` | `LISTING_CHANGED` | Another change to the listing, in practice another price change, landed first, and the listing is still active. Nothing was written. Read it again and retry |
+| `503` | | We couldn't read your account just then. Nothing was written. Retry shortly |
 | `500` | | A database error. Send the same price again: that finishes the change, or writes nothing if it had already landed |
 
 <RequestExample>
 ```bash cURL
-curl -X PATCH https://catchbackcards.com/api/partner/v1/listings/5f1c2a90-… \
+curl -X PATCH https://catchbackcards.com/api/partner/v1/listings/5f1c2a90-7d3e-4b8a-a1c6-9e0f2b4d6c58 \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "price": 52.5 }'

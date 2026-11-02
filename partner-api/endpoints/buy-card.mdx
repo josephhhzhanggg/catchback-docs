@@ -19,13 +19,13 @@ Charges the card's price plus a $1 buyer fee, from your cash CatchCoins balance 
 ## Response
 
 <ResponseField name="checkout_id" type="string">Our id for the order.</ResponseField>
-<ResponseField name="transaction_id" type="string">The sale. It is the `purchase_id` that [Get vault](/partner-api/endpoints/get-vault) and [Sell back](/partner-api/endpoints/sell-back) use for this card.</ResponseField>
+<ResponseField name="transaction_id" type="string | null">The sale. It is the `purchase_id` that [Get vault](/partner-api/endpoints/get-vault) and [Sell back](/partner-api/endpoints/sell-back) use for this card.</ResponseField>
 <ResponseField name="card_id" type="string" />
 <ResponseField name="source" type="string">`shop` or `listing`.</ResponseField>
 <ResponseField name="listing_id" type="string | null" />
 <ResponseField name="price" type="number">Charged for the card.</ResponseField>
 <ResponseField name="fee" type="number" />
-<ResponseField name="total_charged" type="number">`price` + `fee`.</ResponseField>
+<ResponseField name="total_charged" type="number | null">`price` + `fee`.</ResponseField>
 <ResponseField name="remaining_balance" type="number" />
 <ResponseField name="item" type="object | null">A [card object](/partner-api/card-object), or `null` if we couldn't load the card. The card is yours either way.</ResponseField>
 <ResponseField name="idempotent_replay" type="boolean">Present and `true` when this is a stored response to a retried order. Nothing was charged again.</ResponseField>
@@ -46,7 +46,7 @@ Charges the card's price plus a $1 buyer fee, from your cash CatchCoins balance 
 | `409` | `CARD_NO_LONGER_AVAILABLE` | Sold, pulled from a pack, delisted or shipped, or an item that is only sold in packs. Search again |
 | `409` | `CARD_MOVED_TO_AUCTION` | The card is now in an auction, not sold at a fixed price. The response has `listing_id` and `listing_type` |
 | `409` | `OWN_LISTING` | The card is your own listing |
-| `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order), or retry later with the same key. Don't retry in a tight loop |
+| `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body usually has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order), or retry later with the same key. Don't retry in a tight loop |
 | `409` | `IDEMPOTENCY_RETRY` | An earlier attempt with this key failed just as this one arrived. Retry with the same key |
 | `422` | `IDEMPOTENCY_KEY_REUSED` | This key was used for a different order |
 | `429` | `DAILY_CARD_LIMIT_REACHED` | Your daily card or spend cap. See [Rate limits](/partner-api/rate-limits#card-purchases) |
@@ -68,12 +68,12 @@ curl -X POST https://catchbackcards.com/api/partner/v1/cards/purchase \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Idempotency-Key: order-2077" \
   -H "Content-Type: application/json" \
-  -d '{ "card_id": "0e94dc61-…", "max_price": 1450 }'
+  -d '{ "card_id": "0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e", "max_price": 1450 }'
 ```
 </RequestExample>
 
 <ResponseExample>
-```json 200
+```json 200 (abridged)
 {
   "checkout_id": "5d1c…",
   "transaction_id": "a17e…",

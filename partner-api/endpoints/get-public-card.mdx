@@ -23,7 +23,7 @@ Call it from a server. It sends no CORS header, so another site's browser JavaSc
 ## Response
 
 <ResponseField name="card" type="object">
-  These fields of the [card object](/partner-api/card-object), and no others. A field a card doesn't have is left out.
+  These fields of the [card object](/partner-api/card-object), and no others. A field a card's catalog doesn't have is left out. A field it has but we don't know is `null`.
 
   - **Identity:** `id`, `category`, `name`, `set`, `year`, `number`, `variant`, `rarity`, `card_type`, `language`
   - **Slab:** `slab_label`, `grading_company`, `grading_rank`, `card_condition`, `cert_number`
@@ -36,12 +36,9 @@ Nothing says who holds the card, what it sold for or whether it's for sale.
 
 ## Cache time
 
-A `200` is sent with `Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=60`:
+Our CDN caches a `200` for up to **5 minutes**, and can serve it for another minute while it refreshes. Behind the CDN, a card is read at most once a minute.
 
-- Our CDN keeps the response for **5 minutes**, and can serve it for another minute while it refreshes.
-- Behind the CDN, a card is read at most once a minute.
-
-So a response can be up to about 7 minutes old. Errors are `no-store`, so the CDN never keeps them, though a card added in the last minute can still read as a `404`.
+So a response can be up to about 7 minutes old. Errors are never cached, though a card added in the last minute can still read as a `404`.
 
 Send only `category` as a query parameter. Anything else in the URL misses the CDN and counts against your limit.
 
@@ -69,7 +66,7 @@ curl "https://catchbackcards.com/api/public/v1/cards/0e94dc61-5a2f-4b1e-9c3d-7f8
 </RequestExample>
 
 <ResponseExample>
-```json 200
+```json 200 (abridged)
 {
   "card": {
     "id": "0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e",

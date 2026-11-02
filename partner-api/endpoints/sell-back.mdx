@@ -39,7 +39,7 @@ The whole request is refused when:
 
 | Status | When |
 |---|---|
-| `400` | The body isn't JSON, `items` is missing, empty or longer than 10, an item lacks a UUID `card_id` or doesn't have exactly one of `pull_id` and `purchase_id`, or the same card is listed twice |
+| `400` | The body isn't JSON, `items` is missing, empty or longer than 10, an item lacks a UUID `card_id` or doesn't have exactly one of `pull_id` and `purchase_id`, or the same pull or purchase of a card is listed twice |
 | `403` | The key lacks `sell:cards` or isn't linked to an account, or the account is unavailable |
 
 Otherwise the response is a `200`, and each item that couldn't be sold comes back with `status: "failed"`, an `error`, and sometimes a `code`:
@@ -49,6 +49,7 @@ Otherwise the response is a `200`, and each item that couldn't be sold comes bac
 | `CARD_LISTED_ON_MARKETPLACE` | The card is listed. [Delist it](/partner-api/endpoints/delist-card) first |
 | `GOODS_SELLBACK_WINDOW_CLOSED` | A luxury goods item, more than 5 minutes after its pull |
 | `CARD_IN_BATTLE` | The card is held by a pack battle that hasn't finished |
+| `SHOP_PURCHASE_NOT_SELLABLE` | An item bought from a partner shop, which can ship but doesn't sell back |
 
 A `failed` item without a `code` explains itself in `error`, e.g. a `purchase_id` that isn't a purchase of this card by your account, or a card that has shipped. Read `error` for anything you don't branch on.
 
@@ -57,7 +58,7 @@ A `failed` item without a `code` explains itself in `error`, e.g. a `purchase_id
 curl -X POST https://catchbackcards.com/api/partner/v1/cards/sell-back \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "items": [{ "card_id": "bee48cce-…", "pull_id": "873deb80-…" }] }'
+  -d '{ "items": [{ "card_id": "bee48cce-3d1f-4c2a-8b7e-5a9d0c4f1e62", "pull_id": "873deb80-6c2b-4e1d-9f35-2a7b8c0d4e91" }] }'
 ```
 </RequestExample>
 
