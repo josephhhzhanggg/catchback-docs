@@ -22,7 +22,7 @@ description: "Order ids make every purchase safe to retry: how to choose one, wh
 |---|---|---|
 | Is new | The order runs | Once |
 | Belongs to an order that finished | The stored response, with its original status, plus `"idempotent_replay": true` | No, not again |
-| Belongs to an order that is still running | `409 IDEMPOTENCY_IN_PROGRESS`, with the order's `checkout_id` and `started_at`. Resend shortly | No, not again |
+| Belongs to an order that is still running | `409 IDEMPOTENCY_IN_PROGRESS`, with the order's `checkout_id` and `started_at`. Resend later, or follow it with [Get an order](/partner-api/endpoints/get-order) | No, not again |
 | Belongs to an attempt that failed just as you sent this one | `409 IDEMPOTENCY_RETRY`. Resend it | No |
 | Belongs to an order that failed earlier | The order runs again: a failed order refunds itself and frees its id | Once, if it succeeds this time |
 | Was used for a different body | `422 IDEMPOTENCY_KEY_REUSED`. Use a new id for a different order | No |
@@ -86,6 +86,8 @@ If a request is cut off on our side after the charge (a timeout, a crash, a depl
 </CodeGroup>
 
 A reconciled pack order has no `pulls`, no `summary` and no `remaining_balance`. Its `pull_ids` are the `pull_id`s of the pulls, and the cards are already in your vault: read them, with their CatchBack offers, from [Get vault](/partner-api/endpoints/get-vault). A reconciled card order has no `fee`, `remaining_balance` or `item`.
+
+You don't have to resend an order to learn where it stands. [Get an order](/partner-api/endpoints/get-order) takes its `checkout_id` (the `409` body carries it): it shows the order as `pending` until it completes or we close it, a pack order's pulls as soon as they have landed, and `reconciled: true` on an order we closed. [List orders](/partner-api/endpoints/list-orders) shows the same for every order in a window.
 
 If an order still answers `409` after 30 minutes, we couldn't prove from our records that it went through. Contact us with the order id and the `checkout_id`.
 

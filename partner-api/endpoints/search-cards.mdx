@@ -6,7 +6,7 @@ description: "Every card you can buy right now: shop stock and fixed-price user 
 
 Scope: `read:catalog` · MCP tool: `search_cards`
 
-Each result is buyable with [Buy a card](/partner-api/endpoints/buy-card) unless someone else takes it first. `price` is exactly what the buy charges for the card, and `total_cost` adds the $1 buyer fee. Dutch auctions and your own listings are left out. Results are [point-in-time](/partner-api/errors-and-limits#inventory-is-point-in-time).
+Each result is buyable with [Buy a card](/partner-api/endpoints/buy-card) unless someone else takes it first. `price` is exactly what the buy charges for the card, and `total_cost` adds the $1 buyer fee. Dutch auctions and your own listings are left out; [Your listings](/partner-api/endpoints/get-listings) lists yours. Results are [point-in-time](/partner-api/errors-and-limits#inventory-is-point-in-time).
 
 <ParamField query="category" type="string" default="pokemon">
   `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
@@ -22,20 +22,23 @@ Each result is buyable with [Buy a card](/partner-api/endpoints/buy-card) unless
 <ParamField query="min_price" type="number">Dollars.</ParamField>
 <ParamField query="max_price" type="number">Dollars.</ParamField>
 <ParamField query="source" type="string" default="all">`all`, `shop` (CatchBack stock) or `listing` (another user's fixed-price listing).</ParamField>
-<ParamField query="sort" type="string" default="price_asc">`price_asc` or `price_desc`. Equal prices are ordered by `card_id`.</ParamField>
+<ParamField query="sort" type="string" default="price_asc">`price_asc` or `price_desc`. At an equal price, user listings come before shop stock, each in id order: listing id for a listing, card id for the shop.</ParamField>
 <ParamField query="page" type="integer" default="1">1–20. A higher page is treated as 20. See [Pagination](/partner-api/pagination).</ParamField>
 <ParamField query="per_page" type="integer" default="50">1–100. A higher value is treated as 100.</ParamField>
 
-<Note>
-  The `q`, `grading_company` and grade filters are applied to user listings after we take the first 500 listings in the category by price (cheapest first, or priciest first with `price_desc`). In a category with more listings than that, a filtered search can miss matches past the first 500, and `has_more` stays `true`. `min_price` and `max_price` apply before that cut, so a price band reaches the rest. Shop stock is filtered in full.
-</Note>
+## How far a search reaches
+
+Each request reads shop stock and user listings in price order, up to 5,000 rows from each, and applies every filter to every row it reads. If either one reaches that ceiling before the page is full, `truncated` is `true` and the results stop at the last row it read.
+
+To reach past page 20, or past a truncated page, narrow the price range: set `min_price` to the last result's price (`max_price` with `price_desc`) and start again from page 1. Results at exactly that price come back again, so skip the ones you already have. A truncated page with no results has no last price to start from: narrow the price range or the filters directly.
 
 ## Response
 
 <ResponseField name="category" type="string" />
 <ResponseField name="page" type="integer" />
 <ResponseField name="per_page" type="integer" />
-<ResponseField name="has_more" type="boolean">Whether another page may exist. It can still be `true` on page 20, the last page you can ask for: narrow the filters to see more.</ResponseField>
+<ResponseField name="has_more" type="boolean">`true` when at least one more result follows this page. Always `false` on page 20, the last page you can ask for.</ResponseField>
+<ResponseField name="truncated" type="boolean">`true` when the search stopped at its 5,000-row ceiling with matches unread. See [How far a search reaches](#how-far-a-search-reaches).</ResponseField>
 <ResponseField name="results" type="object[]">
   <Expandable title="result">
     <ResponseField name="card_id" type="string">Pass to [Buy a card](/partner-api/endpoints/buy-card).</ResponseField>
@@ -73,6 +76,7 @@ curl "https://catchbackcards.com/api/partner/v1/marketplace/listings?category=po
   "page": 1,
   "per_page": 50,
   "has_more": false,
+  "truncated": false,
   "results": [
     {
       "card_id": "0e94dc61-…",

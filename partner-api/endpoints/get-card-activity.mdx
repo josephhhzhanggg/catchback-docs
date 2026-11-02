@@ -1,0 +1,82 @@
+---
+title: "Card activity"
+api: "GET /api/partner/v1/cards/{id}/activity"
+description: "A card's recent sales and marketplace listings over the last 1–365 days, newest first, with nobody named."
+---
+
+Scope: `read:catalog` · MCP tool: `get_card_activity`
+
+Two lists for one card: its sales, from the shop or a marketplace listing, and its listings. Nobody is named: there are no buyer or seller ids, usernames or listing text.
+
+Only market trades count. A buy by one of CatchBack's own accounts (staff, test or content accounts) and a seller buying their own listing aren't market prices, so they are left out of `sales`, and the listing such a buy filled is left out of `listings`. Pack pulls and sell-backs to CatchBack aren't sales here.
+
+<ParamField path="id" type="string" required>A card id, as in [Get a card](/partner-api/endpoints/get-card).</ParamField>
+<ParamField query="category" type="string">The card's catalog, if you know it. See [Get a card](/partner-api/endpoints/get-card).</ParamField>
+<ParamField query="days" type="integer" default="90">How many days back from now: a whole number from 1 to 365. Anything else is a `400`.</ParamField>
+<ParamField query="limit" type="integer" default="20">The most sales, and the most listings, returned: 1–50. Anything else is a `400`.</ParamField>
+
+Activity is cached for up to a minute.
+
+## Response
+
+<ResponseField name="card_id" type="string" />
+<ResponseField name="category" type="string">The card's catalog.</ResponseField>
+<ResponseField name="days" type="integer" />
+<ResponseField name="limit" type="integer" />
+<ResponseField name="since" type="string">The start of the window: `days` before now.</ResponseField>
+<ResponseField name="sales" type="object[]">
+  Completed sales in the window, newest first.
+  <Expandable title="sale">
+    <ResponseField name="sale_id" type="string" />
+    <ResponseField name="sold_at" type="string" />
+    <ResponseField name="price" type="number">What the card sold for in USD, before the buyer fee.</ResponseField>
+    <ResponseField name="source" type="string">`shop` (CatchBack stock) or `listing` (a marketplace listing).</ResponseField>
+    <ResponseField name="listing_id" type="string | null">The listing it sold from. `null` for a shop sale.</ResponseField>
+    <ResponseField name="listing_type" type="string | null">`fixed_price` or `dutch_auction`. `null` for a shop sale.</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="listings" type="object[]">
+  Listings created or sold in the window, plus any listing still active whatever its age, newest first.
+  <Expandable title="listing">
+    <ResponseField name="listing_id" type="string" />
+    <ResponseField name="listing_type" type="string">`fixed_price` or `dutch_auction`.</ResponseField>
+    <ResponseField name="status" type="string">`active`, `sold`, `cancelled` or `expired`. New values can be added, so don't fail on one you don't know.</ResponseField>
+    <ResponseField name="price" type="number">The listing's price in USD. For a Dutch auction, the price stored on the listing rather than its current auction price: what it sold for is in `sales`.</ResponseField>
+    <ResponseField name="listed_at" type="string" />
+    <ResponseField name="sold_at" type="string | null">`null` unless it sold.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | A malformed card id, an unknown `category`, `days` that isn't a whole number from 1 to 365, or `limit` that isn't one from 1 to 50 |
+| `404` | No card has this id |
+| `500` | We couldn't read the activity. Retry with backoff |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/cards/0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e/activity?days=90&limit=20" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "card_id": "0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e",
+  "category": "pokemon",
+  "days": 90,
+  "limit": 20,
+  "since": "2026-07-30T18:00:00.000Z",
+  "sales": [
+    { "sale_id": "a17e…", "sold_at": "2026-10-20T15:02:44Z", "price": 395, "source": "listing", "listing_id": "5f1c2a90-…", "listing_type": "fixed_price" },
+    { "sale_id": "93c2…", "sold_at": "2026-09-02T11:40:09Z", "price": 360, "source": "shop", "listing_id": null, "listing_type": null }
+  ],
+  "listings": [
+    { "listing_id": "5f1c2a90-…", "listing_type": "fixed_price", "status": "sold", "price": 395, "listed_at": "2026-10-18T09:12:00Z", "sold_at": "2026-10-20T15:02:44Z" }
+  ]
+}
+```
+</ResponseExample>

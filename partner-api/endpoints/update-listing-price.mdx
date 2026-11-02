@@ -1,0 +1,85 @@
+---
+title: "Change a listing's price"
+api: "PATCH /api/partner/v1/listings/{listing_id}"
+description: "Reprice one of your fixed-price listings in place, without delisting it."
+---
+
+Scope: `write:listings` · MCP tool: `update_listing_price`
+
+Changes the price of one of your active fixed-price listings. The listing keeps its `listing_id`, and the new price lands whole or not at all. The limits are the same as for [List a card](/partner-api/endpoints/list-card): at least $5, and at most the larger of $5 and 2× the card's market value, with no upper cap when the card has no market value. The price is rounded to the cent.
+
+Changing a price runs the same seller checks as listing a card. Sending the price a listing already has writes nothing and answers `200`, as long as that price is still within the limits: if the card's market value has dropped since, the cap may have dropped below it.
+
+<ParamField path="listing_id" type="string" required>
+  The listing, from [Your listings](/partner-api/endpoints/get-listings) or a listed card in [Get vault](/partner-api/endpoints/get-vault). A UUID.
+</ParamField>
+<ParamField body="price" type="number" required>
+  The new asking price in USD, more than 0. A card worth $40 can be listed from $5 to $80.
+</ParamField>
+
+## Response
+
+<ResponseField name="listing_id" type="string" />
+<ResponseField name="card_id" type="string" />
+<ResponseField name="category" type="string">The card's catalog.</ResponseField>
+<ResponseField name="price" type="number">The new price, rounded to the cent.</ResponseField>
+<ResponseField name="previous_price" type="number">The price before this change.</ResponseField>
+<ResponseField name="seller_fee" type="number">What a sale takes from your payout: $1.</ResponseField>
+<ResponseField name="payout" type="number">What your balance is credited if it sells: `price` − `seller_fee`.</ResponseField>
+<ResponseField name="updated_at" type="string">When the listing last changed.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | | The listing id isn't a UUID, or `price` isn't a positive number |
+| `400` | `PRICE_BELOW_MINIMUM` | Under $5. The body has `min_price` and `max_price` (`null` when the card has no market value, so no cap) |
+| `400` | `PRICE_ABOVE_MAXIMUM` | Over the larger of $5 and 2× market value. The body has `min_price` and `max_price` |
+| `400` | `NOT_FIXED_PRICE` | The listing is a Dutch auction, whose price follows its schedule |
+| `403` | | The key lacks `write:listings` or isn't linked to an account, the account needs a verified phone number (`"Phone verification required"`), or it can't list cards |
+| `403` | `FEATURE_RESTRICTED` | The marketplace is switched off for your account (`capability: "marketplace"`). Contact us |
+| `404` | `LISTING_NOT_FOUND` | No listing with this id belongs to your account |
+| `409` | `LISTING_NOT_ACTIVE` | The listing sold, was taken down or expired, or its card left your account, including a buy or a delist that landed while you were changing the price. Once the listing has closed, the body has its `status`. Nothing was written |
+| `409` | `LISTING_CHANGED` | Another change to the listing, in practice another price change, landed first, and the listing is still active. Nothing was written. Read it again and retry |
+| `500` | | A database error. Send the same price again: that finishes the change, or writes nothing if it had already landed |
+
+<RequestExample>
+```bash cURL
+curl -X PATCH https://catchbackcards.com/api/partner/v1/listings/5f1c2a90-… \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "price": 52.5 }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "listing_id": "5f1c2a90-…",
+  "card_id": "0e94dc61-…",
+  "category": "pokemon",
+  "price": 52.5,
+  "previous_price": 45,
+  "seller_fee": 1,
+  "payout": 51.5,
+  "updated_at": "2026-10-28T20:02:11Z"
+}
+```
+
+```json 400
+{
+  "error": "Listings can't exceed 200% of market value: max $76.86 for this card",
+  "code": "PRICE_ABOVE_MAXIMUM",
+  "min_price": 5,
+  "max_price": 76.86
+}
+```
+
+```json 409
+{
+  "error": "This listing is no longer active",
+  "code": "LISTING_NOT_ACTIVE",
+  "status": "sold"
+}
+```
+</ResponseExample>

@@ -1,0 +1,134 @@
+---
+title: "List orders"
+api: "GET /api/partner/v1/orders"
+description: "Your account's order history, newest first: pack and card purchases, sell-backs and sales of your listings."
+---
+
+Scope: `read:account` · MCP tool: `list_orders`
+
+Everything that moved your balance through the API, newest first, so you can reconcile your records against ours. There are four kinds of order:
+
+| `type` | What it is | Its `checkout_id` |
+|---|---|---|
+| `pack_purchase` | A [Buy packs](/partner-api/endpoints/buy-packs) order | The `checkout_id` the purchase returned |
+| `card_purchase` | A [Buy a card](/partner-api/endpoints/buy-card) order | The `checkout_id` the purchase returned |
+| `sell_back` | One card [sold back](/partner-api/endpoints/sell-back). A request that sells several cards makes one order per card | The sell-back's `transaction_id` |
+| `listing_sale` | A sale of one of your listings to someone else, fixed price or Dutch auction | The sale's id |
+
+The history belongs to the account, not the key: every key linked to the account sees the same orders. Purchases and sell-backs made in our app are left out. A sale of one of your listings is in, wherever you listed the card.
+
+A key acts as one CatchBack account, so the history can't say which of your own customers an order was for. Keep that on your side, against the `order_id` you chose or the order's `pull_ids`.
+
+<ParamField query="type" type="string">
+  Only orders of this kind: `pack_purchase`, `card_purchase`, `sell_back` or `listing_sale`. Leave it out for all four.
+</ParamField>
+<ParamField query="since" type="string">ISO 8601 with a time zone, e.g. `2026-10-01T00:00:00Z`. Inclusive. Defaults to `until` minus 7 days.</ParamField>
+<ParamField query="until" type="string">ISO 8601 with a time zone. Inclusive. Defaults to now. At most 31 days after `since`.</ParamField>
+<ParamField query="limit" type="integer" default="50">Orders per page, 1–100. A higher value is treated as 100.</ParamField>
+<ParamField query="cursor" type="string">
+  `next_cursor` from the previous page, unchanged. It carries that page's window and type, so `since`, `until` and `type` are ignored when you send it. See [Pagination](/partner-api/pagination#cursor-pages).
+</ParamField>
+
+The window is capped at **31 days**, and a malformed or inverted window is a `400`, as on the [Purchase report](/partner-api/endpoints/purchase-report). To read a longer stretch, ask for it a month at a time.
+
+## Response
+
+<ResponseField name="since" type="string">The window's start, as used.</ResponseField>
+<ResponseField name="until" type="string">The window's end, as used.</ResponseField>
+<ResponseField name="type" type="string | null">The `type` filter, or `null` for all four.</ResponseField>
+<ResponseField name="limit" type="integer" />
+<ResponseField name="has_more" type="boolean">Whether there are more orders in the window.</ResponseField>
+<ResponseField name="next_cursor" type="string | null">Send it as `cursor` for the next page. `null` on the last page.</ResponseField>
+<ResponseField name="orders" type="object[]">
+  Newest first, by `created_at`.
+  <Expandable title="order">
+    <ResponseField name="checkout_id" type="string">The order's id: see the table above. [Get an order](/partner-api/endpoints/get-order) takes it.</ResponseField>
+    <ResponseField name="order_id" type="string | null">The `Idempotency-Key` you sent with a purchase. `null` for a sell-back or a sale.</ResponseField>
+    <ResponseField name="type" type="string">`pack_purchase`, `card_purchase`, `sell_back` or `listing_sale`.</ResponseField>
+    <ResponseField name="status" type="string">
+      `completed`, or `pending` while a purchase is still running, or until we close an interrupted one ([how](/partner-api/idempotency#timeouts-and-interrupted-orders)). A purchase that failed and refunded itself isn't listed. New values can be added, so don't fail on one you don't know.
+    </ResponseField>
+    <ResponseField name="created_at" type="string" />
+    <ResponseField name="completed_at" type="string | null">`null` while the order is pending.</ResponseField>
+    <ResponseField name="amount" type="number | null">What a purchase charged (a card buy includes its $1 buyer fee), what a sell-back paid, or what a listing sold for, in USD.</ResponseField>
+    <ResponseField name="fee" type="number | null">The $1 buyer fee on a card buy or the $1 seller fee on a sale. `0` on a pack purchase or a sell-back.</ResponseField>
+    <ResponseField name="balance_change" type="number | null">
+      The order's effect on your balance: −`amount` for a purchase, +`amount` for a sell-back, +(`amount` − `fee`) for a sale. `null` until something shows the order was charged. A pending purchase whose packs or card have already landed shows its charge here before we close it.
+    </ResponseField>
+    <ResponseField name="reconciled" type="boolean">`true` when the order went through but its response was lost, and we closed it from our own records.</ResponseField>
+    <ResponseField name="pack_type" type="string | null">Pack purchases only.</ResponseField>
+    <ResponseField name="quantity" type="integer | null">Pack purchases only.</ResponseField>
+    <ResponseField name="pull_ids" type="string[]">A pack purchase's pulls. For a sell-back of a card you pulled, the pull it sold. Empty otherwise.</ResponseField>
+    <ResponseField name="card_id" type="string | null">The card a card buy, a sell-back or a sale was for. `null` on a pack purchase.</ResponseField>
+    <ResponseField name="listing_id" type="string | null">The listing a card buy or a sale came from. `null` for a shop buy, a pack purchase or a sell-back.</ResponseField>
+    <ResponseField name="transaction_id" type="string | null">
+      For a card buy, the sale: the `purchase_id` that [Get vault](/partner-api/endpoints/get-vault) and [Sell back](/partner-api/endpoints/sell-back) use. For a sell-back or a sale, the same id as `checkout_id`. `null` on a pack purchase.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | An unknown `type`, a `since` or `until` we can't read as a date, `since` not before `until`, a window wider than 31 days, or a `cursor` that wasn't passed back unchanged |
+| `403` | The key lacks `read:account` or isn't linked to an account |
+| `500` | We couldn't read your history. Retry with backoff: you never get a partial page |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/orders?since=2026-10-01T00:00:00Z&until=2026-10-31T00:00:00Z&limit=50" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "since": "2026-10-01T00:00:00.000Z",
+  "until": "2026-10-31T00:00:00.000Z",
+  "type": null,
+  "limit": 50,
+  "has_more": true,
+  "next_cursor": "WyIyMDI2LTEwLTIwVDA0OjU0OjU3LjM3MzAwMVoiLC…",
+  "orders": [
+    {
+      "checkout_id": "a0c3e7d1-…",
+      "order_id": null,
+      "type": "listing_sale",
+      "status": "completed",
+      "created_at": "2026-10-21T16:02:11.482+00:00",
+      "completed_at": "2026-10-21T16:02:11.482+00:00",
+      "amount": 45,
+      "fee": 1,
+      "balance_change": 44,
+      "reconciled": false,
+      "pack_type": null,
+      "quantity": null,
+      "pull_ids": [],
+      "card_id": "0e94dc61-…",
+      "listing_id": "5f1c2a90-…",
+      "transaction_id": "a0c3e7d1-…"
+    },
+    {
+      "checkout_id": "3e1ab17c-…",
+      "order_id": "order-1042",
+      "type": "pack_purchase",
+      "status": "completed",
+      "created_at": "2026-10-20T04:54:57.373+00:00",
+      "completed_at": "2026-10-20T04:54:58.563+00:00",
+      "amount": 25,
+      "fee": 0,
+      "balance_change": -25,
+      "reconciled": false,
+      "pack_type": "bronze",
+      "quantity": 1,
+      "pull_ids": ["e9d27918-…"],
+      "card_id": null,
+      "listing_id": null,
+      "transaction_id": null
+    }
+  ]
+}
+```
+</ResponseExample>

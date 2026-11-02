@@ -3,7 +3,7 @@ title: "The card object"
 description: "One card shape, returned by every endpoint that returns a card."
 ---
 
-The card catalog, a pack's pool, the cards you pull, and your vault all return the same card object. `id`, `category`, `name`, `set`, `grading_company`, `grading_rank`, `slab_label`, `language`, `cert_number`, `market_value` and the four image fields are always present: `null` when unknown, except `market_value`, which is `0`. Other fields appear only on cards whose catalog has them: the sports fields on sports cards, the watch fields on watches and luxury goods, and `description` and `attributes` on luxury goods.
+The card catalog, a pack's pool, the cards you pull or buy, your vault, your listings, your orders and the card lookups all return the same card object. `id`, `category`, `name`, `set`, `grading_company`, `grading_rank`, `slab_label`, `language`, `cert_number`, `market_value` and the four image fields are always present: `null` when unknown, except `market_value`, which is `0`. Other fields appear only on cards whose catalog has them: the sports fields on sports cards, the watch fields on watches and luxury goods, and `description` and `attributes` on luxury goods.
 
 <ResponseExample>
 ```json Card
@@ -102,6 +102,6 @@ A card object never carries how you got the card. The endpoints that return one 
 
 | Field | Where | What it is |
 |---|---|---|
-| `pull_id` | [Buy packs](/partner-api/endpoints/buy-packs), [Get vault](/partner-api/endpoints/get-vault) | The pull that dealt you the card. It is the pull's `transaction_uuid`, the UUID the [Provably Fair](/about-catchback/provably-fair) seed is derived from. Send it to [Sell back](/partner-api/endpoints/sell-back) |
-| `transaction_id` | [Buy a card](/partner-api/endpoints/buy-card) | The sale of a card you bought |
+| `pull_id` | [Buy packs](/partner-api/endpoints/buy-packs), [Get vault](/partner-api/endpoints/get-vault), [Get an order](/partner-api/endpoints/get-order) | The pull that dealt you the card. It is the pull's `transaction_uuid`, the UUID the [Provably Fair](/about-catchback/provably-fair) seed is derived from ([Verify a pull](/partner-api/verify-a-pull)). Send it to [Sell back](/partner-api/endpoints/sell-back) |
+| `transaction_id` | [Buy a card](/partner-api/endpoints/buy-card), and a `card_purchase` in [List orders](/partner-api/endpoints/list-orders) | The sale of a card you bought |
 | `purchase_id` | [Get vault](/partner-api/endpoints/get-vault) | The same sale, as Get vault names it. Send it to Sell back for a bought card |

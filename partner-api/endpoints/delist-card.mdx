@@ -6,6 +6,8 @@ description: "Take a marketplace listing down. The card returns to your vault."
 
 Scope: `write:listings` · MCP tool: `delist_card`
 
+Delisting runs none of the seller checks that listing does, so an account that can no longer list can still take its listings down. To change a listing's price, you don't need to delist it: [change the price in place](/partner-api/endpoints/update-listing-price).
+
 <ParamField body="card_id" type="string" required>The listed card's `card_id`. A UUID.</ParamField>
 
 ## Response

@@ -5,6 +5,24 @@ description: "What changed in the Partner API, newest first."
 
 Changes to `v1` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. A breaking change would ship under a new version prefix. Dates are US Pacific time.
 
+<Update label="October 29, 2026" description="Pull proofs, one-step price changes, partner accounts">
+  - [Buy packs](/partner-api/endpoints/buy-packs): every pull carries a `proof`, its provably fair record, with a `verify_path` you can `GET` without a key to replay the draw. New guide: [Verify a pull](/partner-api/verify-a-pull).
+  - [Change a listing's price](/partner-api/endpoints/update-listing-price) writes the new price in one step, so it lands whole or not at all. A buy or delist that lands first makes it a `409 LISTING_NOT_ACTIVE`, another price change a `409 LISTING_CHANGED`, and neither writes anything.
+  - A partner account stays off CatchBack's public leaderboards and public pull feeds, its pulls aren't posted as big-pull cards in chat, and it earns no CatchPoints or quest progress.
+</Update>
+
+<Update label="October 28, 2026" description="Card lookups, your listings, price changes, order history">
+  - New: [Get a card](/partner-api/endpoints/get-card) (`GET /cards/{id}`, MCP tool `get_card`) and [Find a card by cert](/partner-api/endpoints/find-card-by-cert) (`GET /cards?cert=`, MCP tool `find_card_by_cert`), scope `read:catalog`: any card by its id or by the cert on its slab.
+  - New: [Price history](/partner-api/endpoints/get-price-history) (`GET /cards/{id}/price-history`, MCP tool `get_price_history`): a card's CardLadder value readings, up to a year back.
+  - New: [Card activity](/partner-api/endpoints/get-card-activity) (`GET /cards/{id}/activity`, MCP tool `get_card_activity`): a card's recent sales and listings, with nobody named.
+  - New: [Your listings](/partner-api/endpoints/get-listings) (`GET /listings`, scope `read:account`, MCP tool `get_listings`): your own active listings, with your payout on each.
+  - New: [Change a listing's price](/partner-api/endpoints/update-listing-price) (`PATCH /listings/{listing_id}`, scope `write:listings`, MCP tool `update_listing_price`): reprice a fixed-price listing in place, without delisting it.
+  - New: [List orders](/partner-api/endpoints/list-orders) (`GET /orders`, MCP tool `list_orders`) and [Get an order](/partner-api/endpoints/get-order) (`GET /orders/{checkout_id}`, MCP tool `get_order`), scope `read:account`: your order history, paged by cursor, and one order by its id, even while it is still running.
+  - [Search cards](/partner-api/endpoints/search-cards) applies its filters to every listing it reads, up to 5,000 rows from each source, and gains `truncated`. `has_more` is `false` on the last page and on page 20.
+  - [Get vault](/partner-api/endpoints/get-vault): a listed card carries its `listing_id` and `listing_price`.
+  - [List a card](/partner-api/endpoints/list-card) runs the app's seller checks, so the account needs a verified phone number.
+</Update>
+
 <Update label="October 26, 2026" description="Sealed pack pools">
   - [Get a pack's pool](/partner-api/endpoints/get-pack-pool) covers sealed packs (the Starter and the sealed mystery packs). The response gains `kind` (`slab` or `sealed`); a sealed pack lists its products in `products`, with `total_products`, and one band per product.
   - A sold-out pack with no pool to show returns `200` with `available: false` and an empty pool, instead of an error.
