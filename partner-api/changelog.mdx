@@ -8,7 +8,7 @@ Changes to `v1` are additive: a response can gain fields, an enum can gain value
 <Update label="October 29, 2026" description="Pull proofs, one-step price changes, partner accounts">
   - [Buy packs](/partner-api/endpoints/buy-packs): every pull carries a `proof`, its provably fair record, with a `verify_path` you can `GET` without a key to replay the draw. New guide: [Verify a pull](/partner-api/verify-a-pull).
   - [Change a listing's price](/partner-api/endpoints/update-listing-price) writes the new price in one step, so it lands whole or not at all. A buy or delist that lands first makes it a `409 LISTING_NOT_ACTIVE`, another price change a `409 LISTING_CHANGED`, and neither writes anything.
-  - A partner account stays off CatchBack's public leaderboards and public pull feeds, its pulls aren't posted as big-pull cards in chat, and it earns no CatchPoints or quest progress.
+  - A partner account stays off CatchBack's VIP and Top Gifters leaderboards and recent-pull feeds, its pulls aren't posted as big-pull cards in chat, and it earns no CatchPoints or quest progress.
 </Update>
 
 <Update label="October 28, 2026" description="Card lookups, your listings, price changes, order history">
