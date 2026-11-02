@@ -1,0 +1,96 @@
+---
+title: "Withdraw"
+api: "POST /api/partner/v1/withdrawals"
+description: "Send part of your balance as USDC on Base to your escrow address."
+---
+
+Scope: `withdraw:funds`, granted on request · REST only, no MCP tool · **Moves money**
+
+Sends `amount` USDC on Base to the escrow address we set on your account. It leaves your balance at once and usually arrives within a few minutes, with no fee. See [Funding in USDC](/partner-api/funding) for the limits.
+
+<ParamField header="Idempotency-Key" type="string" required>
+  Your own id for this withdrawal: 8–128 characters of `A-Z`, `a-z`, `0-9`, `_` and `-`. Reuse it on every attempt of this withdrawal, and a new one for the next.
+</ParamField>
+
+<ParamField body="amount" type="number" required>
+  USD, at least `10`, in whole cents. That many USDC arrive.
+</ParamField>
+
+## Retrying
+
+| You send an `Idempotency-Key` that… | You get | Sent? |
+|---|---|---|
+| Is new | The withdrawal runs (`201`) | Once |
+| Was used for a withdrawal | That withdrawal (`200`), in its current state | No, not again |
+| Was used for a different amount | `422 IDEMPOTENCY_KEY_REUSED` | No |
+| Belongs to a withdrawal still being set up | `409 IN_PROGRESS`. Retry shortly | No, not again |
+| Was refused before anything was taken (a `400`, `402` or `403`) | The withdrawal runs again, so fix the cause and resend | Once, if it succeeds |
+
+Keys are per API key. A withdrawal that failed after we took the amount stays `failed` under its key, with the amount back in your balance; send a new key to try again.
+
+## Response
+
+`201` for a new withdrawal, `200` for a retry.
+
+<ResponseField name="withdrawal" type="object">
+  <Expandable title="withdrawal">
+    <ResponseField name="id" type="string">Pass it to [Get a withdrawal](/partner-api/endpoints/get-withdrawal).</ResponseField>
+    <ResponseField name="status" type="string">`processing`, `completed`, `pending_review` (held for our review) or `failed` (the amount is back in your balance).</ResponseField>
+    <ResponseField name="amount" type="number" />
+    <ResponseField name="fee" type="number">`0`.</ResponseField>
+    <ResponseField name="currency" type="string">`USDC`.</ResponseField>
+    <ResponseField name="destination" type="object">`{ network, address }`.</ResponseField>
+    <ResponseField name="tx_hashes" type="string[]">The Base transaction hashes, once it's `completed`.</ResponseField>
+    <ResponseField name="failure_reason" type="string | null">Only on `failed`.</ResponseField>
+    <ResponseField name="created_at" type="string" />
+    <ResponseField name="completed_at" type="string | null" />
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+Every refusal has an `error`. A refusal by the withdrawal checks also has a `code`: a specific one below, or `WITHDRAWAL_REFUSED`.
+
+| Status | Code | When |
+|---|---|---|
+| `400` | | The `Idempotency-Key` is missing or malformed, or `amount` is under 10 or not whole cents |
+| `400` | `CARD_FUNDS_BANK_ONLY` | Part of your balance came in by card in the last 60 days and can only go to a bank. The response has `freeUsd` (what can leave as USDC now) and `releases` |
+| `402` | `WITHDRAWAL_REFUSED` | Not enough balance |
+| `403` | `WITHDRAWAL_ADDRESS_NOT_SET` | We haven't set your withdrawal address yet |
+| `403` | `IDENTITY_REQUIRED` | Card money is in play and the account needs identity verification first. Contact us |
+| `403` | `WITHDRAWAL_REFUSED` | The account can't withdraw right now; `error` says why. Contact us |
+| `403` | | The key lacks `withdraw:funds` or isn't linked to an account |
+| `409` | `IN_PROGRESS` | The first request with this key is still being set up. Retry shortly |
+| `409` | `ANOTHER_WITHDRAWAL_RUNNING` | Another withdrawal on your account is still being processed. Retry shortly |
+| `422` | `IDEMPOTENCY_KEY_REUSED` | This key was used for a different amount |
+| `502` | | We couldn't send it. The amount is back in your balance, and a retry with the same key returns it as `failed` |
+| `503` | | USDC withdrawals are switched off, or we couldn't check your balance just now. Retry later |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v1/withdrawals \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Idempotency-Key: withdraw-2026-11-02-001" \
+  -H "Content-Type: application/json" \
+  -d '{ "amount": 2500 }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201
+{
+  "withdrawal": {
+    "id": "3a6f1c2e-…",
+    "status": "processing",
+    "amount": 2500,
+    "fee": 0,
+    "currency": "USDC",
+    "destination": { "network": "USDC on Base", "address": "0xab12…ab12" },
+    "tx_hashes": [],
+    "failure_reason": null,
+    "created_at": "2026-11-02T18:00:00.000Z",
+    "completed_at": null
+  }
+}
+```
+</ResponseExample>

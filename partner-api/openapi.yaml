@@ -28,6 +28,8 @@ tags:
     description: Estimate, create and track shipments of cards you hold.
   - name: Account
     description: Your key, balance, limits, vault and order history, across every rail.
+  - name: Funding
+    description: Deposit and withdraw your balance in USDC.
   - name: Testing
     description: Test logins for trying CatchBack without real money.
   - name: Webhooks
@@ -2438,6 +2440,205 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/funding:
+    get:
+      tags: [Funding]
+      operationId: getFunding
+      summary: Get funding details
+      description: |-
+        **Scope:** `read:account` (needs a linked account).
+
+        Your permanent USDC deposit addresses, and where withdrawals go. A deposit lands in your balance once it settles, for the full amount sent.
+      security:
+        - bearerAuth: ['read:account']
+      responses:
+        '200':
+          description: Your funding details.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deposit, withdrawal]
+                properties:
+                  deposit:
+                    type: object
+                    properties:
+                      currency: { type: string, enum: [USDC] }
+                      credited_to: { type: string, enum: [balance] }
+                      addresses:
+                        type: array
+                        description: '`ethereum` takes USDC on the EVM chains we accept, Base included; `solana` takes Solana USDC.'
+                        items:
+                          type: object
+                          properties:
+                            chain_type: { type: string }
+                            address: { type: string }
+                  withdrawal:
+                    type: [object, 'null']
+                    description: '`null` until we''ve set your withdrawal address.'
+                    properties:
+                      network: { type: string }
+                      address: { type: string }
+                      min_amount: { type: number }
+                      daily_limit: { type: number }
+                      fee: { type: number }
+              example:
+                deposit:
+                  currency: USDC
+                  credited_to: balance
+                  addresses:
+                    - { chain_type: ethereum, address: 0x5f2c…9a1e }
+                    - { chain_type: solana, address: 7Hq3…Lm2P }
+                withdrawal: { network: USDC on Base, address: 0xab12…ab12, min_amount: 10, daily_limit: 50000, fee: 0 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:account` or isn't linked to an account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: We couldn't load the addresses just now. Retry shortly.
+        '503':
+          description: USDC funding is switched off.
+  /api/partner/v1/withdrawals:
+    post:
+      tags: [Funding]
+      operationId: createWithdrawal
+      summary: Withdraw
+      description: |-
+        **Scope:** `withdraw:funds`, granted on request. **Moves money.**
+
+        Sends `amount` USDC on Base to the escrow address we set on your account, with no fee. A retry with the same `Idempotency-Key` returns the first withdrawal and never sends twice. Past your 24-hour limit a withdrawal is held for review, not refused. One withdrawal runs at a time per account.
+      security:
+        - bearerAuth: ['withdraw:funds']
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { type: number, minimum: 10, description: USD in whole cents. That many USDC arrive. }
+            example: { amount: 2500 }
+      responses:
+        '201':
+          description: A new withdrawal.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  withdrawal: { $ref: '#/components/schemas/Withdrawal' }
+        '200':
+          description: A retry with the same key; the first withdrawal in its current state.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  withdrawal: { $ref: '#/components/schemas/Withdrawal' }
+        '400':
+          description: A missing or malformed `Idempotency-Key`, an `amount` under 10 or not in whole cents, or `CARD_FUNDS_BANK_ONLY` (card money from the last 60 days can only go to a bank).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402':
+          description: Not enough balance (`WITHDRAWAL_REFUSED`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: '`WITHDRAWAL_ADDRESS_NOT_SET`, `IDENTITY_REQUIRED` or `WITHDRAWAL_REFUSED`, or the key lacks `withdraw:funds`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: '`IN_PROGRESS` (this key''s first request is still being set up) or `ANOTHER_WITHDRAWAL_RUNNING`. Retry shortly.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: '`IDEMPOTENCY_KEY_REUSED`: this key was used for a different amount.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: We couldn't send it. The amount is back in your balance.
+        '503':
+          description: USDC withdrawals are switched off, or we couldn't check your balance. Retry later.
+    get:
+      tags: [Funding]
+      operationId: listWithdrawals
+      summary: List withdrawals
+      description: |-
+        **Scope:** `withdraw:funds`, granted on request.
+
+        Your account's latest 50 USDC withdrawals, newest first.
+      security:
+        - bearerAuth: ['withdraw:funds']
+      responses:
+        '200':
+          description: Newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  withdrawals: { type: array, items: { $ref: '#/components/schemas/Withdrawal' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `withdraw:funds` or isn't linked to an account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/partner/v1/withdrawals/{id}:
+    get:
+      tags: [Funding]
+      operationId: getWithdrawal
+      summary: Get a withdrawal
+      description: |-
+        **Scope:** `withdraw:funds`, granted on request.
+
+        One USDC withdrawal and its current status. Poll until it's `completed` or `failed`.
+      security:
+        - bearerAuth: ['withdraw:funds']
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The withdrawal.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  withdrawal: { $ref: '#/components/schemas/Withdrawal' }
+        '400':
+          description: The id isn't a UUID.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `withdraw:funds` or isn't linked to an account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: No withdrawal with that id on your account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/partner/v1/orders:
     get:
       tags: [Account]
@@ -3060,6 +3261,27 @@ components:
       type: string
       description: A card's catalog. `goods` is luxury goods and `singles` is raw singles.
       enum: [pokemon, onepiece, sports, riftbound, watches, goods, singles]
+    Withdrawal:
+      type: object
+      required: [id, status, amount, fee, currency, destination, tx_hashes, failure_reason, created_at, completed_at]
+      properties:
+        id: { type: string }
+        status:
+          type: string
+          enum: [processing, pending_review, completed, failed]
+          description: '`pending_review`: held for our review. `failed`: the amount is back in your balance.'
+        amount: { type: number }
+        fee: { type: number, description: Always `0`. }
+        currency: { type: string, enum: [USDC] }
+        destination:
+          type: object
+          properties:
+            network: { type: string }
+            address: { type: [string, 'null'] }
+        tx_hashes: { type: array, items: { type: string }, description: The Base transaction hashes once `completed`. }
+        failure_reason: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+        completed_at: { type: [string, 'null'], format: date-time }
     HoldingCategory:
       type: string
       description: A catalog you can hold cards in. `goods` is luxury goods, `singles` is raw singles and `energy` is the energy cards from base packs.

@@ -64,6 +64,10 @@ Account actions (`read:account`, `rip:packs`, `buy:cards`, `sell:cards`, `write:
 | [`POST /shipments`](/partner-api/endpoints/create-shipment) | `ship:cards` | `create_shipment` | Yes |
 | [`GET /shipments`](/partner-api/endpoints/list-shipments) | `ship:cards` | `list_shipments` | Yes |
 | [`GET /shipments/{id}`](/partner-api/endpoints/get-shipment) | `ship:cards` | `get_shipment` | Yes |
+| [`GET /funding`](/partner-api/endpoints/get-funding) | `read:account` | none | Yes |
+| [`POST /withdrawals`](/partner-api/endpoints/create-withdrawal) | `withdraw:funds` | none | Yes |
+| [`GET /withdrawals`](/partner-api/endpoints/list-withdrawals) | `withdraw:funds` | none | Yes |
+| [`GET /withdrawals/{id}`](/partner-api/endpoints/get-withdrawal) | `withdraw:funds` | none | Yes |
 | [`GET /pulls`](/partner-api/endpoints/purchase-report) | `read:pulls` | none | No |
 | [`POST /test-accounts`](/partner-api/endpoints/create-test-account) | `create:test_accounts` | `create_test_account` | No |
 | [`GET /test-accounts`](/partner-api/endpoints/list-test-accounts) | `create:test_accounts` | `list_test_accounts` | No |
@@ -73,7 +77,7 @@ Every path is under `https://catchbackcards.com/api/partner/v1`. [Public card me
 ## Keeping your key safe
 
 <Warning>
-  A key with `rip:packs`, `buy:cards`, `sell:cards` or `ship:cards` can move your balance. Treat it like a bank credential.
+  A key with `rip:packs`, `buy:cards`, `sell:cards`, `ship:cards` or `withdraw:funds` can move your balance. Treat it like a bank credential.
 </Warning>
 
 - Keep it **server-side only**. Never put it in browser, mobile or other client code.

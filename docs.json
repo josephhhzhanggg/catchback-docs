@@ -132,6 +132,16 @@
             ]
           },
           {
+            "group": "Funding",
+            "pages": [
+              "partner-api/funding",
+              "partner-api/endpoints/get-funding",
+              "partner-api/endpoints/create-withdrawal",
+              "partner-api/endpoints/list-withdrawals",
+              "partner-api/endpoints/get-withdrawal"
+            ]
+          },
+          {
             "group": "Shipping",
             "pages": [
               "partner-api/shipping",

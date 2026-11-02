@@ -1,0 +1,68 @@
+---
+title: "Get funding details"
+api: "GET /api/partner/v1/funding"
+description: "Your USDC deposit addresses, and where your withdrawals go."
+---
+
+Scope: `read:account` · REST only, no MCP tool
+
+The addresses are yours permanently and never change. A deposit to one lands in your balance once it settles. See [Funding in USDC](/partner-api/funding).
+
+## Response
+
+<ResponseField name="deposit" type="object">
+  <Expandable title="deposit">
+    <ResponseField name="currency" type="string">`USDC`.</ResponseField>
+    <ResponseField name="credited_to" type="string">`balance`: a deposit adds to your CatchCoins balance.</ResponseField>
+    <ResponseField name="addresses" type="object[]">
+      One per kind of chain, each `{ chain_type, address }`. `ethereum` takes USDC on the EVM chains we accept, Base included; `solana` takes Solana USDC.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="withdrawal" type="object | null">
+  Where withdrawals go. `null` until we've set your withdrawal address.
+  <Expandable title="withdrawal">
+    <ResponseField name="network" type="string">`USDC on Base`.</ResponseField>
+    <ResponseField name="address" type="string">Your escrow address.</ResponseField>
+    <ResponseField name="min_amount" type="number">The smallest withdrawal, in USD.</ResponseField>
+    <ResponseField name="daily_limit" type="number">Withdrawals past this over 24 hours are held for review.</ResponseField>
+    <ResponseField name="fee" type="number">`0`.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `403` | The key lacks `read:account` or isn't linked to an account |
+| `502` | We couldn't load the addresses just now. Retry shortly |
+| `503` | USDC funding is switched off |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v1/funding \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "deposit": {
+    "currency": "USDC",
+    "credited_to": "balance",
+    "addresses": [
+      { "chain_type": "ethereum", "address": "0x5f2c…9a1e" },
+      { "chain_type": "solana", "address": "7Hq3…Lm2P" }
+    ]
+  },
+  "withdrawal": {
+    "network": "USDC on Base",
+    "address": "0xab12…ab12",
+    "min_amount": 10,
+    "daily_limit": 50000,
+    "fee": 0
+  }
+}
+```
+</ResponseExample>
