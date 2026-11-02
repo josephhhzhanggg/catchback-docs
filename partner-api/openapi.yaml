@@ -1669,7 +1669,7 @@ paths:
       description: |-
         **Scope:** `ship:cards`, opt-in, granted on request (needs a linked account).
 
-        Live carrier rates for shipping cards you hold to a customer's address, at the full rate you would pay. It stores nothing, and it is a `POST` so the address never lands in a URL. Create a shipment takes the `carrier` and `token` of the rate you choose. The account needs a verified phone number. 60 estimates a minute per key.
+        Live carrier rates for shipping cards you hold to a customer's address, at the full rate you would pay. It stores nothing, and it is a `POST` so the address never lands in a URL. Create a shipment takes the `carrier` and `token` of the rate you choose. The account needs a verified phone number. 60 estimates a minute per key. Read [Shipping cards](/partner-api/shipping) first.
       security:
         - bearerAuth: ['ship:cards']
       requestBody:
@@ -1763,7 +1763,7 @@ paths:
 
         Use a new `Idempotency-Key` for each shipment, and resend the same key and body to retry it: a finished shipment comes back, and is never charged twice. A refused shipment charges nothing and frees its key.
 
-        **`SHIPMENT_OUTCOME_UNKNOWN` means the charge may have gone through.** Don't resend it under a new key until you hear from us.
+        **`SHIPMENT_OUTCOME_UNKNOWN` means the charge may have gone through.** Don't resend it under a new key until you hear from us: [what to do](/partner-api/shipping#unconfirmed-shipments). Read [Shipping cards](/partner-api/shipping) first, including what covers a parcel.
       security:
         - bearerAuth: ['ship:cards']
       parameters:
@@ -1844,7 +1844,7 @@ paths:
           description: |-
             Nothing more was charged.
 
-            - `CARDS_NOT_SHIPPABLE`: a card can't ship. `cards[]` gives each refused `card_id` and its `reason`. A card lost at the last moment comes with no `cards` list: read Get vault again.
+            - `CARDS_NOT_SHIPPABLE`: a card can't ship. `cards[]` gives each refused `card_id` and its `reason`: [what they mean](/partner-api/shipping#which-cards-can-ship). A card lost at the last moment comes with no `cards` list: read Get vault again.
             - `RATE_UNAVAILABLE`: the carrier no longer offers that rate. Estimate again.
             - `PRICE_CHANGED`: the fresh rate is above `max_cost`. The body has `amount` and `max_cost`.
             - `IDEMPOTENCY_IN_PROGRESS`: a shipment with this key is still running, or is with our team (`needs_review: true`). The body has `shipment_id` and `started_at`. Follow it with Get a shipment.
@@ -1926,7 +1926,7 @@ paths:
       description: |-
         **Scope:** `ship:cards`, opt-in, granted on request (needs a linked account).
 
-        Every shipment on your account, newest first, across every key linked to it. No address appears here: Get a shipment has that. Unlike the other list endpoints, this one doesn't clamp: a `page` or `per_page` out of range is a `400`.
+        Every shipment on your account, newest first, across every key linked to it. No address appears here: Get a shipment has that. [What each status means](/partner-api/shipping#status). Unlike the other list endpoints, this one doesn't clamp: a `page` or `per_page` out of range is a `400`.
       security:
         - bearerAuth: ['ship:cards']
       parameters:
@@ -1993,7 +1993,7 @@ paths:
       description: |-
         **Scope:** `ship:cards`, opt-in, granted on request (needs a linked account).
 
-        One shipment on your account, with its cards and the address it ships to. It always has the current status, so it's the place to check after a `shipment.updated` event or a `SHIPMENT_OUTCOME_UNKNOWN`. We remove the address 90 days after a shipment closes, or 180 days after it shipped if the carrier never reported an end.
+        One shipment on your account, with its cards and the address it ships to. It always has the current status, so it's the place to check after a `shipment.updated` event or a `SHIPMENT_OUTCOME_UNKNOWN`. We remove the address 90 days after a shipment closes, or 180 days after it shipped if the carrier never reported an end: [how long we keep it](/partner-api/shipping#customer-addresses).
       security:
         - bearerAuth: ['ship:cards']
       parameters:
@@ -2428,7 +2428,7 @@ paths:
 
         Makes a separate CatchBack login, already confirmed and phone-verified, with a $10,000 test balance that lasts 30 days. Each key can have 5 active at a time. There's no body, and the key doesn't have to be linked to an account. **The password is shown once.**
 
-        **A test account is a login, not a key.** Sign in with it to use it: your API calls keep acting on your key's account and spending its real balance. It can open packs up to the Diamond tier, other than sealed mystery and Steph Curry packs, and sell back. It can't use the marketplace, gifts, drops, battles, shipping, chat or DMs, or withdraw. Pulls come from the live pool, and anything it still holds returns there daily at 10:00 UTC.
+        **A test account is a login, not a key.** Sign in with it to use it: your API calls keep acting on your key's account and spending its real balance. It can open packs up to the Diamond tier, other than sealed mystery and Steph Curry packs, and sell back. It can't use the marketplace, gifts, drops, battles, shipping, chat or DMs, or withdraw. Pulls come from the live pool, and anything it still holds returns there daily at 10:00 UTC. See [Testing](/partner-api/testing).
       security:
         - bearerAuth: ['create:test_accounts']
       responses:
@@ -2541,7 +2541,7 @@ webhooks:
       operationId: orderCompletedEvent
       summary: Order completed
       description: |-
-        **We send this to your URL**, once we've set a webhook up for your key: contact us with its name and your URL, and we give you a signing secret once. A pack order, card order or sell-back made through the API finished. It includes an order we closed from our records after you lost its response. App activity sends nothing, and an order held for review sends no event. Every webhook on the account gets it.
+        **We send this to your URL**, once we've set a webhook up for your key: contact us with its name and your URL, and we give you a signing secret once. Setup, checking the signature and retries: [Webhooks](/partner-api/webhooks). A pack order, card order or sell-back made through the API finished. It includes an order we closed from our records after you lost its response. App activity sends nothing, and an order held for review sends no event. Every webhook on the account gets it.
 
         `order` is the same object List orders returns for it. Get an order has its pulls or card.
       security:
@@ -2596,7 +2596,7 @@ webhooks:
       operationId: listingSoldEvent
       summary: Listing sold
       description: |-
-        **We send this to your URL**, once we've set a webhook up for your key: contact us with its name and your URL, and we give you a signing secret once. Someone bought one of your listings, wherever you listed the card. It doesn't say who bought it. Every webhook on the account gets it.
+        **We send this to your URL**, once we've set a webhook up for your key: contact us with its name and your URL, and we give you a signing secret once. Setup, checking the signature and retries: [Webhooks](/partner-api/webhooks). Someone bought one of your listings, wherever you listed the card. It doesn't say who bought it. Every webhook on the account gets it.
 
         `order` is the same object List orders returns for a sale, with `type: "listing_sale"`.
       security:
@@ -2651,7 +2651,7 @@ webhooks:
       operationId: shipmentUpdatedEvent
       summary: Shipment updated
       description: |-
-        **We send this to your URL**, once we've set a webhook up for your key: contact us with its name and your URL, and we give you a signing secret once. A shipment made with this key changed status. Only the key that created the shipment gets it, and that key needs `ship:cards` as well as `read:account`. No part of a customer's address is ever in an event.
+        **We send this to your URL**, once we've set a webhook up for your key: contact us with its name and your URL, and we give you a signing secret once. Setup, checking the signature and retries: [Webhooks](/partner-api/webhooks). A shipment made with this key changed status. Only the key that created the shipment gets it, and that key needs `ship:cards` as well as `read:account`. No part of a customer's address is ever in an event.
 
         Two quick changes can collapse into one event, so `delivered` can arrive with no `shipped` before it, and delivery is unordered: compare `status_updated_at` to tell which of two events is newer. Get a shipment always has the current status.
       security:
@@ -2704,7 +2704,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: cb_live_<48 hex>
-      description: Your API key, sent as a bearer token. Keep it on your server. See [Authentication](/partner-api/authentication). A request from a location we refuse gets a `403` with `Access denied`, whether or not it has a valid key.
+      description: 'Your API key, sent as a bearer token. Keep it on your server. See [Authentication](/partner-api/authentication). A request from a location we refuse gets a `403` with `Access denied`, whether or not it has a valid key: [where you can call from](/partner-api/errors-and-limits#where-you-can-call-from).'
   parameters:
     OrderIdempotencyKey:
       name: Idempotency-Key
@@ -2805,7 +2805,7 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/RestrictedError' }
     CardsNotShippable:
-      description: '`CARDS_NOT_SHIPPABLE`: a card can''t ship. `cards[]` gives each refused `card_id` and its `reason`.'
+      description: '`CARDS_NOT_SHIPPABLE`: a card can''t ship. `cards[]` gives each refused `card_id` and its `reason`: [what they mean](/partner-api/shipping#which-cards-can-ship).'
       content:
         application/json:
           schema: { $ref: '#/components/schemas/CardsNotShippableError' }
