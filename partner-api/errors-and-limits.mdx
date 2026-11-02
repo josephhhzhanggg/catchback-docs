@@ -22,7 +22,7 @@ Branch on the status and the `code`. The `error` text is for people and can chan
 | `409` | A conflict: an order that is still running (`IDEMPOTENCY_IN_PROGRESS`, `IDEMPOTENCY_RETRY`), a card that changed since you looked (`PRICE_CHANGED`, `CARD_NO_LONGER_AVAILABLE`, `CARD_MOVED_TO_AUCTION`, `OWN_LISTING`), or a listing that changed while you were repricing it (`LISTING_NOT_ACTIVE`, `LISTING_CHANGED`) |
 | `422` | `IDEMPOTENCY_KEY_REUSED`: this order id was already used for a different order |
 | `429` | Over a limit: `RATE_LIMITED`, `DAILY_LIMIT_REACHED` or `DAILY_CARD_LIMIT_REACHED`. See [Rate limits](/partner-api/rate-limits) |
-| `500` | Our fault. Retry with backoff. For a purchase, resend the same order id, never a new one; if a card buy's body has `"needs_review": true`, or the resend answers `409 IDEMPOTENCY_IN_PROGRESS`, stop and follow the order with [Get an order](/partner-api/endpoints/get-order) |
+| `500` | Our fault. Retry with backoff. For a purchase, resend the same order id, never a new one; if a purchase's body has `"needs_review": true`, or the resend answers `409 IDEMPOTENCY_IN_PROGRESS`, stop and follow the order with [Get an order](/partner-api/endpoints/get-order) |
 | `503` | We couldn't count your usage against a limit, record your order, or take the payment, so the order didn't go through (the limit checks fail closed). Retry with backoff, with the same order id |
 
 ### Error codes
@@ -30,9 +30,10 @@ Branch on the status and the `code`. The `error` text is for people and can chan
 | Code | Status | Endpoints | What it means |
 |---|---|---|---|
 | `FEATURE_RESTRICTED` | `403` | [Buy packs](/partner-api/endpoints/buy-packs), [Buy a card](/partner-api/endpoints/buy-card), [List a card](/partner-api/endpoints/list-card), [Change a listing's price](/partner-api/endpoints/update-listing-price) | We've switched this action off for your account. `capability` says which: `open_packs` or `marketplace`. Contact us |
-| `IDEMPOTENCY_IN_PROGRESS` | `409` | Buy packs, Buy a card | An order with this id is still running, or is being settled after a failed attempt. The body has its `checkout_id` and `started_at`. Follow it with [Get an order](/partner-api/endpoints/get-order), or resend the same id later; don't resend it in a tight loop |
+| `IDEMPOTENCY_IN_PROGRESS` | `409` | Buy packs, Buy a card | An order with this id is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body has its `checkout_id` and `started_at`. Follow it with [Get an order](/partner-api/endpoints/get-order), or resend the same id later; don't resend it in a tight loop |
 | `IDEMPOTENCY_RETRY` | `409` | Buy packs, Buy a card | An earlier attempt with this id failed just as this one arrived, and freed the id. Resend the same id |
 | `IDEMPOTENCY_KEY_REUSED` | `422` | Buy packs, Buy a card | This id was already used for a different order. Use a new id |
+| `PAYMENT_OUTCOME_UNKNOWN` | `500` | Buy packs, Buy a card | We couldn't confirm whether the order was charged: it may have been, and nothing was delivered. It's held for review (`needs_review: true`) and we settle any charge; resends of the same id return `409 IDEMPOTENCY_IN_PROGRESS` until then. Stop retrying and never place it again under a new id. The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order) |
 | `PRICE_CHANGED` | `409` | Buy a card | The card's price is now above your `max_price`. The body has the current `price`. Nothing was charged |
 | `CARD_NO_LONGER_AVAILABLE` | `409` | Buy a card | Sold, pulled from a pack, delisted, shipped or otherwise gone. Search again |
 | `CARD_MOVED_TO_AUCTION` | `409` | Buy a card | The card is now in an auction and no longer sold at a fixed price. The body has `listing_id` and `listing_type` |
@@ -49,12 +50,12 @@ Branch on the status and the `code`. The `error` text is for people and can chan
 
 [Sell back cards](/partner-api/endpoints/sell-back) answers `200` even when some items fail. Each failed item in `results` has `status: "failed"`, an `error`, and a `code` when there is one, e.g. `CARD_LISTED_ON_MARKETPLACE` (delist it first), `GOODS_SELLBACK_WINDOW_CLOSED` (a luxury goods item sells back only within 5 minutes of its pull) or `CARD_IN_BATTLE`.
 
-### When a card buy needs review
+### When a purchase needs review
 
-[Buy a card](/partner-api/endpoints/buy-card) can add `"needs_review": true` to its body:
+[Buy a card](/partner-api/endpoints/buy-card) and [Buy packs](/partner-api/endpoints/buy-packs) can add `"needs_review": true` to their bodies:
 
-- **On a `200`:** the sale went through and the card is yours, but our bookkeeping needs a manual check. Don't retry under a new order id.
-- **On an error:** you were charged and the order didn't finish cleanly: either the card is yours but the sale couldn't be fully recorded, or the refund didn't go through (the body also says `refund_pending`). The order stays open, so resends return `409 IDEMPOTENCY_IN_PROGRESS`, and we're alerted to settle it by hand. Quote the `checkout_id` if you contact us.
+- **On a card buy's `200`:** the sale went through and the card is yours, but our bookkeeping needs a manual check. Don't retry under a new order id. A pack purchase never carries it on a `200`.
+- **On an error:** you were charged, or we couldn't confirm it (`PAYMENT_OUTCOME_UNKNOWN`, nothing delivered), and the order didn't finish cleanly. If you were charged, either the card is yours but the sale couldn't be fully recorded, or the refund didn't go through (the body also says `refund_pending`). The order stays open, so resends return `409 IDEMPOTENCY_IN_PROGRESS`, and we're alerted to settle it by hand. Quote the `checkout_id` if you contact us.
 
 ## Idempotency: retrying a purchase safely
 
@@ -65,10 +66,10 @@ Idempotency keys are unique per CatchBack account, across pack and card orders t
 | You retry with… | You get |
 |---|---|
 | The same key, and the order finished | The original response again, with `"idempotent_replay": true`. Nothing is charged twice |
-| The same key, while the order is still running | `409 IDEMPOTENCY_IN_PROGRESS`. Follow the order with [Get an order](/partner-api/endpoints/get-order), or retry later with the same key |
+| The same key, while the order is still running | `409 IDEMPOTENCY_IN_PROGRESS`, with `needs_review: true` when we couldn't confirm its charge and it's held for us to settle. Follow the order with [Get an order](/partner-api/endpoints/get-order), or retry later with the same key |
 | The same key, just as an earlier attempt failed | `409 IDEMPOTENCY_RETRY`. Retry with the same key |
 | The same key, but a different body | `422 IDEMPOTENCY_KEY_REUSED` |
-| The same key, after the order failed | It runs again. A failed order refunds itself and releases the key |
+| The same key, after the order failed | It runs again. A failed order refunds itself and releases the key, unless the response had `needs_review: true` |
 
 <Tip>
   Generate one key per order, and reuse it on every attempt of that order. Make a new one only after a success.
@@ -83,7 +84,7 @@ Pack purchases are limited per key to protect the shared pack inventory:
 - **Speed:** one purchase request per minute by default (each request can open several packs). Too soon is a `429 RATE_LIMITED` with a `Retry-After` header and `retry_after_seconds`.
 - **Daily ceiling:** 100 packs per UTC day by default. Going over is a `429 DAILY_LIMIT_REACHED` with `limit`, `used` and `resets_at` (next midnight UTC).
 
-A retry of an order you already sent never counts against either limit, so you can always find out what happened. A purchase that fails gives its slot back. If we can't count today's packs, the purchase is a `503` and nothing is charged. Both are defaults that we can change for your key on request; talk to us if yours don't fit your volume. [`GET /account`](/partner-api/endpoints/get-account) tells you where you stand before you buy. Every limit, per endpoint: [Rate limits](/partner-api/rate-limits).
+A retry of an order you already sent never counts against either limit, so you can always find out what happened. A purchase that fails gives its slot back, unless we couldn't confirm its charge. If we can't count today's packs, the purchase is a `503` and nothing is charged. Both are defaults that we can change for your key on request; talk to us if yours don't fit your volume. [`GET /account`](/partner-api/endpoints/get-account) tells you where you stand before you buy. Every limit, per endpoint: [Rate limits](/partner-api/rate-limits).
 
 ### Card limits
 

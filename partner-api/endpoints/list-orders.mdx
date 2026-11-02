@@ -46,7 +46,7 @@ The window is capped at **31 days**, and a malformed or inverted window is a `40
     <ResponseField name="order_id" type="string | null">The `Idempotency-Key` you sent with a purchase. `null` for a sell-back or a sale.</ResponseField>
     <ResponseField name="type" type="string">`pack_purchase`, `card_purchase`, `sell_back` or `listing_sale`.</ResponseField>
     <ResponseField name="status" type="string">
-      `completed`, or `pending` while a purchase is still running, or until we close an interrupted one ([how](/partner-api/idempotency#timeouts-and-interrupted-orders)). A purchase that failed and refunded itself isn't listed. New values can be added, so don't fail on one you don't know.
+      `completed`, or `pending` while a purchase is still running, until we close an interrupted one ([how](/partner-api/idempotency#timeouts-and-interrupted-orders)), or while one is held for review ([why](/partner-api/errors-and-limits#when-a-purchase-needs-review)). A purchase that failed and refunded itself isn't listed, and neither is a held one once we've settled it. New values can be added, so don't fail on one you don't know.
     </ResponseField>
     <ResponseField name="created_at" type="string" />
     <ResponseField name="completed_at" type="string | null">`null` while the order is pending.</ResponseField>
