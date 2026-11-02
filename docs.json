@@ -175,6 +175,80 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "API Reference",
+        "openapi": "partner-api/openapi.yaml",
+        "groups": [
+          {
+            "group": "Gacha",
+            "pages": [
+              "GET /api/partner/v1/catalog/packs",
+              "GET /api/partner/v1/catalog/packs/pool",
+              "POST /api/partner/v1/packs/purchase",
+              "POST /api/partner/v1/cards/sell-back",
+              "GET /api/partner/v1/pulls",
+              "GET /api/verify-pull"
+            ]
+          },
+          {
+            "group": "Marketplace",
+            "pages": [
+              "GET /api/partner/v1/marketplace/listings",
+              "POST /api/partner/v1/cards/purchase",
+              "GET /api/partner/v1/listings",
+              "POST /api/partner/v1/listings",
+              "PATCH /api/partner/v1/listings/{listing_id}",
+              "DELETE /api/partner/v1/listings"
+            ]
+          },
+          {
+            "group": "Metadata",
+            "pages": [
+              "GET /api/partner/v1/cards/{id}",
+              "GET /api/partner/v1/cards",
+              "GET /api/partner/v1/cards/{id}/price-history",
+              "GET /api/partner/v1/cards/{id}/activity",
+              "GET /api/partner/v1/catalog/cards",
+              "GET /api/public/v1/cards/{id}"
+            ]
+          },
+          {
+            "group": "Shipping",
+            "pages": [
+              "POST /api/partner/v1/shipments/estimate",
+              "POST /api/partner/v1/shipments",
+              "GET /api/partner/v1/shipments",
+              "GET /api/partner/v1/shipments/{id}",
+              "GET /api/shipping-countries"
+            ]
+          },
+          {
+            "group": "Account",
+            "pages": [
+              "GET /api/partner/v1/me",
+              "GET /api/partner/v1/account",
+              "GET /api/partner/v1/vault",
+              "GET /api/partner/v1/orders",
+              "GET /api/partner/v1/orders/{checkout_id}"
+            ]
+          },
+          {
+            "group": "Testing",
+            "pages": [
+              "POST /api/partner/v1/test-accounts",
+              "GET /api/partner/v1/test-accounts"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "WEBHOOK order.completed",
+              "WEBHOOK listing.sold",
+              "WEBHOOK shipment.updated"
+            ]
+          }
+        ]
       }
     ],
     "global": {
