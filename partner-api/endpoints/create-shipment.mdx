@@ -1,12 +1,12 @@
 ---
 title: "Create a shipment"
 api: "POST /api/partner/v1/shipments"
-description: "Ship cards you hold to a customer's address, charged to your balance at the carrier's full rate."
+description: "Ship cards you hold to a customer's address, charged to your balance at the carrier's full rate, plus any insurance."
 ---
 
 Scope: `ship:cards`, granted on request · MCP tool: `create_shipment`, which takes the header below as `order_id`
 
-Charges your balance the rate's full amount and queues the shipment for us to fulfill. We quote again before charging: if the rate has gone above `max_cost`, nothing is charged and you get `409 PRICE_CHANGED`. Read [Shipping cards](/partner-api/shipping) first, including what covers a parcel.
+Charges your balance the rate's full amount, plus the premium if you choose insurance, and queues the shipment for us to fulfill. We quote again before charging: if the total has gone above `max_cost`, nothing is charged and you get `409 PRICE_CHANGED`. Read [Shipping cards](/partner-api/shipping) first, including what covers a parcel.
 
 <ParamField header="Idempotency-Key" type="string" required>
   Your id for this shipment, 8–128 characters of `A-Za-z0-9_-`, unique per account among your shipments. Pack and card order ids are a separate set. Reuse it, with the same body, to retry the same shipment safely: [Retries](#retries).
@@ -35,7 +35,10 @@ Charges your balance the rate's full amount and queues the shipment for us to fu
   </Expandable>
 </ParamField>
 <ParamField body="max_cost" type="number" required>
-  The most you'll pay for this rate, in dollars: more than 0 and at most 10,000. Normally the `amount` from the estimate.
+  The most you'll pay for this shipment, in dollars, with any insurance: more than 0 and at most 10,000. Normally the `amount` from the estimate, or its `total` if you chose insurance.
+</ParamField>
+<ParamField body="cover_amount" type="number">
+  Optional insurance: the dollars of cover you want, with at most two decimals, from \$100 up to `max_cover` from the estimate. Leave it out and the parcel has only the carrier's automatic cover, up to \$100. You carry any loss above your cover: [how insurance works](/partner-api/shipping#insurance).
 </ParamField>
 
 ## Response
@@ -48,8 +51,9 @@ Charges your balance the rate's full amount and queues the shipment for us to fu
 
 | Status | Code | When |
 |---|---|---|
-| `400` | | A missing or malformed `Idempotency-Key`, a body that isn't JSON, `card_ids` that aren't 1–10 card ids (or list one twice), an invalid address (`"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value), a `rate` that isn't a carrier and token, or a missing or out-of-range `max_cost` |
-| `400` | `INSUFFICIENT_BALANCE` | Your balance is below the rate. The body has the `amount`. Nothing was charged |
+| `400` | | A missing or malformed `Idempotency-Key`, a body that isn't JSON, `card_ids` that aren't 1–10 card ids (or list one twice), an invalid address (`"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value), a `rate` that isn't a carrier and token, a missing or out-of-range `max_cost`, or a `cover_amount` that isn't a dollar amount with at most two decimals |
+| `400` | `INSUFFICIENT_BALANCE` | Your balance is below the rate, plus the premium if you chose insurance. The body has the `amount`. Nothing was charged |
+| `400` | `COVER_NOT_ALLOWED` | `cover_amount` is outside the range: from \$100 up to the cards' value, capped at \$10,000. The body has `order_value`, `min_cover` and `max_cover`. Nothing was charged |
 | `400` | `COUNTRY_NOT_SUPPORTED` | We don't ship to this country |
 | `400` | `OVER_CUSTOMS_CAP` | An international shipment worth over $2,500, or with a card we have no value for |
 | `400` | `PARTNER_GOODS` | A partner's own goods ship from that partner |
@@ -57,10 +61,11 @@ Charges your balance the rate's full amount and queues the shipment for us to fu
 | `403` | `FEATURE_RESTRICTED` | The account is restricted from the marketplace or from withdrawals (`capability` is `marketplace` or `withdraw`). Contact us |
 | `409` | `CARDS_NOT_SHIPPABLE` | A card can't ship. `cards[]` gives each refused `card_id` and its `reason`: [what they mean](/partner-api/shipping#which-cards-can-ship). A card lost at the last moment comes with no `cards` list: read [Get vault](/partner-api/endpoints/get-vault) again |
 | `409` | `RATE_UNAVAILABLE` | The carrier no longer offers that rate. Estimate again |
-| `409` | `PRICE_CHANGED` | The fresh rate is above `max_cost`. The body has `amount` and `max_cost`. Nothing was charged |
+| `409` | `PRICE_CHANGED` | The fresh rate, plus any premium, is above `max_cost`. The body has `amount` and `max_cost`, and with insurance `shipping_cost` and `insurance_premium`. Nothing was charged |
+| `409` | `COVER_UNAVAILABLE` | No premium is quoted for cover on this service. Choose another rate, or leave `cover_amount` out. Nothing was charged |
 | `409` | `IDEMPOTENCY_IN_PROGRESS` | A shipment with this id is still running, or is with our team (`needs_review: true`). The body has `shipment_id` and `started_at`. Follow it with [Get a shipment](/partner-api/endpoints/get-shipment) |
 | `409` | `IDEMPOTENCY_RETRY` | An earlier attempt with this id just failed, and freed the id. Resend the same id |
-| `422` | `IDEMPOTENCY_KEY_REUSED` | This id was already used with a different body: a retry has to send the same cards, address, rate and `max_cost` |
+| `422` | `IDEMPOTENCY_KEY_REUSED` | This id was already used with a different body: a retry has to send the same cards, address, rate, `max_cost` and `cover_amount` |
 | `429` | `DAILY_SHIPMENT_LIMIT_REACHED` | This key has made 50 shipments today (UTC). The body has `limit` and `resets_at` |
 | `500` | | The shipment didn't go through and nothing was charged. Try again with the same id |
 | `500` | `SHIPMENT_OUTCOME_UNKNOWN` | We couldn't confirm whether the charge went through. It's with our team (`needs_review: true`, with its `shipment_id`). A retry with the same id can't charge twice. Don't resend it under a new id until you hear from us: [what to do](/partner-api/shipping#unconfirmed-shipments) |
@@ -80,7 +85,7 @@ A refused shipment charges nothing and frees its id, so you can fix the problem 
 | Belongs to a shipment we checked and removed, because nothing was charged | The shipment runs again | Once, if it succeeds this time |
 | Belongs to an attempt that just failed, or was cut off before it reached the charge | `409 IDEMPOTENCY_RETRY`. Resend it | No |
 | Belongs to an attempt we refused | The shipment runs again | Once, if it succeeds this time |
-| Was used with a different body: other cards, another address, another rate or another `max_cost` | `422 IDEMPOTENCY_KEY_REUSED`. Resend the original body, or use a new id for a new shipment | No |
+| Was used with a different body: other cards, another address, another rate, another `max_cost` or another `cover_amount` | `422 IDEMPOTENCY_KEY_REUSED`. Resend the original body, or use a new id for a new shipment | No |
 
 A retry has to send the same body, so if a fresh estimate changes your `rate` or `max_cost`, a shipment still held under that id answers `422`. If it's with our team, wait: a new id isn't safe until you hear from us.
 
@@ -118,6 +123,8 @@ curl -X POST https://catchbackcards.com/api/partner/v1/shipments \
   "service": "Priority Mail",
   "service_token": "usps_priority",
   "cost": 12.85,
+  "cover_amount": null,
+  "insurance_cost": 0,
   "destination_country": "US",
   "tracking_number": null,
   "tracking_url": null,
@@ -131,6 +138,14 @@ curl -X POST https://catchbackcards.com/api/partner/v1/shipments \
 
 ```json 409 PRICE_CHANGED
 { "error": "The rate is now above your max_cost.", "code": "PRICE_CHANGED", "amount": 14.1, "max_cost": 12.85 }
+```
+
+```json 409 PRICE_CHANGED with insurance
+{ "error": "The rate and its cover are now above your max_cost.", "code": "PRICE_CHANGED", "amount": 19.32, "max_cost": 18.01, "shipping_cost": 14.1, "insurance_premium": 5.22 }
+```
+
+```json 409 COVER_UNAVAILABLE
+{ "error": "Cover isn't available on this service right now. Choose another rate, or leave cover_amount out.", "code": "COVER_UNAVAILABLE" }
 ```
 
 ```json 429

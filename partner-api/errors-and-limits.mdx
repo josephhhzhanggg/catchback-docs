@@ -19,7 +19,7 @@ Branch on the status and the `code`. The `error` text is for people and can chan
 | `401` | Missing, malformed, disabled or unknown API key |
 | `403` | Your key lacks the endpoint's scope, the action needs a linked account, the account is unavailable or needs a verified phone number, `FEATURE_RESTRICTED` (below), or `"Access denied"`, for a request from a country on our sanctions list ([below](#where-you-can-call-from)) |
 | `404` | The thing you asked for doesn't exist for your key: a pack you can't buy, a card that doesn't exist, or a listing, order or shipment that isn't on your account |
-| `409` | A conflict: an order that is still running (`IDEMPOTENCY_IN_PROGRESS`, `IDEMPOTENCY_RETRY`), a card that changed since you looked (`PRICE_CHANGED`, `CARD_NO_LONGER_AVAILABLE`, `CARD_MOVED_TO_AUCTION`, `OWN_LISTING`), a listing that changed while you were repricing it (`LISTING_NOT_ACTIVE`, `LISTING_CHANGED`), or a shipment that can't go ahead (`CARDS_NOT_SHIPPABLE`, `RATE_UNAVAILABLE`, `PRICE_CHANGED`) |
+| `409` | A conflict: an order that is still running (`IDEMPOTENCY_IN_PROGRESS`, `IDEMPOTENCY_RETRY`), a card that changed since you looked (`PRICE_CHANGED`, `CARD_NO_LONGER_AVAILABLE`, `CARD_MOVED_TO_AUCTION`, `OWN_LISTING`), a listing that changed while you were repricing it (`LISTING_NOT_ACTIVE`, `LISTING_CHANGED`), or a shipment that can't go ahead (`CARDS_NOT_SHIPPABLE`, `RATE_UNAVAILABLE`, `PRICE_CHANGED`, `COVER_UNAVAILABLE`) |
 | `422` | `IDEMPOTENCY_KEY_REUSED`: this order id was already used for a different order |
 | `429` | Over a limit: `RATE_LIMITED`, `DAILY_LIMIT_REACHED`, `DAILY_CARD_LIMIT_REACHED` or `DAILY_SHIPMENT_LIMIT_REACHED`. See [Rate limits](/partner-api/rate-limits) |
 | `500` | Our fault. Retry with backoff. For a purchase, resend the same order id, never a new one; if a purchase's body has `"needs_review": true`, or the resend answers `409 IDEMPOTENCY_IN_PROGRESS`, stop and follow the order with [Get an order](/partner-api/endpoints/get-order). For a shipment, resend the same id; `SHIPMENT_OUTCOME_UNKNOWN` means it's with our team |
@@ -36,7 +36,7 @@ Branch on the status and the `code`. The `error` text is for people and can chan
 | `IDEMPOTENCY_KEY_REUSED` | `422` | Buy packs, Buy a card, Create a shipment | This id was already used for a different order. Use a new id |
 | `PAYMENT_OUTCOME_UNKNOWN` | `500` | Buy packs, Buy a card | We couldn't confirm whether the order was charged: it may have been, and nothing was delivered. It's held for review (`needs_review: true`) and we settle any charge; resends of the same id return `409 IDEMPOTENCY_IN_PROGRESS` until then. Stop retrying and never place it again under a new id. The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order) |
 | `PRICE_CHANGED` | `409` | Buy a card | The card's price is now above your `max_price`. The body has the current `price`. Nothing was charged |
-| `PRICE_CHANGED` | `409` | Create a shipment | The fresh rate is above your `max_cost`. The body has `amount` and `max_cost`. Nothing was charged |
+| `PRICE_CHANGED` | `409` | Create a shipment | The fresh rate, plus any insurance premium, is above your `max_cost`. The body has `amount` and `max_cost`. Nothing was charged |
 | `CARD_NO_LONGER_AVAILABLE` | `409` | Buy a card | Sold, pulled from a pack, delisted, shipped or otherwise gone. Search again |
 | `CARD_MOVED_TO_AUCTION` | `409` | Buy a card | The card is now in an auction and no longer sold at a fixed price. The body has `listing_id` and `listing_type` |
 | `OWN_LISTING` | `409` | Buy a card | The card is your own listing |
@@ -51,7 +51,9 @@ Branch on the status and the `code`. The `error` text is for people and can chan
 | `LISTING_CHANGED` | `409` | Change a listing's price | Another change to the listing landed first. Nothing was written: read it again and retry |
 | `CARDS_NOT_SHIPPABLE` | `409` | Estimate a shipment, Create a shipment | A card can't ship. `cards[].reason` says why: [what the reasons mean](/partner-api/shipping#which-cards-can-ship). A card lost at the last moment comes with no `cards` list |
 | `RATE_UNAVAILABLE` | `409` | Create a shipment | The carrier no longer offers that rate. Estimate again |
-| `INSUFFICIENT_BALANCE` | `400` | Create a shipment | Your balance is below the rate. The body has the `amount`. Nothing was charged |
+| `INSUFFICIENT_BALANCE` | `400` | Create a shipment | Your balance is below the rate, plus the premium if you chose insurance. The body has the `amount`. Nothing was charged |
+| `COVER_NOT_ALLOWED` | `400` | Estimate a shipment, Create a shipment | `cover_amount` is outside the range. The body has `order_value`, `min_cover` and `max_cover`. Nothing was charged |
+| `COVER_UNAVAILABLE` | `409` | Create a shipment | No premium is quoted for cover on this service. Choose another rate, or leave `cover_amount` out. Nothing was charged |
 | `COUNTRY_NOT_SUPPORTED` | `400` | Estimate a shipment, Create a shipment | We don't ship to this country |
 | `OVER_CUSTOMS_CAP` | `400` | Estimate a shipment, Create a shipment | An international shipment worth over $2,500, or with a card we have no value for |
 | `PARTNER_GOODS` | `400` | Estimate a shipment, Create a shipment | A partner's own goods ship from that partner, not through this API |
@@ -107,7 +109,7 @@ Going over either is a `429 DAILY_CARD_LIMIT_REACHED` with `cards_used`, `max_ca
 
 ### Shipment limits
 
-Each key can make 50 shipments per UTC day (`429 DAILY_SHIPMENT_LIMIT_REACHED`, with `limit` and `resets_at`) and 60 estimates a minute (`429 RATE_LIMITED`). Both are the same for every key. A refused shipment charges nothing and doesn't count.
+Each key can make 50 shipments per UTC day (`429 DAILY_SHIPMENT_LIMIT_REACHED`, with `limit` and `resets_at`) and 60 estimates a minute (`429 RATE_LIMITED`), where one with `cover_amount` counts as two. Both are the same for every key. A refused shipment charges nothing and doesn't count.
 
 ### Everything else
 

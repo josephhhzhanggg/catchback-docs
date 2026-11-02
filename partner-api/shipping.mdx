@@ -3,7 +3,7 @@ title: "Shipping cards"
 description: "Ship cards you hold to your customers, paid from your balance: what you pay, which cards can ship, how we handle your customers' addresses, and how to track a shipment."
 ---
 
-You can ship cards in your vault to your customers, paid from your CatchCoins balance at the carrier's full rate. It takes the `ship:cards` scope, which we grant on request: [contact us](mailto:catchbackcards@gmail.com).
+You can ship cards in your vault to your customers, paid from your CatchCoins balance at the carrier's full rate, plus a premium if you choose insurance. It takes the `ship:cards` scope, which we grant on request: [contact us](mailto:catchbackcards@gmail.com).
 
 <Steps>
   <Step title="Get rates">
@@ -19,10 +19,31 @@ You can ship cards in your vault to your customers, paid from your CatchCoins ba
 
 ## What you pay
 
-The carrier's full rate for the service you pick, and nothing else. There are no promo codes on a shipment, and no free or subsidized tier.
+The carrier's full rate for the service you pick, plus the premium if you choose [insurance](#insurance). There are no promo codes on a shipment, and no free or subsidized tier.
 
 <Warning>
-  **The only cover on a parcel is the carrier's automatic cover, up to $100.** There's no insurance or signature option on a shipment. Keep that in mind before you ship a card worth more.
+  **Without insurance, the only cover on a parcel is the carrier's automatic cover, up to $100.** Keep that in mind before you ship a card worth more. There's no signature option on a shipment.
+</Warning>
+
+## Insurance
+
+Insurance is optional, and you choose it per shipment. To price it, send `cover_amount` to [Estimate a shipment](/partner-api/endpoints/estimate-shipment). Each rate then adds `cover_available`, `insurance_premium` and `total`, the rate plus the premium. To buy it, send the same `cover_amount` to [Create a shipment](/partner-api/endpoints/create-shipment), with `max_cost` set to the `total` you saw:
+
+```json
+{ "card_ids": ["0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e"], "address": { "...": "..." }, "rate": { "carrier": "USPS", "token": "usps_priority" }, "cover_amount": 400, "max_cost": 18.01 }
+```
+
+- **How much:** any amount from \$100 up to `max_cover`, which every estimate returns: the value of the cards, capped at \$10,000. Outside that you get `400 COVER_NOT_ALLOWED`. An order worth \$100 or less can't be insured, and its `max_cover` is `null`.
+- **Orders worth more than \$10,000:** cover stops at \$10,000, and the rest of the order is uninsured.
+- **What it costs:** the premium our insurer quotes for that service. `max_cost` applies to the rate and the premium together. A new quote above it is `409 PRICE_CHANGED`, and a service with no premium quoted is `409 COVER_UNAVAILABLE`. Nothing is charged in either case.
+- **What it pays:** up to the amount you covered, and never more. **You carry any loss above your cover**, whether you chose less than the cards are worth or the order is over the cap.
+
+### If a parcel is lost or damaged
+
+[Contact us](mailto:catchbackcards@gmail.com) with the shipment id. You can't claim from the insurer yourself, because the policy is tied to our sender details. We file the claim, and we credit your balance when it pays out.
+
+<Warning>
+  The insurer's deadlines are **60 days from shipping, or 15 days after a "delivered" scan for a parcel that never arrived**. Report well before them, so we have time to file. We can't file a claim after a deadline has passed.
 </Warning>
 
 ## Which cards can ship
@@ -73,7 +94,7 @@ New values can be added, so handle one you don't know.
 | Limit | Set per key | When you go over |
 |---|---|---|
 | 50 shipments per key per UTC day | No | `429 DAILY_SHIPMENT_LIMIT_REACHED`, with `limit` and `resets_at` |
-| 60 estimates per key per minute | No | `429 RATE_LIMITED`, with `retry_after_seconds` and a `Retry-After` header |
+| 60 estimates per key per minute, where one with `cover_amount` counts as two | No | `429 RATE_LIMITED`, with `retry_after_seconds` and a `Retry-After` header |
 | 1–10 cards per request | No | `400` |
 | `max_cost` up to $10,000 | No | `400` |
 

@@ -27,7 +27,9 @@ Unlike the other list endpoints, this one doesn't clamp: a `page` or `per_page` 
     <ResponseField name="carrier" type="string | null">`null` until we've confirmed a rate.</ResponseField>
     <ResponseField name="service" type="string | null" />
     <ResponseField name="service_token" type="string | null" />
-    <ResponseField name="cost" type="number | null">What the shipment charges in USD. `null` until we've confirmed a rate.</ResponseField>
+    <ResponseField name="cost" type="number | null">What the shipment charges in USD, including any insurance premium. `null` until we've confirmed a rate.</ResponseField>
+    <ResponseField name="cover_amount" type="number | null">The insurance on this shipment, in USD. `null` without insurance, and before the order exists.</ResponseField>
+    <ResponseField name="insurance_cost" type="number | null">The premium in USD, which is part of `cost`. `0` without insurance, and `null` before the order exists.</ResponseField>
     <ResponseField name="destination_country" type="string" />
     <ResponseField name="tracking_number" type="string | null">`null` until there's a label.</ResponseField>
     <ResponseField name="tracking_url" type="string | null">The carrier's tracking page. `null` until there's a label, or if we don't recognize the carrier.</ResponseField>
@@ -71,6 +73,8 @@ curl "https://catchbackcards.com/api/partner/v1/shipments?page=1&per_page=50" \
       "service": "Priority Mail",
       "service_token": "usps_priority",
       "cost": 12.85,
+      "cover_amount": null,
+      "insurance_cost": 0,
       "destination_country": "US",
       "tracking_number": "9400100000000000000000",
       "tracking_url": "https://tools.usps.com/go/TrackConfirmAction?tRef=fullpage&tLc=2&text28777=&tLabels=9400100000000000000000",

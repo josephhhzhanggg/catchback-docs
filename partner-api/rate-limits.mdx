@@ -18,7 +18,7 @@ Four limits are settings on your key: the time between pack purchases, packs per
 | [Buy a card](/partner-api/endpoints/buy-card) | $50,000 of spend per UTC day, the $1 fees included | Yes (default) | `429 DAILY_CARD_LIMIT_REACHED` |
 | [Sell back cards](/partner-api/endpoints/sell-back) | Up to 10 items per request | No | `400` |
 | [Create a shipment](/partner-api/endpoints/create-shipment) | 50 shipments per UTC day | No | `429 DAILY_SHIPMENT_LIMIT_REACHED` |
-| [Estimate a shipment](/partner-api/endpoints/estimate-shipment) | 60 estimates per minute | No | `429 RATE_LIMITED`, with a `Retry-After` header |
+| [Estimate a shipment](/partner-api/endpoints/estimate-shipment) | 60 estimates per minute, where one with `cover_amount` counts as two | No | `429 RATE_LIMITED`, with a `Retry-After` header |
 | [Estimate a shipment](/partner-api/endpoints/estimate-shipment), [Create a shipment](/partner-api/endpoints/create-shipment) | Up to 10 cards per request | No | `400` |
 | [Create a test account](/partner-api/endpoints/create-test-account) | 5 active test accounts, 30 days each | No | `409` |
 | [Public card metadata](/partner-api/endpoints/get-public-card) | 60 requests per minute per IP address; a CDN hit doesn't count | No | `429 RATE_LIMITED`, with a `Retry-After` header |
@@ -82,7 +82,7 @@ Both count the shop and user listings together. A finished order counts what it 
 ## Shipments
 
 - **Per day:** 50 shipments per key per UTC day. A shipment we refused doesn't count, and a refused shipment charges nothing and frees its id.
-- **Estimates:** 60 per key per minute, because each one is a live call to the carrier. The count is kept per server, so the exact point you're refused can vary.
+- **Estimates:** 60 per key per minute, because each one is a live call to the carrier. One with `cover_amount` is two calls, so it counts as two. The count is kept per server, so the exact point you're refused can vary.
 - **Per request:** 1–10 cards to one address, and a `max_cost` of at most $10,000.
 
 These are the same for every key. More on [Shipping cards](/partner-api/shipping#limits).
