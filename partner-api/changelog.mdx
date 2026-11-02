@@ -5,7 +5,7 @@ description: "What changed in the Partner API, newest first."
 
 Changes to `v1` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. A breaking change would ship under a new version prefix. Dates are US Pacific time.
 
-<Update label="November 2, 2026" description="Orders held for review">
+<Update label="November 1, 2026" description="Orders held for review">
   - [Buy packs](/partner-api/endpoints/buy-packs) and [Buy a card](/partner-api/endpoints/buy-card): when we can't confirm whether a purchase was charged, the answer is now `500 PAYMENT_OUTCOME_UNKNOWN` with `needs_review: true` and the order's `checkout_id`, not a `503`. Nothing is delivered and the order is held for us to settle: stop retrying, never place it again under a new order id, and follow it with [Get an order](/partner-api/endpoints/get-order).
   - A resend with the same order id answers `409 IDEMPOTENCY_IN_PROGRESS` with `needs_review: true` until we settle the order, and nothing is charged twice. Once we settle it, the id is free to send again. See [Purchases that need review](/partner-api/idempotency#purchases-that-need-review).
   - A `503` on a purchase now only means the order certainly didn't go through, so retrying it with the same order id is safe.
