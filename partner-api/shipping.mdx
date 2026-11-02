@@ -81,10 +81,12 @@ All of them: [Rate limits](/partner-api/rate-limits#shipments). The address fiel
 
 ## Unconfirmed shipments
 
-Rarely, we can't tell whether a shipment's charge went through. You get a `500 SHIPMENT_OUTCOME_UNKNOWN` with `needs_review: true` and the `shipment_id`, and it's with our team to check.
+Rarely, we can't tell whether a shipment's charge went through. You get a `500 SHIPMENT_OUTCOME_UNKNOWN` with `needs_review: true` and the `shipment_id`, and it's with our team to check. Follow it with [Get a shipment](/partner-api/endpoints/get-shipment), which takes the `shipment_id`. No [event](/partner-api/webhook-events) tells you the outcome.
 
-- **Retrying with the same id is safe.** It never charges again. You get the shipment if it went through, or `409 IDEMPOTENCY_IN_PROGRESS` with `needs_review: true` until we've checked.
-- **Don't resend it under a new id** until you hear from us.
-- [Get a shipment](/partner-api/endpoints/get-shipment) takes the `shipment_id`. It shows `needs_review` until there's an answer.
+| What you see | What it means | What to do |
+|---|---|---|
+| `status: "needs_review"`, or `409 IDEMPOTENCY_IN_PROGRESS` with `needs_review: true` on a resend | We're still checking | Wait. A resend with the same id can't charge twice. Don't resend it under a new id until you hear from us |
+| Any other status, or the shipment with `idempotent_replay: true` on a resend | It went through, and was charged once | Track it as usual |
+| `404` from Get a shipment | We found nothing was charged, and removed it | The id is free to send again. Check your balance before you do |
 
 Quote the `shipment_id` if you contact us.

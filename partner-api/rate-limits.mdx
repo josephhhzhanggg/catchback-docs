@@ -26,13 +26,13 @@ Four limits are settings on your key: the time between pack purchases, packs per
 | Every read endpoint | No per-key rate limit; page sizes are capped (see [Pagination](/partner-api/pagination)) | | |
 | Everything under `/api/` | 300 requests per minute per IP address, shared | No | See [Shared limit per IP](#shared-limit-per-ip) |
 
-Card buys have no per-minute limit, and sell-backs have no per-key rate limit. Reads don't either, but keys are monitored: a full catalog sync a few times an hour is fine; polling every few seconds is not. To hear about your own orders without polling, use a [webhook](/partner-api/webhooks).
+Card buys have no per-minute limit, and sell-backs have no rate limit per key. Reads don't either, but keys are monitored: a full catalog sync a few times an hour is fine; polling every few seconds is not. To hear about your own orders without polling, use a [webhook](/partner-api/webhooks).
 
 Card lookups ([Get a card](/partner-api/endpoints/get-card), [Find a card by cert](/partner-api/endpoints/find-card-by-cert) and [Card activity](/partner-api/endpoints/get-card-activity)) are cached for up to a minute, and [Price history](/partner-api/endpoints/get-price-history) for up to five minutes, so asking more often than that returns the same answer.
 
 ## Shared limit per IP
 
-Everything under `/api/` has a shared limit of **300 requests a minute per IP address**, on top of the per-key limits on this page. That covers every partner endpoint, the [MCP server](/partner-api/mcp) and [Public card metadata](/partner-api/endpoints/get-public-card). It counts by IP address, not by key, so several keys behind one address share it. Keep your traffic well under it, and back off if requests start being refused.
+Everything under `/api/` has a shared limit of **300 requests a minute per IP address**, on top of the per-key limits on this page. That covers every partner endpoint, the [MCP server](/partner-api/mcp) and [Public card metadata](/partner-api/endpoints/get-public-card). It counts by IP address, not by key, so several keys behind one address share it. Keep your traffic well under it. A refusal here may not look like the responses on this page, so treat any refusal as a reason to back off.
 
 ## Pack purchases
 

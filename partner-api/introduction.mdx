@@ -35,7 +35,7 @@ The Partner API lets companies, bots and AI agents work with CatchBack programma
 ## Basics
 
 - **Base URL:** `https://catchbackcards.com`. Every endpoint that takes a key lives under `/api/partner/v1/`. [Public card metadata](/partner-api/endpoints/get-public-card) needs no key and lives under `/api/public/v1/`.
-- **Auth:** every request sends your key as a bearer token. See [Authentication](/partner-api/authentication).
+- **Auth:** every request to those `/api/partner/v1/` endpoints sends your key as a bearer token. See [Authentication](/partner-api/authentication).
 - **Format:** JSON in and out, UTF-8. Money is in **US dollars** as numbers (not cents). Your CatchCoins balance is also in dollars.
 - **Where you call from:** a key doesn't get around our sanctions list. See [Where you can call from](/partner-api/errors-and-limits#where-you-can-call-from).
 - **Versioning:** breaking changes ship under a new version prefix. A `v1` response may gain new fields at any time, so build your parser to ignore fields it doesn't know. What changed and when: [Changelog](/partner-api/changelog).

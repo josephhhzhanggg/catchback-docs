@@ -3,7 +3,7 @@ title: "Authentication"
 description: "API keys, scopes, which endpoint each scope unlocks, and keeping your key safe."
 ---
 
-Every request sends your API key as a bearer token:
+Every request sends your API key as a bearer token, except [Public card metadata](/partner-api/endpoints/get-public-card), which takes no key:
 
 ```http
 Authorization: Bearer cb_live_...

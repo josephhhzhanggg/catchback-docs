@@ -28,7 +28,7 @@ An event never identifies a buyer, and no part of a customer's address is ever i
 
 `order` is the same object [List orders](/partner-api/endpoints/list-orders) returns for it: `type` is `pack_purchase`, `card_purchase` or `sell_back`, and `reconciled` is `true` if we closed it. For its pulls or card, call [Get an order](/partner-api/endpoints/get-order) with its `checkout_id`.
 
-From the time your webhook is set up, every finished order in List orders gives one event. A sell-back of several cards is one order, and one event, per card. If two keys on your account both have webhooks, both get it.
+From the time your webhook is set up, every finished order in List orders gives one event. A sell-back of several cards is one order, and one event, per card. If two keys on your account both have webhooks, both get it. An order [held for review](/partner-api/idempotency#purchases-that-need-review) sends no event.
 
 ```json
 {
@@ -96,6 +96,7 @@ From the time your webhook is set up, every finished order in List orders gives 
 
 A shipment event tells you a shipment moved, not every step it took. **[Get a shipment](/partner-api/endpoints/get-shipment) always has the current status.**
 
+- **It follows the order's status after the order exists.** Creating a shipment sends no event, because the response has already told you, and neither does a shipment coming out of `needs_review`.
 - **Only the key that created the shipment gets it,** even if another key on your account has a webhook. That key needs `ship:cards` as well as `read:account`. A key that loses `ship:cards` stops getting new ones, though what's already queued still goes out. A shipment made with a key you've since replaced sends nothing further, and is still on [List shipments](/partner-api/endpoints/list-shipments).
 - **Two quick changes can collapse into one event.** We read each shipment's latest status [when we look for new events](/partner-api/webhooks#what-you-receive), so two changes between looks reach you as one event with the later status: `delivered` can arrive with no `shipped` before it. The last change is never skipped.
 - **Each change has its own `id`,** including a shipment going back to an earlier status.

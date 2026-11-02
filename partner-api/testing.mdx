@@ -29,7 +29,7 @@ To drive a test account through the API, [ask us](mailto:catchbackcards@gmail.co
 
 | It can't | |
 |---|---|
-| Use the marketplace | No buying or listing cards. To test trading, see [below](#testing-trading) |
+| Use the marketplace | No buying or listing cards, partner shops or the sealed orderbook. To test trading, see [below](#testing-trading) |
 | Use gifts | |
 | Enter drops or battles | |
 | Request shipping | To test shipping, see [below](#testing-shipments) |
@@ -37,10 +37,12 @@ To drive a test account through the API, [ask us](mailto:catchbackcards@gmail.co
 | Withdraw | The test balance isn't money and can't leave CatchBack |
 | Open Starter, sealed or Steph Curry packs | Nor any pack above the Diamond tier |
 | Win a chase card | A pull from its pack can never be the chase |
+| Change account settings | |
 
 ### What to expect
 
 - **Pulls are real cards from the live pool.** While a test account holds a card, nobody else can pull it. What it still holds goes back to the pool at 10:00 UTC every day, so sell back or finish your test before then.
+- **Don't judge odds or returns from one.** It can't win a chase card, and features, events and pack boosts we release to test accounts can reach it, so its results can differ from a real account's.
 - **Limits:** 5 active test accounts per key, 30 days each. A sixth is a `409`. To end one early so you can make another, [contact us](mailto:catchbackcards@gmail.com).
 - **The password is shown once.** We can't show it again or reset it, so keep it when you create the account. [List test accounts](/partner-api/endpoints/list-test-accounts) shows the rest.
 - **How it ends:** when it reaches its `expires_at`, or when your key is turned off. It shows as `active: false` from that date, and its slot frees within about 2 hours, when our job ends it. Then it can't sign in, and a session already open lasts only until its access token expires.

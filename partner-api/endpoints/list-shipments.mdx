@@ -32,7 +32,7 @@ Unlike the other list endpoints, this one doesn't clamp: a `page` or `per_page` 
     <ResponseField name="tracking_number" type="string | null">`null` until there's a label.</ResponseField>
     <ResponseField name="tracking_url" type="string | null">The carrier's tracking page. `null` until there's a label, or if we don't recognize the carrier.</ResponseField>
     <ResponseField name="created_at" type="string" />
-    <ResponseField name="status_updated_at" type="string | null">When the status last changed. `null` until it first does. Between two [`shipment.updated`](/partner-api/webhook-events#shipment-updated) events, the later one is the newer.</ResponseField>
+    <ResponseField name="status_updated_at" type="string | null">When the order's status last changed. `null` until it first changes after the order is created. Between two [`shipment.updated`](/partner-api/webhook-events#shipment-updated) events, the later one is the newer.</ResponseField>
     <ResponseField name="shipped_at" type="string | null" />
     <ResponseField name="expected_delivery" type="string | null" />
     <ResponseField name="delivered_at" type="string | null" />

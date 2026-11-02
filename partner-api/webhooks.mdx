@@ -130,7 +130,7 @@ That's about 45 hours in all. After the eighth attempt the event stops and shows
 
 If your endpoint is down, answers `429` or a `5xx`, or doesn't answer, we stop sending that run's other events, so one outage doesn't use up the attempts on everything queued behind it.
 
-[List orders](/partner-api/endpoints/list-orders) always has the full record and [List shipments](/partner-api/endpoints/list-shipments) the current statuses, so reconcile against them after an outage.
+[List orders](/partner-api/endpoints/list-orders) always has every finished order and [List shipments](/partner-api/endpoints/list-shipments) the current statuses, so reconcile against them after an outage.
 
 ## Duplicates and order
 

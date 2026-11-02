@@ -17,7 +17,7 @@ One shipment on your account, with the same fields as in [List shipments](/partn
 Every field of a shipment in [List shipments](/partner-api/endpoints/list-shipments), plus:
 
 <ResponseField name="items" type="object[]">
-  The cards in the shipment. Empty until the order exists.
+  The cards in the shipment. Empty until the order exists, and if we've removed the order.
   <Expandable title="item">
     <ResponseField name="card_id" type="string" />
     <ResponseField name="name" type="string | null" />
@@ -27,7 +27,7 @@ Every field of a shipment in [List shipments](/partner-api/endpoints/list-shipme
   </Expandable>
 </ResponseField>
 <ResponseField name="address" type="object | null">
-  Where it ships to. `null` until the order exists, and after we've removed it, when `address_removed` is also `true`: [how long we keep it](/partner-api/shipping#customer-addresses).
+  Where it ships to. `null` until the order exists, and if we've removed the order. Also `null` after we've removed the address, when `address_removed` is `true`: [how long we keep it](/partner-api/shipping#customer-addresses).
   <Expandable title="address">
     <ResponseField name="name" type="string | null" />
     <ResponseField name="address1" type="string" />
@@ -46,7 +46,7 @@ Every field of a shipment in [List shipments](/partner-api/endpoints/list-shipme
 |---|---|---|
 | `403` | | The key lacks `ship:cards` or isn't linked to an account, the account is deleted (`"Partner account unavailable"`), or it can't request shipping |
 | `403` | `FEATURE_RESTRICTED` | The account is restricted from the marketplace or from withdrawals, so its key can't read addresses. Contact us |
-| `404` | | No shipment with this id on your account. An unknown id, a malformed one and another account's shipment all look the same |
+| `404` | | No shipment with this id on your account. An unknown id, a malformed one, another account's shipment and an [unconfirmed shipment](/partner-api/shipping#unconfirmed-shipments) we've since removed all look the same |
 | `500` | | We couldn't load the shipment. Retry with backoff |
 | `503` | | We couldn't check the account. Try again |
 

@@ -9,7 +9,7 @@ Scope: `ship:cards`, granted on request · MCP tool: `create_shipment`, which ta
 Charges your balance the rate's full amount and queues the shipment for us to fulfill. We quote again before charging: if the rate has gone above `max_cost`, nothing is charged and you get `409 PRICE_CHANGED`. Read [Shipping cards](/partner-api/shipping) first, including what covers a parcel.
 
 <ParamField header="Idempotency-Key" type="string" required>
-  Your id for this shipment, 8–128 characters of `A-Za-z0-9_-`, unique per account among your shipments. Pack and card order ids are a separate set. Reuse it to retry the same shipment safely: [Retries](#retries).
+  Your id for this shipment, 8–128 characters of `A-Za-z0-9_-`, unique per account among your shipments. Pack and card order ids are a separate set. Reuse it, with the same body, to retry the same shipment safely: [Retries](#retries).
 </ParamField>
 <ParamField body="card_ids" type="string[]" required>
   1–10 card ids from [Get vault](/partner-api/endpoints/get-vault), each once. A listed card has to be [delisted](/partner-api/endpoints/delist-card) first.
@@ -60,10 +60,10 @@ Charges your balance the rate's full amount and queues the shipment for us to fu
 | `409` | `PRICE_CHANGED` | The fresh rate is above `max_cost`. The body has `amount` and `max_cost`. Nothing was charged |
 | `409` | `IDEMPOTENCY_IN_PROGRESS` | A shipment with this id is still running, or is with our team (`needs_review: true`). The body has `shipment_id` and `started_at`. Follow it with [Get a shipment](/partner-api/endpoints/get-shipment) |
 | `409` | `IDEMPOTENCY_RETRY` | An earlier attempt with this id just failed, and freed the id. Resend the same id |
-| `422` | `IDEMPOTENCY_KEY_REUSED` | This id was already used for a different shipment |
+| `422` | `IDEMPOTENCY_KEY_REUSED` | This id was already used with a different body: a retry has to send the same cards, address, rate and `max_cost` |
 | `429` | `DAILY_SHIPMENT_LIMIT_REACHED` | This key has made 50 shipments today (UTC). The body has `limit` and `resets_at` |
 | `500` | | The shipment didn't go through and nothing was charged. Try again with the same id |
-| `500` | `SHIPMENT_OUTCOME_UNKNOWN` | We couldn't confirm whether the charge went through. It's with our team (`needs_review: true`, with its `shipment_id`). A retry with the same id never charges again, and never resend it under a new id until you hear from us: [what to do](/partner-api/shipping#unconfirmed-shipments) |
+| `500` | `SHIPMENT_OUTCOME_UNKNOWN` | We couldn't confirm whether the charge went through. It's with our team (`needs_review: true`, with its `shipment_id`). A retry with the same id can't charge twice. Don't resend it under a new id until you hear from us: [what to do](/partner-api/shipping#unconfirmed-shipments) |
 | `502` | | We couldn't confirm the carrier rate, and nothing was charged. Try again |
 | `503` | | We couldn't check the account, the cards or your daily limit, or start the shipment, and this attempt charged nothing. Try again with the same id |
 
@@ -77,9 +77,12 @@ A refused shipment charges nothing and frees its id, so you can fix the problem 
 | Belongs to a shipment that went through | The shipment as it stands now, plus `"idempotent_replay": true` | No, not again |
 | Belongs to a shipment still running | `409 IDEMPOTENCY_IN_PROGRESS`, with `shipment_id` and `started_at` | No, not again |
 | Belongs to a shipment with our team | `409 IDEMPOTENCY_IN_PROGRESS` with `needs_review: true`, until we've checked it. If it did go through, you get the shipment instead | No, not again |
+| Belongs to a shipment we checked and removed, because nothing was charged | The shipment runs again | Once, if it succeeds this time |
 | Belongs to an attempt that just failed, or was cut off before it reached the charge | `409 IDEMPOTENCY_RETRY`. Resend it | No |
 | Belongs to an attempt we refused | The shipment runs again | Once, if it succeeds this time |
-| Was used for a different shipment | `422 IDEMPOTENCY_KEY_REUSED`. Use a new id | No |
+| Was used with a different body: other cards, another address, another rate or another `max_cost` | `422 IDEMPOTENCY_KEY_REUSED`. Resend the original body, or use a new id for a new shipment | No |
+
+A retry has to send the same body, so if a fresh estimate changes your `rate` or `max_cost`, a shipment still held under that id answers `422`. If it's with our team, wait: a new id isn't safe until you hear from us.
 
 If a shipment still answers `409` after 30 minutes, contact us with its `shipment_id`.
 
