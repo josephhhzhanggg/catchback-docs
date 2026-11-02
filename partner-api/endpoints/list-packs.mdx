@@ -23,7 +23,7 @@ A sealed product isn't in your vault: the Starter and the sealed mystery packs p
     <ResponseField name="name" type="string" />
     <ResponseField name="price" type="number">Price per pack in USD. This is what you're charged.</ResponseField>
     <ResponseField name="available" type="boolean">Whether the pack can be opened right now. [Buy packs](/partner-api/endpoints/buy-packs) refuses one that can't, with `409 PACK_UNAVAILABLE`, before charging anything.</ResponseField>
-    <ResponseField name="reason" type="string">Why it can't, in plain text for people to read. Present only when `available` is false.</ResponseField>
+    <ResponseField name="reason" type="string">One of `Out of stock`, `Odds maintenance in progress`, `Restocking` or `Not available right now`. Present only when `available` is false.</ResponseField>
     <ResponseField name="max_quantity" type="integer">Most packs you can open in one request: up to 10, 5 for watch packs, and 1 for the Starter, sealed mystery packs and community packs. See [Rate limits](/partner-api/rate-limits#pack-purchases).</ResponseField>
     <ResponseField name="risk_levels" type="string[]">The [risk levels](/about-catchback/risk-levels) the pack opens at.</ResponseField>
   </Expandable>

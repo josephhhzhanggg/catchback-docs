@@ -282,7 +282,7 @@ paths:
               schema: { $ref: '#/components/schemas/RestrictedError' }
               example: { error: "Your account can't open packs right now. Contact support if you think this is a mistake.", code: FEATURE_RESTRICTED, capability: open_packs }
         '404':
-          description: '`pack_type` is not one List packs offers this key, including one this account can''t open. Nothing was charged, and the order id is free to use again.'
+          description: '`pack_type` is not one List packs offers this key, including one this account can''t open or one sent under the wrong `category`. Nothing was charged, and the order id is free to use again.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -3024,7 +3024,7 @@ components:
         name: { type: string }
         price: { type: number, description: 'Price per pack in USD, the amount charged.' }
         available: { type: boolean, description: 'Whether the pack can be opened right now. Buy packs refuses one that can''t, with `409 PACK_UNAVAILABLE`, before charging anything.' }
-        reason: { type: string, description: 'Why the pack is unavailable, in plain text. Only when `available` is `false`.' }
+        reason: { type: string, description: 'One of `Out of stock`, `Odds maintenance in progress`, `Restocking` or `Not available right now`. Only when `available` is `false`.' }
         max_quantity: { type: integer, description: The most in one request. }
         risk_levels:
           type: array
