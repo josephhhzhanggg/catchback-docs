@@ -385,7 +385,7 @@ paths:
                   type: array
                   minItems: 1
                   maxItems: 10
-                  description: Each item needs a `card_id` and exactly one of `pull_id` and `purchase_id`, all UUIDs. Get vault has them, and so do Buy packs and Buy a card. The same card can't be listed twice.
+                  description: Each item needs a `card_id` and exactly one of `pull_id` and `purchase_id`, all UUIDs. Get vault has them, and so do Buy packs and Buy a card. The same pull or purchase of a card can't be listed twice.
                   items:
                     type: object
                     required: [card_id]
@@ -465,7 +465,7 @@ paths:
                   - { card_id: e3d7148d-…, pull_id: e9d27918-…, status: already_sold, transaction_id: 2fa30a7d-…, payout_amount: 18 }
                   - { card_id: 4a51bc92-…, purchase_id: e22855d2-…, status: failed, error: No purchase of this card by this account with that purchase_id }
         '400':
-          description: The body isn't JSON, `items` is missing, empty or longer than 10, an item lacks a UUID `card_id` or doesn't have exactly one of `pull_id` and `purchase_id`, or the same card is listed twice.
+          description: The body isn't JSON, `items` is missing, empty or longer than 10, an item lacks a UUID `card_id` or doesn't have exactly one of `pull_id` and `purchase_id`, or the same pull or purchase of a card is listed twice.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -476,6 +476,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: An error on our side, and the body may not be JSON. Some items may already have sold. Send the same items again to find out, because a pull or purchase pays out only once and the retry answers `already_sold` for those.
   /api/partner/v1/pulls:
     get:
       tags: [Gacha]
@@ -750,7 +752,7 @@ paths:
 
         Buys one card from the shop or a fixed-price listing: its price plus a $1 buyer fee, from your cash CatchCoins balance only. The card lands in your vault. Daily card and spend caps apply: see [Rate limits](/partner-api/rate-limits#card-purchases).
 
-        **`needs_review: true` in any response means money moved and we are settling the order.** Never place it again under a new key. Follow it with [Get an order](/partner-api/endpoints/get-order). See [Idempotency](/partner-api/idempotency).
+        **`needs_review: true` in any response means the order may have been charged and we are settling it.** Never place it again under a new key. Follow it with [Get an order](/partner-api/endpoints/get-order). See [Idempotency](/partner-api/idempotency).
       security:
         - bearerAuth: ['buy:cards']
       parameters:
@@ -2056,7 +2058,7 @@ paths:
       description: |-
         **No key.** No scope.
 
-        The countries a card can ship to, as ISO 3166 alpha-2 codes. This is the list `address.country` is checked against. Cached for up to 5 minutes.
+        The countries a card can ship to, as ISO 3166 alpha-2 codes. This is the list `address.country` is checked against. A response can be up to about 15 minutes old: 5 minutes in the cache, then up to 10 more while it refreshes.
       security:
         - {}
       responses:
@@ -2179,6 +2181,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: An error on our side, and the body may not be JSON. Retry with backoff.
   /api/partner/v1/vault:
     get:
       tags: [Account]
@@ -2537,7 +2541,7 @@ webhooks:
       operationId: orderCompletedEvent
       summary: Order completed
       description: |-
-        **We send this to your URL.** A pack order, card order or sell-back made through the API finished. It includes an order we closed from our records after you lost its response. App activity sends nothing, and an order held for review sends no event. Every webhook on the account gets it.
+        **We send this to your URL**, once we've set a webhook up for your key: contact us with its name and your URL, and we give you a signing secret once. A pack order, card order or sell-back made through the API finished. It includes an order we closed from our records after you lost its response. App activity sends nothing, and an order held for review sends no event. Every webhook on the account gets it.
 
         `order` is the same object List orders returns for it. Get an order has its pulls or card.
       security:
@@ -2592,7 +2596,7 @@ webhooks:
       operationId: listingSoldEvent
       summary: Listing sold
       description: |-
-        **We send this to your URL.** Someone bought one of your listings, wherever you listed the card. It doesn't say who bought it. Every webhook on the account gets it.
+        **We send this to your URL**, once we've set a webhook up for your key: contact us with its name and your URL, and we give you a signing secret once. Someone bought one of your listings, wherever you listed the card. It doesn't say who bought it. Every webhook on the account gets it.
 
         `order` is the same object List orders returns for a sale, with `type: "listing_sale"`.
       security:
@@ -2647,7 +2651,7 @@ webhooks:
       operationId: shipmentUpdatedEvent
       summary: Shipment updated
       description: |-
-        **We send this to your URL.** A shipment made with this key changed status. Only the key that created the shipment gets it, and that key needs `ship:cards` as well as `read:account`. No part of a customer's address is ever in an event.
+        **We send this to your URL**, once we've set a webhook up for your key: contact us with its name and your URL, and we give you a signing secret once. A shipment made with this key changed status. Only the key that created the shipment gets it, and that key needs `ship:cards` as well as `read:account`. No part of a customer's address is ever in an event.
 
         Two quick changes can collapse into one event, so `delivered` can arrive with no `shipped` before it, and delivery is unordered: compare `status_updated_at` to tell which of two events is newer. Get a shipment always has the current status.
       security:
@@ -3139,7 +3143,7 @@ components:
         checkout_id: { type: string, description: The order's id. Get an order takes it. }
         order_id: { type: [string, 'null'], description: 'The `Idempotency-Key` you sent with a purchase. `null` for a sell-back or a sale.' }
         type: { $ref: '#/components/schemas/OrderType' }
-        status: { type: string, description: '`completed`, or `pending` while a purchase is still running or held for review.' }
+        status: { type: string, description: '`completed`, or `pending` while a purchase is still running or held for review. New values can be added, so don''t fail on one you don''t know.' }
         created_at: { type: string }
         completed_at: { type: [string, 'null'] }
         amount: { type: [number, 'null'], description: 'What a purchase charged (a card buy includes its $1 fee), what a sell-back paid, or what a listing sold for, in USD.' }

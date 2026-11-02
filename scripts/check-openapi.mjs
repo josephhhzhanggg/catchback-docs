@@ -3,9 +3,11 @@
 //
 //   node scripts/check-openapi.mjs [spec] [docs.json]
 //
-// The terms are hashed because this repo is public and some of them name things we don't
-// document. The plain list is on CAT-923. A term is lowercase with its separators removed,
-// and is matched against each word of the spec and each pair of adjacent words.
+// The terms are hashed so that this public file doesn't spell out things we don't document.
+// That stops someone reading them off, not someone confirming a good guess. The plain list is
+// on CAT-923. A term is lowercase with its separators removed, and is matched against each word
+// of the spec and each pair of adjacent words, across line breaks. It doesn't match inside a
+// longer word, so add a new form of a term to the list.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
@@ -28,15 +30,16 @@ const configPath = process.argv[3] ?? new URL('../docs.json', import.meta.url);
 const hash = (term) => createHash('sha256').update(term).digest('hex').slice(0, 16);
 const failures = [];
 
+const words = [];
 readFileSync(specPath, 'utf8').split('\n').forEach((line, i) => {
-  const words = line.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-  words.forEach((word, w) => {
-    for (const term of [word, word + (words[w + 1] ?? '')]) {
-      if (KEEP_OUT.has(hash(term))) failures.push(`spec line ${i + 1}: keep-out term "${term}"`);
-    }
-  });
+  for (const word of line.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)) words.push({ word, line: i + 1 });
   // Page and tool overrides: x-mint can turn a page's playground on, x-mcp a docs-site tool.
   if (/\bx-(mint|mcp)\b|\bplayground\b/i.test(line)) failures.push(`spec line ${i + 1}: live-call override`);
+});
+words.forEach(({ word, line }, w) => {
+  for (const term of [word, word + (words[w + 1]?.word ?? '')]) {
+    if (KEEP_OUT.has(hash(term))) failures.push(`spec line ${line}: keep-out term "${term}"`);
+  }
 });
 
 const display = JSON.parse(readFileSync(configPath, 'utf8')).api?.playground?.display;
