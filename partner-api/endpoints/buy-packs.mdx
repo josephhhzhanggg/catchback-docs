@@ -58,6 +58,9 @@ Opens packs with your account's CatchCoins at list price, through the same check
   </Expandable>
 </ResponseField>
 <ResponseField name="idempotent_replay" type="boolean">Present and `true` when this is a stored result returned for a retry.</ResponseField>
+<ResponseField name="needs_review" type="boolean">
+  Present and `true` only on an error, never on a `200`: we couldn't confirm whether the order was charged, and it's held for us to settle. Nothing was delivered. Don't retry under a new order id. We're alerted automatically. See [When a purchase needs review](/partner-api/errors-and-limits#when-a-purchase-needs-review).
+</ResponseField>
 
 ## Checking a pull
 
@@ -70,12 +73,13 @@ Each pull's `proof` lets you check that the pull followed from its seed: `GET` i
 | `400` | | Missing or malformed `Idempotency-Key`, a bad `pack_type`, `category`, `quantity` or `risk_level`, not enough balance, or the pack can't be bought in multiples |
 | `403` | | The key lacks `rip:packs` or isn't linked to an account, the account can't open this pack, or `"Partner account unavailable"` (the account is deleted). We also answer "not linked" or "unavailable" when we couldn't read your key or account just then, so one retry is worth it. Nothing was charged |
 | `403` | `FEATURE_RESTRICTED` | Opening packs is switched off for your account (`capability: "open_packs"`). Contact us |
-| `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running, or is being settled after a failed attempt. The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order), or retry later with the same key. Don't retry in a tight loop |
+| `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order), or retry later with the same key. Don't retry in a tight loop |
 | `409` | `IDEMPOTENCY_RETRY` | An earlier attempt with this key failed just as this one arrived. Retry with the same key |
 | `422` | `IDEMPOTENCY_KEY_REUSED` | This key was already used for a different order |
 | `429` | `RATE_LIMITED` | Too soon after your last purchase. Wait `retry_after_seconds` (also the `Retry-After` header) |
 | `429` | `DAILY_LIMIT_REACHED` | Your daily pack ceiling would be exceeded. Resets at `resets_at` |
 | `500` | | A pack failed to open. The whole order was refunded; nothing was charged |
+| `500` | `PAYMENT_OUTCOME_UNKNOWN` | We couldn't confirm whether the order was charged: it may have been, and nothing was delivered. It's held for review (`needs_review: true`) and we settle any charge. Stop retrying, and never place it again under a new key: the same key answers `409 IDEMPOTENCY_IN_PROGRESS` until we settle it. The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order). Also sent when a pack failed to open and its refund errored |
 | `503` | | We couldn't record the order, count today's packs or take the payment, so the order didn't go through. Retry shortly with the same key |
 
 <RequestExample>

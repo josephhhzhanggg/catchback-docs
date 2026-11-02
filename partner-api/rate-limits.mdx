@@ -30,7 +30,7 @@ Card lookups ([Get a card](/partner-api/endpoints/get-card), [Find a card by cer
 - **Daily ceiling:** 100 packs per UTC day, counting completed orders. A request is refused whole if it would take you over: with 97 used, a request for 5 is a `429` even though 3 would fit.
 - **Per request:** 1–10 packs of one type. [List packs](/partner-api/endpoints/list-packs) gives each pack's `max_quantity`: `1` for the Starter, sealed mystery packs and community packs, and `5` for watch packs. More than that is a `400`.
 
-The daily ceiling is checked first, then the speed limit. A refused request charges nothing and doesn't use up your slot for the minute. A purchase that fails after it starts hands the slot back too, so a fixable error doesn't cost you a minute. A retry of an order you already sent (the same `Idempotency-Key`) skips both checks: you can always find out what your first attempt did.
+The daily ceiling is checked first, then the speed limit. A refused request charges nothing and doesn't use up your slot for the minute. A purchase that fails after it starts hands the slot back too, so a fixable error doesn't cost you a minute, unless we couldn't confirm its charge: that order is held for review and keeps its slot. A retry of an order you already sent (the same `Idempotency-Key`) skips both checks: you can always find out what your first attempt did.
 
 ```json 429 RATE_LIMITED
 {

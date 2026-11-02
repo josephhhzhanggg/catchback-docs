@@ -30,7 +30,7 @@ Charges the card's price plus a $1 buyer fee, from your cash CatchCoins balance 
 <ResponseField name="item" type="object | null">A [card object](/partner-api/card-object), or `null` if we couldn't load the card. The card is yours either way.</ResponseField>
 <ResponseField name="idempotent_replay" type="boolean">Present and `true` when this is a stored response to a retried order. Nothing was charged again.</ResponseField>
 <ResponseField name="needs_review" type="boolean">
-  Present and `true` when the sale went through but our bookkeeping needs a manual check. The card is yours; don't retry under a new order id. We're alerted automatically. An error can carry it too: see [When a card buy needs review](/partner-api/errors-and-limits#when-a-card-buy-needs-review).
+  Present and `true` when the sale went through but our bookkeeping needs a manual check. The card is yours; don't retry under a new order id. We're alerted automatically. An error can carry it too, including when we couldn't confirm the charge: see [When a purchase needs review](/partner-api/errors-and-limits#when-a-purchase-needs-review).
 </ResponseField>
 
 ## Errors
@@ -46,11 +46,12 @@ Charges the card's price plus a $1 buyer fee, from your cash CatchCoins balance 
 | `409` | `CARD_NO_LONGER_AVAILABLE` | Sold, pulled from a pack, delisted or shipped, or an item that is only sold in packs. Search again |
 | `409` | `CARD_MOVED_TO_AUCTION` | The card is now in an auction, not sold at a fixed price. The response has `listing_id` and `listing_type` |
 | `409` | `OWN_LISTING` | The card is your own listing |
-| `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running, or is being settled after a failed attempt. The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order), or retry later with the same key. Don't retry in a tight loop |
+| `409` | `IDEMPOTENCY_IN_PROGRESS` | An order with this key is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order), or retry later with the same key. Don't retry in a tight loop |
 | `409` | `IDEMPOTENCY_RETRY` | An earlier attempt with this key failed just as this one arrived. Retry with the same key |
 | `422` | `IDEMPOTENCY_KEY_REUSED` | This key was used for a different order |
 | `429` | `DAILY_CARD_LIMIT_REACHED` | Your daily card or spend cap. See [Rate limits](/partner-api/rate-limits#card-purchases) |
 | `500` | | The purchase failed. Retry once with the same key, never a new one: if nothing was charged, it runs again. If the body has `needs_review: true`, or the retry answers `409 IDEMPOTENCY_IN_PROGRESS`, the order may have been charged and we're settling it: stop retrying and follow it with [Get an order](/partner-api/endpoints/get-order) |
+| `500` | `PAYMENT_OUTCOME_UNKNOWN` | We couldn't confirm whether the order was charged: it may have been, and nothing was delivered. It's held for review (`needs_review: true`) and we settle any charge. Stop retrying, and never place it again under a new key: the same key answers `409 IDEMPOTENCY_IN_PROGRESS` until we settle it. The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order) |
 | `503` | | We couldn't read your key's limits, record the order, count today's cards or take the payment, so the order didn't go through. Retry shortly with the same key |
 
 Errors from the purchase itself carry the order's `checkout_id`, as in the `409` example.
