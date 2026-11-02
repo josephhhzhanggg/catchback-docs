@@ -1,0 +1,101 @@
+---
+title: "Public card metadata"
+api: "GET /api/public/v1/cards/{id}"
+authMethod: "none"
+description: "A card's metadata and image URLs, with no API key. No prices."
+---
+
+No key · No scope · No MCP tool
+
+Any card's metadata and image URLs, by id. It needs no key and no account, so you can use it to show a card without giving your server a key.
+
+**It carries no price or value of any kind.** `market_value`, `price` and `market_value_last_updated` are left out, and so is a luxury goods item's `attributes`. A key still gets those from [Get a card](/partner-api/endpoints/get-card), along with [price history](/partner-api/endpoints/get-price-history).
+
+Call it from a server. It sends no CORS header, so another site's browser JavaScript can't read the response.
+
+<ParamField path="id" type="string" required>
+  A card id: `item.id` or `card_id` from any other endpoint.
+</ParamField>
+<ParamField query="category" type="string">
+  The card's catalog, if you know it: `pokemon`, `onepiece`, `sports`, `riftbound`, `watches`, `goods` (luxury goods) or `singles` (raw singles). Without it, every catalog is searched.
+</ParamField>
+
+## Response
+
+<ResponseField name="card" type="object">
+  These fields of the [card object](/partner-api/card-object), and no others. A field a card doesn't have is left out.
+
+  - **Identity:** `id`, `category`, `name`, `set`, `year`, `number`, `variant`, `rarity`, `card_type`, `language`
+  - **Slab:** `slab_label`, `grading_company`, `grading_rank`, `card_condition`, `cert_number`
+  - **Images, as URLs:** `front_image`, `back_image`, `render_image`, `image_url`
+  - **Sports cards:** `sport`, `player_name`, `team`, `manufacturer`, `parallel`, `is_rookie`, `is_autograph`, `is_memorabilia`, `serial_numbered`
+  - **Watches and luxury goods:** `brand`, `reference_number`, `video_url`, `condition`, `size`, `description`
+</ResponseField>
+
+Nothing says who holds the card, what it sold for or whether it's for sale.
+
+## Cache time
+
+A `200` is sent with `Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=60`:
+
+- Our CDN keeps the response for **5 minutes**, and can serve it for another minute while it refreshes.
+- Behind the CDN, a card is read at most once a minute.
+
+So a response can be up to about 7 minutes old. Errors are `no-store`, so the CDN never keeps them, though a card added in the last minute can still read as a `404`.
+
+Send only `category` as a query parameter. Anything else in the URL misses the CDN and counts against your limit.
+
+## Limits
+
+- **60 requests a minute per IP address** (an IPv4 address, or an IPv6 /64). After that you get a `429 RATE_LIMITED` with `retry_after_seconds` and a `Retry-After` header. A response from the CDN doesn't count. The count is kept per server, so the exact point you're refused can vary.
+- **The shared limit** on everything under `/api/`: see [Rate limits](/partner-api/rate-limits#shared-limit-per-ip).
+
+A key doesn't raise these. This route never reads one.
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | | An id with a character other than letters, digits, `_` and `-`, or longer than 128 characters; or an unknown `category` (the seven above) |
+| `403` | | `"Access denied"`: requests from your location are refused. See [Where you can call from](/partner-api/errors-and-limits#where-you-can-call-from) |
+| `404` | | No card has this id (in that catalog, if you sent `category`), or the card is archived |
+| `429` | `RATE_LIMITED` | Over the limit above. Wait `retry_after_seconds` |
+| `500` | | We couldn't look the card up. Retry with backoff |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/public/v1/cards/0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e?category=pokemon"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "card": {
+    "id": "0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e",
+    "category": "pokemon",
+    "name": "Charizard ex",
+    "set": "Pokemon Sv3 En-Obsidian Flames",
+    "year": "2023",
+    "number": "223",
+    "language": "english",
+    "slab_label": "2023 Obsidian Flames Charizard ex",
+    "grading_company": "PSA",
+    "grading_rank": 10,
+    "cert_number": "84512377",
+    "front_image": "https://…",
+    "back_image": "https://…",
+    "render_image": "https://…",
+    "image_url": "https://…"
+  }
+}
+```
+
+```json 404
+{ "error": "Card not found" }
+```
+
+```json 429
+{ "error": "Too many requests", "code": "RATE_LIMITED", "retry_after_seconds": 41 }
+```
+</ResponseExample>

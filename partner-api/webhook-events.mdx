@@ -1,0 +1,131 @@
+---
+title: "Webhook events"
+description: "Every event a webhook can send, and what each one carries."
+---
+
+Every event has the same outer shape, and its `data` depends on its `type`. To get events, see [Webhooks](/partner-api/webhooks).
+
+<ResponseField name="id" type="string">The event's id, `evt_` and 32 hex characters. It never changes, including across retries, so dedupe on it.</ResponseField>
+<ResponseField name="type" type="string">`order.completed`, `listing.sold` or `shipment.updated`.</ResponseField>
+<ResponseField name="created_at" type="string">When the thing happened: the order finished, or the shipment's status changed. Not when we sent the event.</ResponseField>
+<ResponseField name="data" type="object">Depends on `type`.</ResponseField>
+
+<Warning>
+  **This list isn't final.** We'll add more events without notice, so ignore a `type` you don't recognize.
+</Warning>
+
+| `type` | When | `data` | Who gets it |
+|---|---|---|---|
+| [`order.completed`](#order-completed) | A pack order, card order or sell-back made through the API finished | `{ order }` | Every webhook on the account |
+| [`listing.sold`](#listing-sold) | Someone bought one of your listings | `{ order }` with `type: "listing_sale"` | Every webhook on the account |
+| [`shipment.updated`](#shipment-updated) | A shipment made with this key changed status | `{ shipment }` | Only the key that made the shipment |
+
+An event never identifies a buyer, and no part of a customer's address is ever in one.
+
+## Order completed
+
+`order.completed`: a pack order, card order or sell-back you made through the API finished. It includes an order we closed from our records after you lost its response. Orders and sell-backs made in our app send nothing.
+
+`order` is the same object [List orders](/partner-api/endpoints/list-orders) returns for it: `type` is `pack_purchase`, `card_purchase` or `sell_back`, and `reconciled` is `true` if we closed it. For its pulls or card, call [Get an order](/partner-api/endpoints/get-order) with its `checkout_id`.
+
+From the time your webhook is set up, every finished order in List orders gives one event. A sell-back of several cards is one order, and one event, per card. If two keys on your account both have webhooks, both get it. An order [held for review](/partner-api/idempotency#purchases-that-need-review) sends no event.
+
+```json
+{
+  "id": "evt_0b7e4d21c8f53a96e1d07c4f2ab86d13",
+  "type": "order.completed",
+  "created_at": "2026-11-01T18:04:11.312Z",
+  "data": {
+    "order": {
+      "checkout_id": "3e1ab17c-…",
+      "order_id": "order-1042",
+      "type": "pack_purchase",
+      "status": "completed",
+      "created_at": "2026-11-01T18:04:10.102+00:00",
+      "completed_at": "2026-11-01T18:04:11.312+00:00",
+      "amount": 25,
+      "fee": 0,
+      "balance_change": -25,
+      "reconciled": false,
+      "pack_type": "bronze",
+      "quantity": 1,
+      "pull_ids": ["e9d27918-…"],
+      "card_id": null,
+      "listing_id": null,
+      "transaction_id": null
+    }
+  }
+}
+```
+
+## Listing sold
+
+`listing.sold`: someone bought one of your listings, wherever you listed the card. `order` is the same object [List orders](/partner-api/endpoints/list-orders) returns for a sale, with `type: "listing_sale"`. It doesn't say who bought it. If two keys on your account both have webhooks, both get it.
+
+```json
+{
+  "id": "evt_6b1d3f0c9a7e4d218c5fb0a4e2d17c36",
+  "type": "listing.sold",
+  "created_at": "2026-11-01T18:04:11.312Z",
+  "data": {
+    "order": {
+      "checkout_id": "a0c3e7d1-…",
+      "order_id": null,
+      "type": "listing_sale",
+      "status": "completed",
+      "created_at": "2026-11-01T18:04:11.312+00:00",
+      "completed_at": "2026-11-01T18:04:11.312+00:00",
+      "amount": 45,
+      "fee": 1,
+      "balance_change": 44,
+      "reconciled": false,
+      "pack_type": null,
+      "quantity": null,
+      "pull_ids": [],
+      "card_id": "0e94dc61-…",
+      "listing_id": "5f1c2a90-…",
+      "transaction_id": "a0c3e7d1-…"
+    }
+  }
+}
+```
+
+## Shipment updated
+
+`shipment.updated`: a shipment made with this key changed status. `shipment` is the object [List shipments](/partner-api/endpoints/list-shipments) returns, without `destination_country` and `address_removed`, which both come from the customer's address. [Get a shipment](/partner-api/endpoints/get-shipment) has them.
+
+A shipment event tells you a shipment moved, not every step it took. **[Get a shipment](/partner-api/endpoints/get-shipment) always has the current status.**
+
+- **It follows the order's status after the order exists.** Creating a shipment sends no event, because the response has already told you, and neither does a shipment coming out of `needs_review`.
+- **Only the key that created the shipment gets it,** even if another key on your account has a webhook. That key needs `ship:cards` as well as `read:account`. A key that loses `ship:cards` stops getting new ones, though what's already queued still goes out. A shipment made with a key you've since replaced sends nothing further, and is still on [List shipments](/partner-api/endpoints/list-shipments).
+- **Two quick changes can collapse into one event.** We read each shipment's latest status [when we look for new events](/partner-api/webhooks#what-you-receive), so two changes between looks reach you as one event with the later status: `delivered` can arrive with no `shipped` before it. The last change is never skipped.
+- **Each change has its own `id`,** including a shipment going back to an earlier status.
+- **`status` can repeat one you already hold,** because some internal changes have the same public status. It's still a change, with its own `id`.
+- **An order our team removes** turns `cancelled` with no event.
+- **Delivery is unordered,** so compare `status_updated_at` to tell which of two events is newer.
+
+```json
+{
+  "id": "evt_d2a94c17f06b8e3512c7ab04e9f6130d",
+  "type": "shipment.updated",
+  "created_at": "2026-11-03T16:20:00.000Z",
+  "data": {
+    "shipment": {
+      "id": "7c1e0000-…",
+      "status": "shipped",
+      "card_ids": ["0e94dc61-…"],
+      "carrier": "USPS",
+      "service": "Priority Mail",
+      "service_token": "usps_priority",
+      "cost": 12.85,
+      "tracking_number": "9400100000000000000000",
+      "tracking_url": "https://tools.usps.com/go/TrackConfirmAction?tRef=fullpage&tLc=2&text28777=&tLabels=9400100000000000000000",
+      "created_at": "2026-11-02T18:04:11.000Z",
+      "status_updated_at": "2026-11-03T16:20:00.000Z",
+      "shipped_at": "2026-11-03T16:20:00.000Z",
+      "expected_delivery": null,
+      "delivered_at": null
+    }
+  }
+}
+```

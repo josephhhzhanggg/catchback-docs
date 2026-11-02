@@ -1,0 +1,100 @@
+---
+title: "Estimate a shipment"
+api: "POST /api/partner/v1/shipments/estimate"
+description: "Live carrier rates for shipping cards you hold to a customer's address. Charges nothing and stores nothing."
+---
+
+Scope: `ship:cards`, granted on request · MCP tool: `estimate_shipment`
+
+Live carrier rates, at the full rate you'd pay. It charges nothing and stores nothing: the address only goes to our carrier partner for the quote. Take the `carrier` and `token` of the rate you choose to [Create a shipment](/partner-api/endpoints/create-shipment). See [Shipping cards](/partner-api/shipping) for how shipping works.
+
+<ParamField body="card_ids" type="string[]" required>
+  1–10 card ids from [Get vault](/partner-api/endpoints/get-vault), each once. A listed card has to be [delisted](/partner-api/endpoints/delist-card) first.
+</ParamField>
+<ParamField body="address" type="object" required>
+  Your customer's address.
+  <Expandable title="address">
+    <ParamField body="name" type="string" required>The recipient's name. At most 100 characters.</ParamField>
+    <ParamField body="address1" type="string" required>At most 100 characters.</ParamField>
+    <ParamField body="address2" type="string">At most 100 characters.</ParamField>
+    <ParamField body="city" type="string" required>At most 100 characters.</ParamField>
+    <ParamField body="state" type="string">State or region, at most 100 characters. Required where the country has one and needs it, such as the US.</ParamField>
+    <ParamField body="zip" type="string">Postal code, at most 20 characters. Required, and checked against the country's format, where the country needs it, such as the US.</ParamField>
+    <ParamField body="country" type="string" required>ISO 3166 alpha-2, e.g. `US`. [Where you can ship](/partner-api/shipping#where-you-can-ship).</ParamField>
+    <ParamField body="phone" type="string">At most 20 characters. Required outside the US.</ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="destination_country" type="string">The `country` you sent, in capitals.</ResponseField>
+<ResponseField name="package_type" type="string">The parcel we'd use, e.g. `mailer`.</ResponseField>
+<ResponseField name="rates" type="object[]">
+  Cheapest first. Can be empty.
+  <Expandable title="rate">
+    <ResponseField name="carrier" type="string">e.g. `USPS`. Send it back as `rate.carrier`.</ResponseField>
+    <ResponseField name="service" type="string">The service's name, e.g. `Priority Mail`.</ResponseField>
+    <ResponseField name="token" type="string">e.g. `usps_priority`. Send it back as `rate.token`.</ResponseField>
+    <ResponseField name="amount" type="number">The full rate in USD. Normally what you send as `max_cost`.</ResponseField>
+    <ResponseField name="estimated_days" type="number | null">The carrier's estimate, in days.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | | The body isn't JSON, `card_ids` isn't 1–10 card ids (or lists one twice), or the address is invalid. An address error is `"error": "Invalid address"` with `fields`, which names each bad field and never repeats its value |
+| `400` | `COUNTRY_NOT_SUPPORTED` | We don't ship to this country |
+| `400` | `OVER_CUSTOMS_CAP` | An international shipment worth over $2,500, or with a card we have no value for |
+| `400` | `PARTNER_GOODS` | A partner's own goods ship from that partner |
+| `403` | | The key lacks `ship:cards` or isn't linked to an account, the account needs a verified phone number (`"Phone verification required"`), the account is deleted (`"Partner account unavailable"`), or it can't request shipping |
+| `403` | `FEATURE_RESTRICTED` | The account is restricted from the marketplace or from withdrawals (`capability` is `marketplace` or `withdraw`). Contact us |
+| `409` | `CARDS_NOT_SHIPPABLE` | A card can't ship. `cards[]` gives each refused `card_id` and its `reason`: [what they mean](/partner-api/shipping#which-cards-can-ship) |
+| `429` | `RATE_LIMITED` | More than 60 estimates a minute on this key. Wait `retry_after_seconds`, also sent as a `Retry-After` header |
+| `502` | | The carrier quote failed. Try again |
+| `503` | | We couldn't check the account or the cards. Try again |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v1/shipments/estimate \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "card_ids": ["0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e"],
+    "address": {
+      "name": "Sam Rivera",
+      "address1": "1 Example Way",
+      "city": "Testville",
+      "state": "CA",
+      "zip": "94000",
+      "country": "US"
+    }
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "destination_country": "US",
+  "package_type": "mailer",
+  "rates": [
+    { "carrier": "USPS", "service": "Ground Advantage", "token": "usps_ground_advantage", "amount": 5.4, "estimated_days": 3 },
+    { "carrier": "USPS", "service": "Priority Mail", "token": "usps_priority", "amount": 12.85, "estimated_days": 2 }
+  ]
+}
+```
+
+```json 400
+{ "error": "Invalid address", "fields": { "zip": "Required", "phone": "Required for international shipments" } }
+```
+
+```json 409
+{
+  "error": "Some cards cannot ship.",
+  "code": "CARDS_NOT_SHIPPABLE",
+  "cards": [{ "card_id": "0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e", "reason": "listed" }]
+}
+```
+</ResponseExample>

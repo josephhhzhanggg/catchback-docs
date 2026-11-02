@@ -19,6 +19,8 @@ The history belongs to the account, not the key: every key linked to the account
 
 A key acts as one CatchBack account, so the history can't say which of your own customers an order was for. Keep that on your side, against the `order_id` you chose or the order's `pull_ids`.
 
+To hear when an order finishes instead of polling, use a [webhook](/partner-api/webhooks).
+
 <ParamField query="type" type="string">
   Only orders of this kind: `pack_purchase`, `card_purchase`, `sell_back` or `listing_sale`. Leave it out for all four.
 </ParamField>

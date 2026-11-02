@@ -29,7 +29,7 @@ To change the price later, [change it in place](/partner-api/endpoints/update-li
 | `400` | | You don't hold the card, or it's already listed |
 | `400` | | The price is below $5 (`"Listings must be priced at least $5"`) or above the cap (the message gives this card's maximum) |
 | `400` | | The card can't be listed: it has shipped, it's archived, it's an energy card, or it's a luxury goods item or raw single (those sell back or ship only) |
-| `400` | `CARD_ON_PACK_HOLD` | The card came from a pack that holds its cards: sell it back or ship it |
+| `400` | `CARD_ON_PACK_HOLD` | The card came from a pack that holds its cards: sell it back. It can't ship through the API either |
 | `403` | | The key lacks `write:listings` or isn't linked to an account, the account needs a verified phone number (`"Phone verification required"`), or it can't list cards |
 | `403` | `FEATURE_RESTRICTED` | The marketplace is switched off for your account (`capability: "marketplace"`). Contact us |
 | `404` | | The card was gone by the time we created the listing, e.g. it left your account a moment earlier. Read your vault and try again |

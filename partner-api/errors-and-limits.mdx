@@ -15,38 +15,48 @@ Branch on the status and the `code`. The `error` text is for people and can chan
 
 | Status | Meaning |
 |---|---|
-| `400` | A bad parameter or body, a missing or malformed `Idempotency-Key`, not enough balance, or something the endpoint won't do (a pack that can't be bought in multiples, a listing price out of range, a Dutch auction you tried to reprice). The `error` says which |
+| `400` | A bad parameter or body, a missing or malformed `Idempotency-Key`, not enough balance, or something the endpoint won't do (a pack that can't be bought in multiples, a listing price out of range, a Dutch auction you tried to reprice, a country we can't ship to). The `error` says which |
 | `401` | Missing, malformed, disabled or unknown API key |
-| `403` | Your key lacks the endpoint's scope, the action needs a linked account, the account is unavailable or needs a verified phone number, or `FEATURE_RESTRICTED` (below) |
-| `404` | The thing you asked for doesn't exist for your key: a pack you can't buy, a card that doesn't exist, or a listing or order that isn't on your account |
-| `409` | A conflict: an order that is still running (`IDEMPOTENCY_IN_PROGRESS`, `IDEMPOTENCY_RETRY`), a card that changed since you looked (`PRICE_CHANGED`, `CARD_NO_LONGER_AVAILABLE`, `CARD_MOVED_TO_AUCTION`, `OWN_LISTING`), or a listing that changed while you were repricing it (`LISTING_NOT_ACTIVE`, `LISTING_CHANGED`) |
+| `403` | Your key lacks the endpoint's scope, the action needs a linked account, the account is unavailable or needs a verified phone number, `FEATURE_RESTRICTED` (below), or `"Access denied"`, for a request from a country on our sanctions list ([below](#where-you-can-call-from)) |
+| `404` | The thing you asked for doesn't exist for your key: a pack you can't buy, a card that doesn't exist, or a listing, order or shipment that isn't on your account |
+| `409` | A conflict: an order that is still running (`IDEMPOTENCY_IN_PROGRESS`, `IDEMPOTENCY_RETRY`), a card that changed since you looked (`PRICE_CHANGED`, `CARD_NO_LONGER_AVAILABLE`, `CARD_MOVED_TO_AUCTION`, `OWN_LISTING`), a listing that changed while you were repricing it (`LISTING_NOT_ACTIVE`, `LISTING_CHANGED`), or a shipment that can't go ahead (`CARDS_NOT_SHIPPABLE`, `RATE_UNAVAILABLE`, `PRICE_CHANGED`) |
 | `422` | `IDEMPOTENCY_KEY_REUSED`: this order id was already used for a different order |
-| `429` | Over a limit: `RATE_LIMITED`, `DAILY_LIMIT_REACHED` or `DAILY_CARD_LIMIT_REACHED`. See [Rate limits](/partner-api/rate-limits) |
-| `500` | Our fault. Retry with backoff. For a purchase, resend the same order id, never a new one; if a purchase's body has `"needs_review": true`, or the resend answers `409 IDEMPOTENCY_IN_PROGRESS`, stop and follow the order with [Get an order](/partner-api/endpoints/get-order) |
-| `503` | We couldn't count your usage against a limit, record your order, or take the payment, so the order didn't go through (the limit checks fail closed). Retry with backoff, with the same order id |
+| `429` | Over a limit: `RATE_LIMITED`, `DAILY_LIMIT_REACHED`, `DAILY_CARD_LIMIT_REACHED` or `DAILY_SHIPMENT_LIMIT_REACHED`. See [Rate limits](/partner-api/rate-limits) |
+| `500` | Our fault. Retry with backoff. For a purchase, resend the same order id, never a new one; if a purchase's body has `"needs_review": true`, or the resend answers `409 IDEMPOTENCY_IN_PROGRESS`, stop and follow the order with [Get an order](/partner-api/endpoints/get-order). For a shipment, resend the same id; `SHIPMENT_OUTCOME_UNKNOWN` means it's with our team |
+| `502` | The carrier quote failed on a shipment, and nothing was charged. Try again |
+| `503` | We couldn't count your usage against a limit, record your order, or take the payment, so the order didn't go through (the limit checks fail closed). A shipment we couldn't check or start charges nothing either. Retry with backoff, with the same id |
 
 ### Error codes
 
 | Code | Status | Endpoints | What it means |
 |---|---|---|---|
-| `FEATURE_RESTRICTED` | `403` | [Buy packs](/partner-api/endpoints/buy-packs), [Buy a card](/partner-api/endpoints/buy-card), [List a card](/partner-api/endpoints/list-card), [Change a listing's price](/partner-api/endpoints/update-listing-price) | We've switched this action off for your account. `capability` says which: `open_packs` or `marketplace`. Contact us |
-| `IDEMPOTENCY_IN_PROGRESS` | `409` | Buy packs, Buy a card | An order with this id is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body has its `checkout_id` and `started_at`. Follow it with [Get an order](/partner-api/endpoints/get-order), or resend the same id later; don't resend it in a tight loop |
-| `IDEMPOTENCY_RETRY` | `409` | Buy packs, Buy a card | An earlier attempt with this id failed just as this one arrived, and freed the id. Resend the same id |
-| `IDEMPOTENCY_KEY_REUSED` | `422` | Buy packs, Buy a card | This id was already used for a different order. Use a new id |
+| `FEATURE_RESTRICTED` | `403` | [Buy packs](/partner-api/endpoints/buy-packs), [Buy a card](/partner-api/endpoints/buy-card), [List a card](/partner-api/endpoints/list-card), [Change a listing's price](/partner-api/endpoints/update-listing-price), [Estimate a shipment](/partner-api/endpoints/estimate-shipment), [Create a shipment](/partner-api/endpoints/create-shipment), [Get a shipment](/partner-api/endpoints/get-shipment) | We've switched this action off for your account. `capability` says which: `open_packs`, `marketplace` or `withdraw`. Contact us |
+| `IDEMPOTENCY_IN_PROGRESS` | `409` | Buy packs, Buy a card, Create a shipment | An order with this id is still running, or is being settled after a failed attempt (`needs_review: true` says it's held for us to settle, so resending won't help until we do). The body has its `checkout_id` (a shipment's: `shipment_id`) and `started_at`. Follow it with [Get an order](/partner-api/endpoints/get-order) or [Get a shipment](/partner-api/endpoints/get-shipment), or resend the same id later; don't resend it in a tight loop |
+| `IDEMPOTENCY_RETRY` | `409` | Buy packs, Buy a card, Create a shipment | An earlier attempt with this id failed just as this one arrived, and freed the id. Resend the same id |
+| `IDEMPOTENCY_KEY_REUSED` | `422` | Buy packs, Buy a card, Create a shipment | This id was already used for a different order. Use a new id |
 | `PAYMENT_OUTCOME_UNKNOWN` | `500` | Buy packs, Buy a card | We couldn't confirm whether the order was charged: it may have been, and nothing was delivered. It's held for review (`needs_review: true`) and we settle any charge; resends of the same id return `409 IDEMPOTENCY_IN_PROGRESS` until then. Stop retrying and never place it again under a new id. The body has its `checkout_id`: follow it with [Get an order](/partner-api/endpoints/get-order) |
 | `PRICE_CHANGED` | `409` | Buy a card | The card's price is now above your `max_price`. The body has the current `price`. Nothing was charged |
+| `PRICE_CHANGED` | `409` | Create a shipment | The fresh rate is above your `max_cost`. The body has `amount` and `max_cost`. Nothing was charged |
 | `CARD_NO_LONGER_AVAILABLE` | `409` | Buy a card | Sold, pulled from a pack, delisted, shipped or otherwise gone. Search again |
 | `CARD_MOVED_TO_AUCTION` | `409` | Buy a card | The card is now in an auction and no longer sold at a fixed price. The body has `listing_id` and `listing_type` |
 | `OWN_LISTING` | `409` | Buy a card | The card is your own listing |
-| `RATE_LIMITED` | `429` | Buy packs | Too soon after your last pack purchase. Wait `retry_after_seconds`, also sent as a `Retry-After` header |
+| `RATE_LIMITED` | `429` | Buy packs, Estimate a shipment, [Public card metadata](/partner-api/endpoints/get-public-card) | Too soon after your last pack purchase, or over the estimate or public read limit. Wait `retry_after_seconds`, also sent as a `Retry-After` header |
 | `DAILY_LIMIT_REACHED` | `429` | Buy packs | Your daily pack ceiling. The body has `limit`, `used` and `resets_at` |
 | `DAILY_CARD_LIMIT_REACHED` | `429` | Buy a card | Your daily card or spend cap. The body has `cards_used`, `max_cards_per_day`, `spend_used`, `max_card_spend_per_day` and `resets_at` |
-| `CARD_ON_PACK_HOLD` | `400` | List a card | The card came from a pack that holds its cards: it can be sold back or shipped, not listed |
+| `CARD_ON_PACK_HOLD` | `400` | List a card | The card came from a pack that holds its cards: it can be sold back, but not listed, and not shipped through the API |
 | `PRICE_BELOW_MINIMUM`, `PRICE_ABOVE_MAXIMUM` | `400` | Change a listing's price | The new price is outside the listing limits. The body has `min_price` and `max_price` |
 | `NOT_FIXED_PRICE` | `400` | Change a listing's price | The listing is a Dutch auction, whose price follows its schedule |
 | `LISTING_NOT_FOUND` | `404` | Change a listing's price | No listing with this id belongs to your account |
 | `LISTING_NOT_ACTIVE` | `409` | Change a listing's price | The listing sold, was taken down or expired, or its card left your account. The body has the listing's `status` once it has closed. Nothing was written |
 | `LISTING_CHANGED` | `409` | Change a listing's price | Another change to the listing landed first. Nothing was written: read it again and retry |
+| `CARDS_NOT_SHIPPABLE` | `409` | Estimate a shipment, Create a shipment | A card can't ship. `cards[].reason` says why: [what the reasons mean](/partner-api/shipping#which-cards-can-ship). A card lost at the last moment comes with no `cards` list |
+| `RATE_UNAVAILABLE` | `409` | Create a shipment | The carrier no longer offers that rate. Estimate again |
+| `INSUFFICIENT_BALANCE` | `400` | Create a shipment | Your balance is below the rate. The body has the `amount`. Nothing was charged |
+| `COUNTRY_NOT_SUPPORTED` | `400` | Estimate a shipment, Create a shipment | We don't ship to this country |
+| `OVER_CUSTOMS_CAP` | `400` | Estimate a shipment, Create a shipment | An international shipment worth over $2,500, or with a card we have no value for |
+| `PARTNER_GOODS` | `400` | Estimate a shipment, Create a shipment | A partner's own goods ship from that partner, not through this API |
+| `DAILY_SHIPMENT_LIMIT_REACHED` | `429` | Create a shipment | 50 shipments on this key today (UTC). The body has `limit` and `resets_at` |
+| `SHIPMENT_OUTCOME_UNKNOWN` | `500` | Create a shipment | We couldn't confirm whether the charge went through. It's with our team (`needs_review: true`, with its `shipment_id`). A retry with the same id never charges again: [what to do](/partner-api/shipping#unconfirmed-shipments) |
 
 [Sell back cards](/partner-api/endpoints/sell-back) answers `200` even when some items fail. Each failed item in `results` has `status: "failed"`, an `error`, and a `code` when there is one, e.g. `CARD_LISTED_ON_MARKETPLACE` (delist it first), `GOODS_SELLBACK_WINDOW_CLOSED` (a luxury goods item sells back only within 5 minutes of its pull) or `CARD_IN_BATTLE`.
 
@@ -61,7 +71,7 @@ Branch on the status and the `code`. The `error` text is for people and can chan
 
 Every [pack purchase](/partner-api/endpoints/buy-packs) and [card purchase](/partner-api/endpoints/buy-card) requires an `Idempotency-Key` header: 8–128 characters of `A-Za-z0-9_-`. Use your own order id. It is what makes a retry after a timeout or network error safe.
 
-Idempotency keys are unique per CatchBack account, across pack and card orders together: an id you used for a pack order can't be reused for a card order, and every API key linked to the same account draws from the same set.
+Idempotency keys are unique per CatchBack account, across pack and card orders together: an id you used for a pack order can't be reused for a card order, and every API key linked to the same account draws from the same set. [Create a shipment](/partner-api/endpoints/create-shipment#retries) takes the same header, with a set of ids of its own.
 
 | You retry with… | You get |
 |---|---|
@@ -95,7 +105,19 @@ Card buys have no per-minute limit, but each key has daily caps, counted per UTC
 
 Going over either is a `429 DAILY_CARD_LIMIT_REACHED` with `cards_used`, `max_cards_per_day`, `spend_used`, `max_card_spend_per_day` and `resets_at`. An order still running counts at its `max_price` + $1, so parallel orders can't all slip under the cap. A refused order charges nothing, and if we can't count today's orders the buy is a `503`. Both caps are defaults that we can change for your key on request, and [`GET /account`](/partner-api/endpoints/get-account) shows where you stand (`card_limits`).
 
-Reads, sell-backs and listings are not rate-limited, but keys are monitored. A full catalog sync a few times an hour is fine; polling every few seconds is not.
+### Shipment limits
+
+Each key can make 50 shipments per UTC day (`429 DAILY_SHIPMENT_LIMIT_REACHED`, with `limit` and `resets_at`) and 60 estimates a minute (`429 RATE_LIMITED`). Both are the same for every key. A refused shipment charges nothing and doesn't count.
+
+### Everything else
+
+Reads, sell-backs and listings have no per-key rate limit, but keys are monitored. A full catalog sync a few times an hour is fine; polling every few seconds is not. Everything under `/api/` also shares [a limit of 300 requests a minute per IP address](/partner-api/rate-limits#shared-limit-per-ip).
+
+## Where you can call from
+
+A key doesn't get around our sanctions list. A country on it gets a `403` (`"error": "Access denied"`) on every endpoint and the [MCP server](/partner-api/mcp), with or without a key.
+
+If CatchBack limits access in any other way, a valid key still works on these endpoints and the MCP server, but other CatchBack endpoints can refuse you. That includes the ones that take no key, such as [Public card metadata](/partner-api/endpoints/get-public-card) and [Verify a pull](/partner-api/verify-a-pull).
 
 ## Inventory is point-in-time
 
