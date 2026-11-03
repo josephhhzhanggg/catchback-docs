@@ -1,0 +1,39 @@
+---
+title: "Funding in USDC"
+description: "Top up your balance by sending USDC, and withdraw it back as USDC on Base to your own escrow address."
+---
+
+Your balance can come in and go out as USDC, with no wire and nothing for us to do by hand.
+
+## Deposit
+
+1. [Get funding details](/partner-api/endpoints/get-funding) returns your deposit addresses. They're yours permanently: store them, there's no new address per deposit.
+2. Send USDC to one. The `ethereum` address takes USDC on the EVM chains we accept, Base included; the `solana` address takes Solana USDC. Base is the cheapest and fastest, since that's where your balance settles.
+3. Once the deposit settles on chain, usually within a few minutes, the full amount you sent is in your balance. We absorb the network and bridge fees. [Get account](/partner-api/endpoints/get-account) shows it.
+
+<Warning>
+  Send USDC only. Another token may be swapped at a loss or may not be credited.
+</Warning>
+
+## Withdraw
+
+Withdrawals go to **one address only**: the escrow address on Base you give us, which we set on your account. The withdrawal request carries an amount and no address, so a leaked key can't send your money anywhere else. To set or change the address, [contact us](mailto:catchbackcards@gmail.com).
+
+1. [Withdraw](/partner-api/endpoints/create-withdrawal) with an `amount` and an `Idempotency-Key`. The amount leaves your balance at once.
+2. The same amount of USDC arrives on Base, usually within a few minutes. There is no fee.
+3. Follow it with [Get a withdrawal](/partner-api/endpoints/get-withdrawal) until it's `completed` (with its transaction hashes) or `failed` (the amount is already back in your balance).
+
+| | |
+|---|---|
+| Network | USDC on Base |
+| Minimum | \$10, in whole cents |
+| Fee | None |
+| Settlement | Usually a few minutes |
+| Daily limit | \$50,000 over any 24 hours unless we agree otherwise. Past it, a withdrawal is held for our review (usually cleared within one business day), never refused |
+| At a time | One withdrawal per account; a second while one is still being processed is a `409` to retry |
+
+**Money that came in by card can't leave as USDC for 60 days**; it can only go to a bank. USDC you deposited, and what you earn on CatchBack (sell-backs, sales), can leave as USDC at once.
+
+The account itself must be able to withdraw: phone-verified, with a name on file, and not under review or restricted. Partner accounts are set up that way.
+
+Scope: [Get funding details](/partner-api/endpoints/get-funding) needs `read:account`. Withdrawals need `withdraw:funds`, granted on request.

@@ -1,0 +1,58 @@
+---
+title: "Get a withdrawal"
+api: "GET /api/partner/v1/withdrawals/{id}"
+description: "One USDC withdrawal and its current status."
+---
+
+Scope: `withdraw:funds`, granted on request · REST only, no MCP tool
+
+Poll this after [Withdraw](/partner-api/endpoints/create-withdrawal) until the status is `completed` or `failed`. A few seconds apart is plenty; most finish within minutes.
+
+<ParamField path="id" type="string" required>
+  The withdrawal's `id`. A UUID.
+</ParamField>
+
+## Response
+
+<ResponseField name="withdrawal" type="object">The fields of a withdrawal in [Withdraw](/partner-api/endpoints/create-withdrawal).</ResponseField>
+
+| Status | Means |
+|---|---|
+| `processing` | Sent, or being sent |
+| `pending_review` | Held for our review, usually cleared within one business day |
+| `completed` | Arrived; `tx_hashes` are on Base |
+| `failed` | Didn't go through; the amount is back in your balance |
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | The id isn't a UUID |
+| `403` | The key lacks `withdraw:funds` or isn't linked to an account |
+| `404` | No withdrawal with that id on your account |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v1/withdrawals/3a6f1c2e-0000-4000-8000-000000000001 \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "withdrawal": {
+    "id": "3a6f1c2e-…",
+    "status": "completed",
+    "amount": 2500,
+    "fee": 0,
+    "currency": "USDC",
+    "destination": { "network": "USDC on Base", "address": "0xab12…ab12" },
+    "tx_hashes": ["0x9c41…"],
+    "failure_reason": null,
+    "created_at": "2026-11-02T18:00:00.000Z",
+    "completed_at": "2026-11-02T18:02:10.000Z"
+  }
+}
+```
+</ResponseExample>

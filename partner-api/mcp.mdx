@@ -72,6 +72,6 @@ A tool whose endpoint has an id in its path takes that id as an argument: `card_
 
 `create_test_account` returns a login for a person to sign in with. It doesn't move your agent onto that account: your other tools keep acting on your key's account and its real balance. See [Testing](/partner-api/testing).
 
-[Card catalog export](/partner-api/endpoints/card-catalog), [Purchase report](/partner-api/endpoints/purchase-report) and [Public card metadata](/partner-api/endpoints/get-public-card) are REST only, with no MCP tool.
+[Card catalog export](/partner-api/endpoints/card-catalog), [Purchase report](/partner-api/endpoints/purchase-report), [Public card metadata](/partner-api/endpoints/get-public-card), and [funding and withdrawals](/partner-api/funding) are REST only, with no MCP tool.
 
 An error comes back as a tool result with `isError: true` and the HTTP status in the text, so the agent can read it and react.

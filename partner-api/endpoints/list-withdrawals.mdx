@@ -1,0 +1,41 @@
+---
+title: "List withdrawals"
+api: "GET /api/partner/v1/withdrawals"
+description: "Your latest USDC withdrawals, newest first."
+---
+
+Scope: `withdraw:funds`, granted on request · REST only, no MCP tool
+
+Your account's latest 50 USDC withdrawals, newest first, including any made in our app. Each has the fields of a withdrawal in [Withdraw](/partner-api/endpoints/create-withdrawal).
+
+## Response
+
+<ResponseField name="withdrawals" type="object[]">Newest first, at most 50.</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v1/withdrawals \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "withdrawals": [
+    {
+      "id": "3a6f1c2e-…",
+      "status": "completed",
+      "amount": 2500,
+      "fee": 0,
+      "currency": "USDC",
+      "destination": { "network": "USDC on Base", "address": "0xab12…ab12" },
+      "tx_hashes": ["0x9c41…"],
+      "failure_reason": null,
+      "created_at": "2026-11-02T18:00:00.000Z",
+      "completed_at": "2026-11-02T18:02:10.000Z"
+    }
+  ]
+}
+```
+</ResponseExample>

@@ -5,6 +5,8 @@ description: "Order ids make every purchase safe to retry: how to choose one, wh
 
 [Buy packs](/partner-api/endpoints/buy-packs) and [Buy a card](/partner-api/endpoints/buy-card) spend your balance, so each one requires an `Idempotency-Key` header: your own id for the order. We record it before anything is charged, and from then on that order is charged at most once, however many times you send it.
 
+[Withdraw](/partner-api/endpoints/create-withdrawal) takes an `Idempotency-Key` too, with its own rules on that page.
+
 <Warning>
   Generate one order id per order and reuse it on every attempt of that order. A new id is a new order: a second set of packs, or a second card.
 </Warning>
