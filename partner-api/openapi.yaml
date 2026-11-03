@@ -2647,7 +2647,7 @@ paths:
       description: |-
         **Scope:** `read:account` (needs a linked account).
 
-        Your pack purchases, card purchases, sell-backs (one order per card) and sales of your listings, newest first. Shipment charges aren't here: read `cost` in List shipments. Money we credit to your account isn't here either, so this alone won't reconcile your balance. The history belongs to the account, not the key. Purchases and sell-backs made in our app are left out.
+        Your pack purchases, card purchases, sell-backs (one order per card) and sales of your listings, newest first. Shipment charges, money in and withdrawals aren't here: to reconcile your balance, use Balance history. The history belongs to the account, not the key. Purchases and sell-backs made in our app are left out.
 
         The window is capped at 31 days. Page with `next_cursor`: see [Pagination](/partner-api/pagination#cursor-pages).
       security:
@@ -2714,6 +2714,72 @@ paths:
                     transaction_id: null
         '400':
           description: An unknown `type`, a malformed or inverted window, a window over 31 days, or a cursor not passed back unchanged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'Invalid cursor: pass next_cursor from the previous page unchanged' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The key lacks `read:account` or isn't linked to an account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/partner/v1/balance-history:
+    get:
+      tags: [Account]
+      operationId: getBalanceHistory
+      summary: Balance history
+      description: |-
+        **Scope:** `read:account` (needs a linked account). REST only.
+
+        Every change to your balance in a window, newest first: orders, shipping charges, USDC withdrawals and money in (USDC deposits, wires we credited, card deposits). Only what moved your balance is listed: a failed order or withdrawal (refunded) isn't, and neither is an order still running before anything shows it charged. There's no running balance per line; `balance` is your balance now. What the account did in our app is left out.
+
+        The window is capped at 31 days. A page can come back short, even empty, while `has_more` is `true`: follow `next_cursor` until it is `null`. See [Pagination](/partner-api/pagination#cursor-pages).
+      security:
+        - bearerAuth: ['read:account']
+      parameters:
+        - $ref: '#/components/parameters/Since'
+        - $ref: '#/components/parameters/Until'
+        - name: limit
+          in: query
+          description: Entries per page, 1–100. A higher value is treated as 100.
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: cursor
+          in: query
+          description: '`next_cursor` from the previous page, unchanged. It carries that page''s window, so `since` and `until` are ignored when you send it.'
+          schema: { type: string }
+      responses:
+        '200':
+          description: One page of balance changes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [since, until, balance, limit, has_more, next_cursor, entries]
+                properties:
+                  since: { type: string, format: date-time }
+                  until: { type: string, format: date-time }
+                  balance: { type: number, description: Your balance now, in USD. }
+                  limit: { type: integer }
+                  has_more: { type: boolean }
+                  next_cursor: { type: [string, 'null'], description: Send it as `cursor` for the next page. `null` on the last page. }
+                  entries:
+                    type: array
+                    items: { $ref: '#/components/schemas/BalanceEntry' }
+              example:
+                since: '2026-10-01T00:00:00.000Z'
+                until: '2026-10-31T00:00:00.000Z'
+                balance: 4930
+                limit: 50
+                has_more: false
+                next_cursor: null
+                entries:
+                  - { id: 7b0f2c4e-…, type: withdrawal, amount: -5000, created_at: '2026-10-03T15:20:41.118+00:00', order_id: withdraw-2026-10-03-001, method: null }
+                  - { id: 3e1ab17c-…, type: pack_purchase, amount: -250, created_at: '2026-10-02T18:05:57.373+00:00', order_id: order-1042, method: null }
+                  - { id: c71d09a2-…, type: deposit, amount: 10000, created_at: '2026-10-02T17:41:03.552+00:00', order_id: null, method: usdc }
+        '400':
+          description: A malformed or inverted window, a window over 31 days, or a cursor not passed back unchanged.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -3261,6 +3327,22 @@ components:
       type: string
       description: A card's catalog. `goods` is luxury goods and `singles` is raw singles.
       enum: [pokemon, onepiece, sports, riftbound, watches, goods, singles]
+    BalanceEntry:
+      type: object
+      required: [id, type, amount, created_at, order_id, method]
+      properties:
+        id: { type: string, description: 'The order''s `checkout_id`, the shipment or withdrawal id, or the deposit''s id.' }
+        type:
+          type: string
+          enum: [pack_purchase, card_purchase, sell_back, listing_sale, shipment, withdrawal, deposit]
+          description: New values can be added, so don't fail on one you don't know.
+        amount: { type: number, description: 'The change to your balance in USD: negative when it took from it.' }
+        created_at: { type: string, format: date-time }
+        order_id: { type: [string, 'null'], description: The `Idempotency-Key` you sent with a purchase, shipment or withdrawal. }
+        method:
+          type: [string, 'null']
+          enum: [usdc, wire, card, other, null]
+          description: Deposits only.
     Withdrawal:
       type: object
       required: [id, status, amount, fee, currency, destination, tx_hashes, failure_reason, created_at, completed_at]

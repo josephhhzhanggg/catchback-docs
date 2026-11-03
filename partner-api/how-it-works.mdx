@@ -21,7 +21,7 @@ flowchart LR
 ## 1. Get a key and fund your account
 
 1. **Account and key.** You sign up for a CatchBack account. We create an API key with the [scopes](/partner-api/authentication#scopes) you need and link it to that account. The key is shown once; store it like a bank credential.
-2. **Funding.** You wire funds and we credit your account's CatchCoins balance (1 CatchCoin = $1). Purchases spend only that balance. There are no promo codes, add-ons or bonus balance on partner purchases.
+2. **Funding.** You send USDC to your deposit address ([Funding in USDC](/partner-api/funding)), or wire funds and we credit them. Either way the money lands in your account's CatchCoins balance (1 CatchCoin = $1). Purchases spend only that balance. There are no promo codes, add-ons or bonus balance on partner purchases.
 3. **Check the link.** Call [Who am I](/partner-api/endpoints/get-me). It works with any key and shows which account your key acts as. Quote that `account.id` when you fund the account or contact us.
 4. **Track your own customers.** A key acts as one CatchBack account, so we don't know which of your customers a pull or an order is for. Record that on your side, against each `pull_id` and the order ids you choose.
 5. **Try it first, if you like.** [Testing](/partner-api/testing) covers test accounts, what they can't do, and what to test with small real orders instead.
@@ -133,7 +133,7 @@ for each pull:
 wait until next_purchase_at    -> repeat
 ```
 
-To reconcile against your own records, [List orders](/partner-api/endpoints/list-orders) gives every pack purchase, card buy, sell-back and sale of your listings in a window, each with its effect on your balance. Shipment charges are on [List shipments](/partner-api/endpoints/list-shipments) (`cost`), and money we credit to your account is on neither, so include both when you reconcile your balance. To hear about them without polling, use a [webhook](/partner-api/webhooks).
+To reconcile your balance, [Balance history](/partner-api/endpoints/get-balance-history) lists every change to it in a window: orders, shipping charges, withdrawals and money in. [List orders](/partner-api/endpoints/list-orders) has the full detail of each order. To hear when an order finishes without polling, use a [webhook](/partner-api/webhooks).
 
 ## Doing it with an AI agent
 
