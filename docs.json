@@ -50,7 +50,7 @@
               "about-catchback/leaderboard",
               "about-catchback/referral-program",
               "about-catchback/shipping",
-              "about-catchback/catchcoins"
+              "about-catchback/wallet-balance"
             ]
           },
           {
@@ -318,5 +318,11 @@
     "playground": {
       "display": "simple"
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/about-catchback/catchcoins",
+      "destination": "/about-catchback/wallet-balance"
+    }
+  ]
 }
