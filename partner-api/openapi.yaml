@@ -13,7 +13,7 @@ info:
     change. New fields can be added to any response.
   contact:
     name: CatchBack support
-    email: catchbackcards@gmail.com
+    email: support@catchbackcards.com
 servers:
   - url: https://catchbackcards.com
     description: Production. Every call acts on real money and real inventory.

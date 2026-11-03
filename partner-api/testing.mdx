@@ -12,13 +12,13 @@ Reads never spend anything, so [Who am I](/partner-api/endpoints/get-me), [List 
 
 ## Test accounts
 
-[Create a test account](/partner-api/endpoints/create-test-account) makes a separate CatchBack login with a $10,000 test balance. It needs the `create:test_accounts` scope, which we grant on request: [contact us](mailto:catchbackcards@gmail.com).
+[Create a test account](/partner-api/endpoints/create-test-account) makes a separate CatchBack login with a $10,000 test balance. It needs the `create:test_accounts` scope, which we grant on request: [contact us](mailto:support@catchbackcards.com).
 
 <Warning>
   **A test account is a login, not a key.** Sign in with it on the web or in the app. Your API calls and MCP tools keep acting on your key's account, so they spend your key's real balance, even after you've made a test account.
 </Warning>
 
-To drive a test account through the API, [ask us](mailto:catchbackcards@gmail.com) to link a separate key to it. That key then acts on the test account and spends its test balance. Everything below still applies, and we turn that key off when the test account ends.
+To drive a test account through the API, [ask us](mailto:support@catchbackcards.com) to link a separate key to it. That key then acts on the test account and spends its test balance. Everything below still applies, and we turn that key off when the test account ends.
 
 ### What a test account can do
 
@@ -43,7 +43,7 @@ To drive a test account through the API, [ask us](mailto:catchbackcards@gmail.co
 
 - **Pulls are real cards from the live pool.** While a test account holds a card, nobody else can pull it. What it still holds goes back to the pool at 10:00 UTC every day, so sell back or finish your test before then.
 - **Don't judge odds or returns from one.** Its results can differ from a real account's.
-- **Limits:** 5 active test accounts per key, 30 days each. A sixth is a `409`. To end one early so you can make another, [contact us](mailto:catchbackcards@gmail.com).
+- **Limits:** 5 active test accounts per key, 30 days each. A sixth is a `409`. To end one early so you can make another, [contact us](mailto:support@catchbackcards.com).
 - **The password is shown once.** We can't show it again or reset it, so keep it when you create the account. [List test accounts](/partner-api/endpoints/list-test-accounts) shows the rest.
 - **How it ends:** when it reaches its `expires_at`, or when your key is turned off. It shows as `active: false` from that date, and its slot frees within about 2 hours, when our job ends it. Then it can't sign in, and a session already open lasts only until its access token expires.
 

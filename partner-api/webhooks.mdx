@@ -7,7 +7,7 @@ Instead of polling [List orders](/partner-api/endpoints/list-orders), your key c
 
 ## Setup
 
-We set the webhook up for you. [Contact us](mailto:catchbackcards@gmail.com) with your key's name and your URL, and we give you a signing secret, **once**. It starts `whsec_`. Keep it in a secret manager, like your API key.
+We set the webhook up for you. [Contact us](mailto:support@catchbackcards.com) with your key's name and your URL, and we give you a signing secret, **once**. It starts `whsec_`. Keep it in a secret manager, like your API key.
 
 - **The URL** has to be `https` on port 443, on a public hostname: no IP addresses and no private or internal addresses. We check it when we set it up and again on every delivery.
 - **The key** has to be linked to an account and hold `read:account`, because events carry what your order history shows. [`shipment.updated`](/partner-api/webhook-events#shipment-updated) also needs `ship:cards`.
@@ -126,7 +126,7 @@ A failure is retried on this schedule, counted from the failure before it:
 | 7 | 12 hours |
 | 8 | 24 hours |
 
-These are the shortest waits: retries go out when we next look for events. That's about 45 hours in all. After the eighth attempt the event stops and shows as failed on our side. [Contact us](mailto:catchbackcards@gmail.com) and we can send failed events again.
+These are the shortest waits: retries go out when we next look for events. That's about 45 hours in all. After the eighth attempt the event stops and shows as failed on our side. [Contact us](mailto:support@catchbackcards.com) and we can send failed events again.
 
 If your endpoint is down, answers `429` or a `5xx`, or doesn't answer, we stop sending that run's other events, so one outage doesn't use up the attempts on everything queued behind it.
 
