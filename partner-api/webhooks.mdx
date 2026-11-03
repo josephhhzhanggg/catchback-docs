@@ -10,7 +10,7 @@ Instead of polling [List orders](/partner-api/endpoints/list-orders), your key c
 We set the webhook up for you. [Contact us](mailto:catchbackcards@gmail.com) with your key's name and your URL, and we give you a signing secret, **once**. It starts `whsec_`. Keep it in a secret manager, like your API key.
 
 - **The URL** has to be `https` on port 443, on a public hostname: no IP addresses and no private or internal addresses. We check it when we set it up and again on every delivery.
-- **The key** has to be linked to an account and hold `read:account`, because events carry what your order history shows. [`shipment.updated`](/partner-api/webhook-events#shipment-updated) also needs `ship:cards`.
+- **The key** has to be linked to an account and hold `read:account`, because events carry what your order history shows. [`shipment.updated`](/partner-api/webhook-events#shipment-updated) also needs `ship:cards`, and [`withdrawal.updated`](/partner-api/webhook-events#withdrawal-updated) `withdraw:funds`.
 - **One webhook per key.** Events start when the webhook is set up, and nothing earlier is replayed.
 
 To change the URL, pause the webhook, or get a new secret, contact us:
@@ -130,11 +130,11 @@ These are the shortest waits: retries go out when we next look for events. That'
 
 If your endpoint is down, answers `429` or a `5xx`, or doesn't answer, we stop sending that run's other events, so one outage doesn't use up the attempts on everything queued behind it.
 
-[List orders](/partner-api/endpoints/list-orders) always has every finished order and [List shipments](/partner-api/endpoints/list-shipments) the current statuses, so reconcile against them after an outage.
+[List orders](/partner-api/endpoints/list-orders) always has every finished order and [List shipments](/partner-api/endpoints/list-shipments) and [List withdrawals](/partner-api/endpoints/list-withdrawals) the current statuses, so reconcile against them after an outage.
 
 ## Duplicates and order
 
 Delivery is at-least-once and unordered. The same event can arrive twice, and a later event can arrive first.
 
 - **Dedupe on `id`.** It never changes for an event, including across retries.
-- **Don't rely on order.** For two events about one shipment, the later `status_updated_at` is the newer.
+- **Don't rely on order.** For two events about one shipment, the later `status_updated_at` is the newer. For a withdrawal, `completed` and `failed` are final.
