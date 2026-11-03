@@ -5,6 +5,10 @@ description: "What changed in the Partner API, newest first."
 
 Changes to `v1` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. A breaking change would ship under a new version prefix. Dates are US Pacific time.
 
+<Update label="November 3, 2026" description="Balance history">
+  - New: [Balance history](/partner-api/endpoints/get-balance-history) (`GET /balance-history`, scope `read:account`): every change to your balance in a window, newest first, in one list: orders, shipping charges, USDC withdrawals and money in (USDC deposits, wires we credited, card deposits). REST only.
+</Update>
+
 <Update label="November 2, 2026" description="Funding and withdrawals in USDC">
   - New guide: [Funding in USDC](/partner-api/funding).
   - New: [Get funding details](/partner-api/endpoints/get-funding) (`GET /funding`, scope `read:account`): your permanent USDC deposit addresses. A deposit lands in your balance once it settles.

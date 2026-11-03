@@ -1,0 +1,87 @@
+---
+title: "Balance history"
+api: "GET /api/partner/v1/balance-history"
+description: "Every change to your balance, newest first: orders, shipments, withdrawals and money in."
+---
+
+Scope: `read:account` · REST only, no MCP tool
+
+Every change to your CatchCoins balance in a window, newest first, in one list: what your orders cost or paid, shipping charges, USDC withdrawals, and the money that came in. Use it to explain your balance line by line, for example to match it against your own books at the end of a month.
+
+| `type` | What it is | Its `id` |
+|---|---|---|
+| `pack_purchase`, `card_purchase`, `sell_back`, `listing_sale` | An order, as in [List orders](/partner-api/endpoints/list-orders) | The order's `checkout_id`: [Get an order](/partner-api/endpoints/get-order) takes it |
+| `shipment` | A shipping charge | The shipment's `id`: [Get a shipment](/partner-api/endpoints/get-shipment) takes it |
+| `withdrawal` | A [USDC withdrawal](/partner-api/funding#withdraw) | The withdrawal's `id`: [Get a withdrawal](/partner-api/endpoints/get-withdrawal) takes it |
+| `deposit` | Money in: a USDC or other crypto deposit, a wire we credited, or a card deposit | The deposit's id |
+
+Only what moved your balance is listed:
+
+- An order still running, before anything shows it charged, isn't listed yet. A failed order or a failed withdrawal is never listed, since the amount went back to your balance.
+- There is no running balance on each line. The response carries your `balance` now.
+- What the account did in our app is left out, as in List orders.
+
+<ParamField query="since" type="string">ISO 8601 with a time zone, e.g. `2026-10-01T00:00:00Z`. Inclusive. Defaults to `until` minus 7 days.</ParamField>
+<ParamField query="until" type="string">ISO 8601 with a time zone. Inclusive. Defaults to now. At most 31 days after `since`.</ParamField>
+<ParamField query="limit" type="integer" default="50">Entries per page, 1–100. A higher value is treated as 100.</ParamField>
+<ParamField query="cursor" type="string">
+  `next_cursor` from the previous page, unchanged. It carries that page's window, so `since` and `until` are ignored when you send it. See [Pagination](/partner-api/pagination#cursor-pages).
+</ParamField>
+
+<Note>
+  A page can come back with fewer entries than `limit`, even none, while `has_more` is `true`. Keep following `next_cursor` until it is `null`.
+</Note>
+
+## Response
+
+<ResponseField name="since" type="string">The window's start, as used.</ResponseField>
+<ResponseField name="until" type="string">The window's end, as used.</ResponseField>
+<ResponseField name="balance" type="number">Your balance now, in USD. The same as `balance` in [Get account](/partner-api/endpoints/get-account).</ResponseField>
+<ResponseField name="limit" type="integer" />
+<ResponseField name="has_more" type="boolean">Whether there may be more entries in the window.</ResponseField>
+<ResponseField name="next_cursor" type="string | null">Send it as `cursor` for the next page. `null` on the last page.</ResponseField>
+<ResponseField name="entries" type="object[]">
+  Newest first, by `created_at`.
+  <Expandable title="entry">
+    <ResponseField name="id" type="string">See the table above.</ResponseField>
+    <ResponseField name="type" type="string">`pack_purchase`, `card_purchase`, `sell_back`, `listing_sale`, `shipment`, `withdrawal` or `deposit`. New values can be added, so don't fail on one you don't know.</ResponseField>
+    <ResponseField name="amount" type="number">The change to your balance in USD: negative when it took from it. A sale's is net of the $1 seller fee.</ResponseField>
+    <ResponseField name="created_at" type="string" />
+    <ResponseField name="order_id" type="string | null">The `Idempotency-Key` you sent with a purchase, shipment or withdrawal. `null` otherwise.</ResponseField>
+    <ResponseField name="method" type="string | null">Deposits only: `crypto` (a USDC deposit to your [deposit address](/partner-api/funding#deposit), or another crypto deposit), `wire`, `card` or `other`. `null` on every other type.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | A `since` or `until` we can't read as a date, `since` not before `until`, a window wider than 31 days, or a `cursor` that wasn't passed back unchanged |
+| `403` | The key lacks `read:account` or isn't linked to an account |
+| `500` | We couldn't read your history. Retry with backoff: you never get a partial page |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v1/balance-history?since=2026-10-01T00:00:00Z&until=2026-10-31T00:00:00Z" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "since": "2026-10-01T00:00:00.000Z",
+  "until": "2026-10-31T00:00:00.000Z",
+  "balance": 4930,
+  "limit": 50,
+  "has_more": false,
+  "next_cursor": null,
+  "entries": [
+    { "id": "7b0f2c4e-…", "type": "withdrawal", "amount": -5000, "created_at": "2026-10-03T15:20:41.118+00:00", "order_id": "withdraw-2026-10-03-001", "method": null },
+    { "id": "a0c3e7d1-…", "type": "sell_back", "amount": 180, "created_at": "2026-10-02T18:09:12.904+00:00", "order_id": null, "method": null },
+    { "id": "3e1ab17c-…", "type": "pack_purchase", "amount": -250, "created_at": "2026-10-02T18:05:57.373+00:00", "order_id": "order-1042", "method": null },
+    { "id": "c71d09a2-…", "type": "deposit", "amount": 10000, "created_at": "2026-10-02T17:41:03.552+00:00", "order_id": null, "method": "crypto" }
+  ]
+}
+```
+</ResponseExample>
