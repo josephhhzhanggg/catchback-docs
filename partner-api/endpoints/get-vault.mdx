@@ -9,7 +9,7 @@ Scope: `read:account` · MCP tool: `get_vault`
 Cards in your vault or listed on the marketplace. Cards that have shipped are not included. A sealed product (a pull from the Starter or a sealed mystery pack) isn't listed here, and the API can't sell it back, list it or ship it. Each card names its latest acquisition: a pull (`pull_id`) or a buy (`purchase_id`). One is set and the other is `null`, and [Sell back](/partner-api/endpoints/sell-back) takes whichever is set. Both can be `null` for a card that reached your account another way: read the vault again, or contact us.
 
 <ParamField query="category" type="string" default="pokemon">
-  `pokemon`, `onepiece`, `sports`, `riftbound`, `watches`, `goods` (luxury goods) or `singles` (raw singles). A pull can land in a different catalog from its pack's (a raw single from a Pokémon pack, for example), and the item's `category` says which, so sync every category you might hold.
+  `pokemon`, `onepiece`, `sports`, `riftbound`, `watches`, `goods` (luxury goods), `singles` (raw singles) or `energy` (the energy cards from base packs, which sell back at 100% of their value). A pull can land in a different catalog from its pack's (a raw single from a Pokémon pack, for example), and the item's `category` says which, so sync every category you might hold.
 </ParamField>
 <ParamField query="page" type="integer" default="1">1-based. See [Pagination](/partner-api/pagination).</ParamField>
 <ParamField query="per_page" type="integer" default="100">1–200. A higher value is treated as 200.</ParamField>
@@ -39,7 +39,7 @@ Cards in your vault or listed on the marketplace. Cards that have shipped are no
 </ResponseField>
 
 <Note>
-  For 7 days after you acquire a card, its offer is based on its value when you acquired it, fixed whether the market moves up or down (`locked_value_until`). After that it follows the current market value. See [Liquidity](/about-catchback/liquidity).
+  For 7 days after you acquire a card, its offer is based on its value when you acquired it, fixed whether the market moves up or down (`locked_value_until`). After that it follows the current market value. See [Liquidity](/about-catchback/liquidity). [Quote a sell-back](/partner-api/endpoints/quote-sell-back) shows when each amount ends.
 </Note>
 
 <RequestExample>

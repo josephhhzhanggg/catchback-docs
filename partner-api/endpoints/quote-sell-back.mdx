@@ -1,0 +1,108 @@
+---
+title: "Quote a sell-back"
+api: "POST /api/partner/v1/cards/sell-back/quote"
+description: "What a sell-back pays for each card you hold, now and at every point after, with the exact UTC time each amount starts and ends."
+---
+
+Scope: `sell:cards` · MCP tool: `quote_sell_back`
+
+A quote moves no money and reserves nothing. It tells you what [Sell back cards](/partner-api/endpoints/sell-back) would pay for each card right now, and when that changes: for a fresh pull, 90% until 5 minutes after the pull, then 80% of the value at pull until 7 days after it, then 80% of market value. Each phase comes with the exact UTC instant it starts and ends.
+
+A quote holds while the card stays in your vault. The last phase follows the market, so its amount is today's estimate. To sell at a quoted price and nothing less, send its `amount` as `min_payout` on [Sell back cards](/partner-api/endpoints/sell-back).
+
+<ParamField body="category" type="string" default="pokemon">
+  The catalog the cards are in: `pokemon`, `onepiece`, `sports`, `riftbound`, `watches`, `goods`, `singles` or `energy` (the energy cards from base packs). One category per request, as in [Get vault](/partner-api/endpoints/get-vault).
+</ParamField>
+
+<ParamField body="items" type="object[]" required>
+  1–100 cards, each `{ card_id }`. An item may also name the `pull_id` or `purchase_id` you'll sell it back by (at most one); it fails if that's no longer the card's latest acquisition. The same card can't be listed twice.
+</ParamField>
+
+## Response
+
+<ResponseField name="category" type="string" />
+<ResponseField name="quoted_at" type="string">When the quote was made, in UTC.</ResponseField>
+<ResponseField name="results" type="object[]">
+  One per item, in the order you sent them.
+  <Expandable title="result">
+    <ResponseField name="card_id" type="string" />
+    <ResponseField name="pull_id" type="string | null">The card's latest acquisition, when it's a pull. Sell back by this.</ResponseField>
+    <ResponseField name="purchase_id" type="string | null">The card's latest acquisition, when it's a buy.</ResponseField>
+    <ResponseField name="status" type="string">`quoted`, `not_offered` (with `reason`) or `failed` (with `error`, e.g. a card you don't hold).</ResponseField>
+    <ResponseField name="reason" type="string">Only on `not_offered`: `listed` ([delist it](/partner-api/endpoints/delist-card) first), or `fresh_window_closed` for a luxury goods item more than 5 minutes after its pull.</ResponseField>
+    <ResponseField name="catchback" type="object">
+      Only on `quoted`.
+      <Expandable title="catchback">
+        <ResponseField name="amount" type="number">What a sell-back pays right now, in USD.</ResponseField>
+        <ResponseField name="rate" type="number" />
+        <ResponseField name="valid_until" type="string | null">When the current amount ends. `null` when it doesn't.</ResponseField>
+        <ResponseField name="schedule" type="object[]">
+          Every phase from now on, back to back. A sell-back sent between `valid_from` and `valid_until` pays `amount`.
+          <Expandable title="phase">
+            <ResponseField name="amount" type="number" />
+            <ResponseField name="rate" type="number" />
+            <ResponseField name="basis" type="string">`value_at_acquisition` (the value when you got the card) or `market_value`.</ResponseField>
+            <ResponseField name="basis_value" type="number">The value the rate applies to.</ResponseField>
+            <ResponseField name="fixed" type="boolean">`true`: the amount is locked and won't change. `false`: it follows the market, and `amount` is today's estimate.</ResponseField>
+            <ResponseField name="valid_from" type="string" />
+            <ResponseField name="valid_until" type="string | null">`null` on the last phase.</ResponseField>
+          </Expandable>
+        </ResponseField>
+        <ResponseField name="auto_sold_at" type="string | null">For a card from a pack that holds its cards, when we sell it back for you.</ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Special cases
+
+- **Energy cards** (`category: "energy"`) have one phase: 100% of their value, with no 5-minute window and no lock.
+- **A card from a pack that holds its cards** has one 90% phase, ending at `auto_sold_at`, when it's sold back automatically.
+- **A luxury goods item** has only its 5-minute phase; after that it's `not_offered`.
+- **Insurance or a boost** bought on the pull raises the first phase's amount, inside the 5-minute window.
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | The body isn't JSON, the category is unknown, `items` is missing, empty or longer than 100, an item lacks a UUID `card_id` or names both a `pull_id` and a `purchase_id`, or the same card is listed twice |
+| `403` | The key lacks `sell:cards` or isn't linked to an account |
+| `500` | We couldn't read the cards or their offers. Nothing changed; retry |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v1/cards/sell-back/quote \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "category": "pokemon", "items": [{ "card_id": "bee48cce-3d1f-4c2a-8b7e-5a9d0c4f1e62" }, { "card_id": "4a51bc92-7e3d-4f1a-9b2c-6d8e0f1a2b3c" }] }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "category": "pokemon",
+  "quoted_at": "2026-11-02T18:01:00.000Z",
+  "results": [
+    {
+      "card_id": "bee48cce-…",
+      "pull_id": "873deb80-…",
+      "purchase_id": null,
+      "status": "quoted",
+      "catchback": {
+        "amount": 18,
+        "rate": 0.9,
+        "valid_until": "2026-11-02T18:05:00.000Z",
+        "schedule": [
+          { "amount": 18, "rate": 0.9, "basis": "value_at_acquisition", "basis_value": 20, "fixed": true, "valid_from": "2026-11-02T18:01:00.000Z", "valid_until": "2026-11-02T18:05:00.000Z" },
+          { "amount": 16, "rate": 0.8, "basis": "value_at_acquisition", "basis_value": 20, "fixed": true, "valid_from": "2026-11-02T18:05:00.000Z", "valid_until": "2026-11-09T18:00:00.000Z" },
+          { "amount": 17.6, "rate": 0.8, "basis": "market_value", "basis_value": 22, "fixed": false, "valid_from": "2026-11-09T18:00:00.000Z", "valid_until": null }
+        ],
+        "auto_sold_at": null
+      }
+    },
+    { "card_id": "4a51bc92-…", "pull_id": null, "purchase_id": "e22855d2-…", "status": "not_offered", "reason": "listed" }
+  ]
+}
+```
+</ResponseExample>
