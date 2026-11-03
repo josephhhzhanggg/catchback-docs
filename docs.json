@@ -155,7 +155,8 @@
             "group": "Orders",
             "pages": [
               "partner-api/endpoints/list-orders",
-              "partner-api/endpoints/get-order"
+              "partner-api/endpoints/get-order",
+              "partner-api/endpoints/get-balance-history"
             ]
           },
           {
