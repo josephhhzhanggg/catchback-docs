@@ -21,7 +21,7 @@ Withdrawals go to **one address only**: the escrow address on Base you give us, 
 
 1. [Withdraw](/partner-api/endpoints/create-withdrawal) with an `amount` and an `Idempotency-Key`. The amount leaves your balance at once.
 2. The same amount of USDC arrives on Base, usually within a few minutes. There is no fee.
-3. Follow it with [Get a withdrawal](/partner-api/endpoints/get-withdrawal) until it's `completed` (with its transaction hashes) or `failed` (the amount is already back in your balance).
+3. Follow it with [Get a withdrawal](/partner-api/endpoints/get-withdrawal), or a [`withdrawal.updated`](/partner-api/webhook-events#withdrawal-updated) webhook, until it's `completed` (with its transaction hashes) or `failed` (the amount is already back in your balance).
 
 | | |
 |---|---|

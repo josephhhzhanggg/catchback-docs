@@ -3136,6 +3136,55 @@ webhooks:
                   delivered_at: null
       responses:
         '200': { $ref: '#/components/responses/WebhookAck' }
+  withdrawal.updated:
+    post:
+      tags: [Webhooks]
+      operationId: withdrawalUpdatedEvent
+      summary: Withdrawal updated
+      description: |-
+        **We send this to your URL**, once we've set a webhook up for your key: contact us with its name and your URL, and we give you a signing secret once. Setup, checking the signature and retries: [Webhooks](/partner-api/webhooks). A USDC withdrawal on your account changed status. Every webhook on the account whose key holds `withdraw:funds` as well as `read:account` gets it.
+
+        At most one event per status: `processing`, `pending_review`, then `completed` or `failed`, which are final. Two quick changes can collapse into one, so a fast withdrawal may send only `completed`, and delivery is unordered. Get a withdrawal always has the current status.
+      security:
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/WebhookSignature'
+        - $ref: '#/components/parameters/WebhookEvent'
+        - $ref: '#/components/parameters/WebhookEventId'
+        - $ref: '#/components/parameters/WebhookAttempt'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/WebhookEnvelope'
+                - type: object
+                  properties:
+                    type: { const: withdrawal.updated }
+                    data:
+                      type: object
+                      required: [withdrawal]
+                      properties:
+                        withdrawal: { $ref: '#/components/schemas/Withdrawal' }
+            example:
+              id: evt_5e2c8a14d97b3f60a1c4e8d2b7f09a35
+              type: withdrawal.updated
+              created_at: '2026-11-03T18:02:10.000Z'
+              data:
+                withdrawal:
+                  id: 3a6f1c2e-…
+                  status: completed
+                  amount: 2500
+                  fee: 0
+                  currency: USDC
+                  destination: { network: USDC on Base, address: 0xab12…ab12 }
+                  tx_hashes: [0x9c41…]
+                  failure_reason: null
+                  created_at: '2026-11-03T18:00:00.000Z'
+                  completed_at: '2026-11-03T18:02:10.000Z'
+      responses:
+        '200': { $ref: '#/components/responses/WebhookAck' }
 components:
   securitySchemes:
     bearerAuth:

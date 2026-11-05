@@ -6,8 +6,8 @@ description: "Every event a webhook can send, and what each one carries."
 Every event has the same outer shape, and its `data` depends on its `type`. To get events, see [Webhooks](/partner-api/webhooks).
 
 <ResponseField name="id" type="string">The event's id, `evt_` and 32 hex characters. It never changes, including across retries, so dedupe on it.</ResponseField>
-<ResponseField name="type" type="string">`order.completed`, `listing.sold` or `shipment.updated`.</ResponseField>
-<ResponseField name="created_at" type="string">When the thing happened: the order finished, or the shipment's status changed. Not when we sent the event.</ResponseField>
+<ResponseField name="type" type="string">`order.completed`, `listing.sold`, `shipment.updated` or `withdrawal.updated`.</ResponseField>
+<ResponseField name="created_at" type="string">When the thing happened: the order finished, or the shipment's or withdrawal's status changed. Not when we sent the event.</ResponseField>
 <ResponseField name="data" type="object">Depends on `type`.</ResponseField>
 
 <Warning>
@@ -19,6 +19,7 @@ Every event has the same outer shape, and its `data` depends on its `type`. To g
 | [`order.completed`](#order-completed) | A pack order, card order or sell-back made through the API finished | `{ order }` | Every webhook on the account |
 | [`listing.sold`](#listing-sold) | Someone bought one of your listings | `{ order }` with `type: "listing_sale"` | Every webhook on the account |
 | [`shipment.updated`](#shipment-updated) | A shipment made with this key changed status | `{ shipment }` | Only the key that made the shipment |
+| [`withdrawal.updated`](#withdrawal-updated) | A USDC withdrawal on your account changed status | `{ withdrawal }` | Every webhook on the account whose key has `withdraw:funds` |
 
 An event never identifies a buyer, and no part of a customer's address is ever in one.
 
@@ -127,6 +128,37 @@ A shipment event tells you a shipment moved, not every step it took. **[Get a sh
       "shipped_at": "2026-11-03T16:20:00.000Z",
       "expected_delivery": null,
       "delivered_at": null
+    }
+  }
+}
+```
+
+## Withdrawal updated
+
+`withdrawal.updated`: a [USDC withdrawal](/partner-api/funding#withdraw) on your account changed status. `withdrawal` is the object [Get a withdrawal](/partner-api/endpoints/get-withdrawal) returns, so a `completed` one carries its `tx_hashes`.
+
+- **Who gets it:** every webhook on your account whose key holds `withdraw:funds` as well as `read:account`, like [List withdrawals](/partner-api/endpoints/list-withdrawals).
+- **At most one event per status:** `processing`, `pending_review`, then `completed` or `failed`. The first can repeat the status [Withdraw](/partner-api/endpoints/create-withdrawal) already returned.
+- **Two quick changes can collapse into one,** so a withdrawal that completes within seconds may send only `completed`.
+- **`completed` and `failed` are final.** Delivery is unordered, so a `processing` that arrives after one of them is old. A `failed` withdrawal is already back in your balance.
+
+```json
+{
+  "id": "evt_5e2c8a14d97b3f60a1c4e8d2b7f09a35",
+  "type": "withdrawal.updated",
+  "created_at": "2026-11-03T18:02:10.000Z",
+  "data": {
+    "withdrawal": {
+      "id": "3a6f1c2e-…",
+      "status": "completed",
+      "amount": 2500,
+      "fee": 0,
+      "currency": "USDC",
+      "destination": { "network": "USDC on Base", "address": "0xab12…ab12" },
+      "tx_hashes": ["0x9c41…"],
+      "failure_reason": null,
+      "created_at": "2026-11-03T18:00:00.000Z",
+      "completed_at": "2026-11-03T18:02:10.000Z"
     }
   }
 }

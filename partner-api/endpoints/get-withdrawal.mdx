@@ -6,7 +6,7 @@ description: "One USDC withdrawal and its current status."
 
 Scope: `withdraw:funds`, granted on request · REST only, no MCP tool
 
-Poll this after [Withdraw](/partner-api/endpoints/create-withdrawal) until the status is `completed` or `failed`. A few seconds apart is plenty; most finish within minutes.
+Poll this after [Withdraw](/partner-api/endpoints/create-withdrawal) until the status is `completed` or `failed`. A few seconds apart is plenty; most finish within minutes. With a webhook, [`withdrawal.updated`](/partner-api/webhook-events#withdrawal-updated) tells you instead.
 
 <ParamField path="id" type="string" required>
   The withdrawal's `id`. A UUID.

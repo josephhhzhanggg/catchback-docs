@@ -257,7 +257,8 @@
             "pages": [
               "WEBHOOK order.completed",
               "WEBHOOK listing.sold",
-              "WEBHOOK shipment.updated"
+              "WEBHOOK shipment.updated",
+              "WEBHOOK withdrawal.updated"
             ]
           }
         ]
