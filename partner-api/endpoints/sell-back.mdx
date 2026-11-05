@@ -1,7 +1,7 @@
 ---
 title: "Sell back cards"
 api: "POST /api/partner/v1/cards/sell-back"
-description: "Sell cards you pulled or bought back to CatchBack for CatchCoins, at the same rates as every customer."
+description: "Sell cards you pulled or bought back to CatchBack, paid to your Wallet Balance, at the same rates as every customer."
 ---
 
 Scope: `sell:cards` · MCP tool: `sell_back_cards`
@@ -21,7 +21,7 @@ Items run in order, and one failing doesn't stop the rest. A pull or purchase pa
 ## Response
 
 <ResponseField name="total_paid" type="number">USD credited by this request: the `sold` items only. An `already_sold` item was paid earlier and isn't counted again.</ResponseField>
-<ResponseField name="remaining_balance" type="number | null">Your CatchCoins balance after the request, or `null` if we couldn't read it.</ResponseField>
+<ResponseField name="remaining_balance" type="number | null">Your Wallet Balance after the request, or `null` if we couldn't read it.</ResponseField>
 <ResponseField name="results" type="object[]">
   One per item, in the order you sent them.
   <Expandable title="result">

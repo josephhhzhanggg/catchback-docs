@@ -1,12 +1,12 @@
 ---
 title: "Buy packs"
 api: "POST /api/partner/v1/packs/purchase"
-description: "Open packs with your CatchCoins and get every hit back, with its CatchBack offer."
+description: "Open packs with your Wallet Balance and get every hit back, with its CatchBack offer."
 ---
 
 Scope: `rip:packs` · MCP tool: `buy_packs`
 
-Opens packs with your account's CatchCoins at list price, through the same checkout as our app. No promo codes, add-ons or bonus balance apply. Cards land in your vault. A sealed product doesn't: it isn't in [Get vault](/partner-api/endpoints/get-vault), and the API can't sell it back, list it or ship it. Don't buy the Starter or a sealed mystery pack from an API-only flow.
+Opens packs with your account's Wallet Balance at list price, through the same checkout as our app. No promo codes, add-ons or bonus balance apply. Cards land in your vault. A sealed product doesn't: it isn't in [Get vault](/partner-api/endpoints/get-vault), and the API can't sell it back, list it or ship it. Don't buy the Starter or a sealed mystery pack from an API-only flow.
 
 **All or nothing:** if any pack in the request fails to open, the whole order is refunded and none of its pulls stand.
 
@@ -38,7 +38,7 @@ Opens packs with your account's CatchCoins at list price, through the same check
 <ResponseField name="pack_type" type="string" />
 <ResponseField name="quantity" type="integer" />
 <ResponseField name="total_charged" type="number | null">USD charged for the whole order.</ResponseField>
-<ResponseField name="remaining_balance" type="number">Your CatchCoins balance after the order.</ResponseField>
+<ResponseField name="remaining_balance" type="number">Your Wallet Balance after the order.</ResponseField>
 <ResponseField name="summary" type="object">
   `total_value` of everything pulled, `catchback_now_total` (what selling all of it back right now would pay), and `best_pull`, which is `null` when no pull has a value.
 </ResponseField>

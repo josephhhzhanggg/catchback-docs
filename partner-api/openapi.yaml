@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   summary: Open packs, trade cards, read card data and ship vaulted cards.
   description: |-
-    The Partner API acts on one CatchBack account with its real CatchCoins balance. Several
+    The Partner API acts on one CatchBack account with its real Wallet Balance. Several
     operations here move money or data, so read [Idempotency](/partner-api/idempotency) before
     you call them.
 
@@ -13,7 +13,7 @@ info:
     change. New fields can be added to any response.
   contact:
     name: CatchBack support
-    email: catchbackcards@gmail.com
+    email: support@catchbackcards.com
 servers:
   - url: https://catchbackcards.com
     description: Production. Every call acts on real money and real inventory.
@@ -184,7 +184,7 @@ paths:
       description: |-
         **Scope:** `rip:packs` (needs a linked account). **Moves money.**
 
-        Opens 1–10 packs with your CatchCoins at list price. No promo codes, add-ons or bonus balance apply. Cards land in your vault, and every hit comes back with its CatchBack offer and a proof you can [check](/partner-api/verify-a-pull). A sealed product doesn't land in your vault: it isn't in Get vault, and the API can't sell it back, list it or ship it. Don't buy the Starter or a sealed mystery pack from an API-only flow.
+        Opens 1–10 packs with your Wallet Balance at list price. No promo codes, add-ons or bonus balance apply. Cards land in your vault, and every hit comes back with its CatchBack offer and a proof you can [check](/partner-api/verify-a-pull). A sealed product doesn't land in your vault: it isn't in Get vault, and the API can't sell it back, list it or ship it. Don't buy the Starter or a sealed mystery pack from an API-only flow.
 
         **All or nothing:** if any pack fails to open, the whole order is refunded and none of its pulls stand.
 
@@ -378,7 +378,7 @@ paths:
       description: |-
         **Scope:** `sell:cards` (needs a linked account). **Moves money.**
 
-        CatchBack up to 10 cards for CatchCoins, at the same rate a customer gets. A pulled card: the pull's fresh rate (90%) within 5 minutes of the pull, then 80% of the value at pull for 7 days, then 80% of market value. A bought card: 80% of the lower of the price you paid and its market value at purchase for 7 days, then 80% of market value.
+        CatchBack up to 10 cards, paid to your Wallet Balance, at the same rate a customer gets. A pulled card: the pull's fresh rate (90%) within 5 minutes of the pull, then 80% of the value at pull for 7 days, then 80% of market value. A bought card: 80% of the lower of the price you paid and its market value at purchase for 7 days, then 80% of market value.
 
         An energy card from a base pack pays 100% of its value. A card from a pack with a hold pays 90% until the hold ends. To see every amount and when it changes before you sell, use Quote a sell-back.
 
@@ -890,7 +890,7 @@ paths:
       description: |-
         **Scope:** `buy:cards` (needs a linked account). **Moves money.**
 
-        Buys one card from the shop or a fixed-price listing: its price plus a $1 buyer fee, from your cash CatchCoins balance only. The card lands in your vault. Daily card and spend caps apply: see [Rate limits](/partner-api/rate-limits#card-purchases).
+        Buys one card from the shop or a fixed-price listing: its price plus a $1 buyer fee, from your cash Wallet Balance only. The card lands in your vault. Daily card and spend caps apply: see [Rate limits](/partner-api/rate-limits#card-purchases).
 
         **`needs_review: true` in any response means the order may have been charged and we are settling it.** Never place it again under a new key. Follow it with [Get an order](/partner-api/endpoints/get-order). See [Idempotency](/partner-api/idempotency).
       security:
@@ -2293,7 +2293,7 @@ paths:
       description: |-
         **Scope:** `read:account` (needs a linked account).
 
-        Your CatchCoins balance, packs used today against the daily ceiling, when the next pack purchase is allowed, and cards and card spend used today against the daily caps.
+        Your Wallet Balance, packs used today against the daily ceiling, when the next pack purchase is allowed, and cards and card spend used today against the daily caps.
       security:
         - bearerAuth: ['read:account']
       responses:
