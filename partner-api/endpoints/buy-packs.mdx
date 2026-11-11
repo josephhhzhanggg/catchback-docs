@@ -29,7 +29,7 @@ Opens packs with your account's Wallet Balance at list price, through the same c
   1–10, up to the pack's `max_quantity`. See [Rate limits](/partner-api/rate-limits#pack-purchases).
 </ParamField>
 <ParamField body="risk_level" type="string" default="standard">
-  `chill`, `standard` or `aggressive` (shown as Chill, Standard and Hot in the app), from the pack's `risk_levels`; any other level is a `400`. See [Risk levels](/about-catchback/risk-levels).
+  `standard` (the default) opens on Classic odds, and its pulls sell back at 100% for the first 5 minutes. `chill` and `aggressive` open on the earlier Chill and Hot odds, and their pulls sell back at 90% for the first 5 minutes. The app's newer Standard, Chill and Hot [odds modes](/about-catchback/risk-levels) aren't available through the API. Use one of the pack's `risk_levels`; any other level is a `400`.
 </ParamField>
 
 ## Response
@@ -52,7 +52,7 @@ Opens packs with your account's Wallet Balance at list price, through the same c
       `rarity_tier`, the `bucket` (band) it came from and that band's `bucket_odds`, `is_chase` and `chase_label`.
     </ResponseField>
     <ResponseField name="catchback" type="object | null">
-      What we'll pay to buy it back: `amount` and `rate` now (90% for the first 5 minutes), `valid_until`, and `after`, the offer once the fresh window ends (80% of the value at pull). `null` for sealed packs and for a pull with no value. The [sell-back](/partner-api/endpoints/sell-back) response is the authoritative amount.
+      What we'll pay to buy it back: `amount` and `rate` now (for the first 5 minutes: 100% at `standard`, 90% at `chill` or `aggressive`), `valid_until`, and `after`, the offer once the fresh window ends (80% of the value at pull). `null` for sealed packs and for a pull with no value. The [sell-back](/partner-api/endpoints/sell-back) response is the authoritative amount.
     </ResponseField>
     <ResponseField name="proof" type="object | null">
       The pull's provably fair record: `seed`, `verification_hash`, `seed_commit_hash`, `timestamp`, and `verify_path`, a check you can `GET` without a key (`null` for a Steph Curry pull, which that check doesn't cover). `proof` is `null` for a guaranteed pull, which no roll chose. Keep it: no other endpoint returns it. See [Verify a pull](/partner-api/verify-a-pull).
@@ -106,7 +106,7 @@ curl -X POST https://catchbackcards.com/api/partner/v1/packs/purchase \
   "remaining_balance": 189935,
   "summary": {
     "total_value": 32.62,
-    "catchback_now_total": 29.36,
+    "catchback_now_total": 32.62,
     "best_pull": { "pull_id": "fe04349b-…", "name": "Tyrunt", "value": 20.62 }
   },
   "pulls": [
@@ -130,8 +130,8 @@ curl -X POST https://catchbackcards.com/api/partner/v1/packs/purchase \
       "value": 20.62,
       "hit": { "rarity_tier": "starter", "bucket": "P0", "bucket_odds": 0.72, "is_chase": false, "chase_label": null },
       "catchback": {
-        "amount": 18.56,
-        "rate": 0.9,
+        "amount": 20.62,
+        "rate": 1,
         "valid_until": "2026-09-29T20:24:55Z",
         "after": { "amount": 16.5, "rate": 0.8, "valid_until": "2026-10-06T20:19:55Z" }
       },

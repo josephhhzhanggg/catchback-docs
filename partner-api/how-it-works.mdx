@@ -30,7 +30,7 @@ flowchart LR
     Every purchase carries your own order id, so a retry can never charge you twice. Each pull comes back with its CatchBack offer and a proof you can check. [Opening packs](/partner-api/opening-packs), [Buying and listing cards](/partner-api/trading-cards)
   </Step>
   <Step title="Decide what to do with each card">
-    Everything lands in your vault. Hold it, sell it back to us (90% for the first 5 minutes after a pull), list it on the marketplace, or ship it to your customer. [Your vault and sell-backs](/partner-api/vault-and-sell-backs), [Shipping cards](/partner-api/shipping)
+    Everything lands in your vault. Hold it, sell it back to us (100% for the first 5 minutes after a pull at `standard`), list it on the marketplace, or ship it to your customer. [Your vault and sell-backs](/partner-api/vault-and-sell-backs), [Shipping cards](/partner-api/shipping)
   </Step>
   <Step title="Reconcile">
     [Balance history](/partner-api/endpoints/get-balance-history) lists every change to your balance, and [List orders](/partner-api/endpoints/list-orders) the detail of each order. A [webhook](/partner-api/webhooks) tells you when an order finishes, a listing sells, a shipment moves or a withdrawal settles, without polling. When you're ready to cash out: [Withdraw](/partner-api/funding#withdraw).

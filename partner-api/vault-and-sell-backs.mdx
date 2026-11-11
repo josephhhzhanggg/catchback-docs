@@ -28,15 +28,15 @@ The same as any customer:
 
 | The card was… | Within 5 minutes | For 7 days | After that |
 |---|---|---|---|
-| Pulled from a pack | 90% of the value at pull | 80% of the value at pull | 80% of market value |
+| Pulled from a pack | 100% of the value at pull (90% at `chill` or `aggressive`) | 80% of the value at pull | 80% of market value |
 | Bought | 80% of the lower of the price you paid and its market value at purchase | same | 80% of market value |
 
-For the first 7 days the offer is fixed to the card's value when you got it, whether the market moves up or down. After that it follows the market. Because the 90% window is so short, decide on each pull as soon as the pack response arrives.
+For the first 7 days the offer is fixed to the card's value when you got it, whether the market moves up or down. After that it follows the market. Because the fresh window is so short, decide on each pull as soon as the pack response arrives.
 
 Some cards follow other rules:
 
 - **Energy cards** from base packs pay 100% of their value, with no window and no lock.
-- **Luxury goods** sell back only within 5 minutes of the pull.
+- **Luxury goods** sell back only within 5 minutes of the pull, at 90%.
 - **A card from a pack that holds its cards** pays a flat 90% for the hold. It can't be kept, listed or shipped through the API, and we sell it back for you when the hold ends.
 - **A card bought from another user** can carry over that seller's lock, if it's lower and still running ([Buy a card](/partner-api/endpoints/buy-card)).
 - **Sealed products** aren't in your vault, and can't be sold back through the API.

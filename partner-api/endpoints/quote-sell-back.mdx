@@ -6,7 +6,7 @@ description: "What a sell-back pays for each card you hold, now and at every poi
 
 Scope: `sell:cards` · MCP tool: `quote_sell_back`
 
-A quote moves no money and reserves nothing. It tells you what [Sell back cards](/partner-api/endpoints/sell-back) would pay for each card right now, and when that changes: for a fresh pull, 90% until 5 minutes after the pull, then 80% of the value at pull until 7 days after it, then 80% of market value. Each phase comes with the exact UTC instant it starts and ends.
+A quote moves no money and reserves nothing. It tells you what [Sell back cards](/partner-api/endpoints/sell-back) would pay for each card right now, and when that changes: for a fresh pull, its fresh rate (100%, or 90% for a pack opened at `chill` or `aggressive`) until 5 minutes after the pull, then 80% of the value at pull until 7 days after it, then 80% of market value. Each phase comes with the exact UTC instant it starts and ends.
 
 A quote holds while the card stays in your vault. The last phase follows the market, so its amount is today's estimate. To sell at a quoted price and nothing less, send its `amount` as `min_payout` on [Sell back cards](/partner-api/endpoints/sell-back).
 
@@ -90,11 +90,11 @@ curl -X POST https://catchbackcards.com/api/partner/v1/cards/sell-back/quote \
       "purchase_id": null,
       "status": "quoted",
       "catchback": {
-        "amount": 18,
-        "rate": 0.9,
+        "amount": 20,
+        "rate": 1,
         "valid_until": "2026-11-02T18:05:00.000Z",
         "schedule": [
-          { "amount": 18, "rate": 0.9, "basis": "value_at_acquisition", "basis_value": 20, "fixed": true, "valid_from": "2026-11-02T18:01:00.000Z", "valid_until": "2026-11-02T18:05:00.000Z" },
+          { "amount": 20, "rate": 1, "basis": "value_at_acquisition", "basis_value": 20, "fixed": true, "valid_from": "2026-11-02T18:01:00.000Z", "valid_until": "2026-11-02T18:05:00.000Z" },
           { "amount": 16, "rate": 0.8, "basis": "value_at_acquisition", "basis_value": 20, "fixed": true, "valid_from": "2026-11-02T18:05:00.000Z", "valid_until": "2026-11-09T18:00:00.000Z" },
           { "amount": 17.6, "rate": 0.8, "basis": "market_value", "basis_value": 22, "fixed": false, "valid_from": "2026-11-09T18:00:00.000Z", "valid_until": null }
         ],

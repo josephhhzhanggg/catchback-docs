@@ -12,7 +12,15 @@ Opening a pack spends your Wallet Balance at list price, with the same odds a cu
     To see what a pack can pull before you buy, [Get a pack's pool](/partner-api/endpoints/get-pack-pool) gives its value bands, their odds at each risk level, and every card a pull can produce right now. The pool is a snapshot: inventory is shared with every CatchBack customer, so it changes as cards are pulled and added ([why](/partner-api/errors-and-limits#inventory-is-point-in-time)).
   </Step>
   <Step title="Choose a risk level">
-    `chill`, `standard` or `aggressive` (Chill, Standard and Hot in the app) change only the spread of outcomes: Chill keeps pulls closer to the average, Hot makes both small and big hits more frequent. The price and the average pulled value are the same at every level. [Risk levels](/about-catchback/risk-levels)
+    The price is the same at every level, but the odds and the sell-back aren't:
+
+    | `risk_level` | Odds | Fresh sell-back |
+    |---|---|---|
+    | `standard` (default) | Classic | 100% for 5 minutes |
+    | `chill` | The earlier Chill odds: steadier outcomes | 90% for 5 minutes |
+    | `aggressive` | The earlier Hot odds: bigger swings | 90% for 5 minutes |
+
+    Unless you want the earlier Chill or Hot odds, use `standard`. The app's newer Standard, Chill and Hot [odds modes](/about-catchback/risk-levels) aren't available through the API. Each pull's `catchback.rate` is the rate it actually got.
   </Step>
   <Step title="Open it">
     [Buy packs](/partner-api/endpoints/buy-packs) opens 1–10 packs of one type in one request, under an `Idempotency-Key` you choose: your own order id. Make a new one per order, and store it before you send the request.
@@ -25,7 +33,7 @@ Opening a pack spends your Wallet Balance at list price, with the same odds a cu
     Keep each pull's `proof`. No other endpoint returns it, and it lets you or your customers check the draw: [Verify a pull](/partner-api/verify-a-pull).
   </Step>
   <Step title="Decide on each card">
-    A fresh pull sells back at 90% of its value for 5 minutes, then 80%. Decide right away whether to keep it, sell it back, list it or ship it: [Your vault and sell-backs](/partner-api/vault-and-sell-backs).
+    A fresh pull sells back at its fresh rate (100% at `standard`) for 5 minutes, then 80%. Decide right away whether to keep it, sell it back, list it or ship it: [Your vault and sell-backs](/partner-api/vault-and-sell-backs).
   </Step>
 </Steps>
 
