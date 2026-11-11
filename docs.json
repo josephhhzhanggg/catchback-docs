@@ -77,13 +77,23 @@
               "partner-api/onboarding",
               "partner-api/quickstart",
               "partner-api/how-it-works",
-              "partner-api/authentication",
               "partner-api/mcp"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "partner-api/funding",
+              "partner-api/testing",
+              "partner-api/verify-a-pull",
+              "partner-api/shipping",
+              "partner-api/webhooks"
             ]
           },
           {
             "group": "Core concepts",
             "pages": [
+              "partner-api/authentication",
               "partner-api/errors-and-limits",
               "partner-api/rate-limits",
               "partner-api/idempotency",
@@ -96,8 +106,7 @@
             "pages": [
               "partner-api/endpoints/list-packs",
               "partner-api/endpoints/get-pack-pool",
-              "partner-api/endpoints/buy-packs",
-              "partner-api/verify-a-pull"
+              "partner-api/endpoints/buy-packs"
             ]
           },
           {
@@ -135,7 +144,6 @@
           {
             "group": "Funding",
             "pages": [
-              "partner-api/funding",
               "partner-api/endpoints/get-funding",
               "partner-api/endpoints/create-withdrawal",
               "partner-api/endpoints/list-withdrawals",
@@ -145,7 +153,6 @@
           {
             "group": "Shipping",
             "pages": [
-              "partner-api/shipping",
               "partner-api/endpoints/estimate-shipment",
               "partner-api/endpoints/create-shipment",
               "partner-api/endpoints/list-shipments",
@@ -163,14 +170,12 @@
           {
             "group": "Webhooks",
             "pages": [
-              "partner-api/webhooks",
               "partner-api/webhook-events"
             ]
           },
           {
             "group": "Testing",
             "pages": [
-              "partner-api/testing",
               "partner-api/endpoints/create-test-account",
               "partner-api/endpoints/list-test-accounts"
             ]
