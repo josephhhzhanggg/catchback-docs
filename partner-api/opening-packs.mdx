@@ -1,0 +1,52 @@
+---
+title: "Opening packs"
+description: "Pick a pack, open it, read what you pulled, and retry safely: the pack flow end to end."
+---
+
+Opening a pack spends your Wallet Balance at list price, with the same odds a customer gets, and puts every card you pull in your vault. It takes the `rip:packs` scope.
+
+<Steps>
+  <Step title="Pick a pack">
+    [List packs](/partner-api/endpoints/list-packs) returns exactly the packs your key can buy, at the price you'll be charged. Use a pack with `"available": true`, and note its `max_quantity` and `risk_levels`.
+
+    To see what a pack can pull before you buy, [Get a pack's pool](/partner-api/endpoints/get-pack-pool) gives its value bands, their odds at each risk level, and every card a pull can produce right now. The pool is a snapshot: inventory is shared with every CatchBack customer, so it changes as cards are pulled and added ([why](/partner-api/errors-and-limits#inventory-is-point-in-time)).
+  </Step>
+  <Step title="Choose a risk level">
+    `chill`, `standard` or `aggressive` (Chill, Standard and Hot in the app) change only the spread of outcomes: Chill keeps pulls closer to the average, Hot makes both small and big hits more frequent. The price and the average pulled value are the same at every level. [Risk levels](/about-catchback/risk-levels)
+  </Step>
+  <Step title="Open it">
+    [Buy packs](/partner-api/endpoints/buy-packs) opens 1–10 packs of one type in one request, under an `Idempotency-Key` you choose: your own order id. Make a new one per order, and store it before you send the request.
+
+    The order is all or nothing: if any pack fails to open, the whole order is refunded and none of its pulls stand. A pack your key can't buy, one that's unavailable, or a risk level the pack doesn't offer is refused before anything is charged.
+  </Step>
+  <Step title="Read what you pulled">
+    Each entry in `pulls` has its `pull_id`, the card, its value, the rarity and odds of the hit, and its CatchBack offer: what we pay to buy it back now, and once the first 5 minutes are up. The cards are already in your vault.
+
+    Keep each pull's `proof`. No other endpoint returns it, and it lets you or your customers check the draw: [Verify a pull](/partner-api/verify-a-pull).
+  </Step>
+  <Step title="Decide on each card">
+    A fresh pull sells back at 90% of its value for 5 minutes, then 80%. Decide right away whether to keep it, sell it back, list it or ship it: [Your vault and sell-backs](/partner-api/vault-and-sell-backs).
+  </Step>
+</Steps>
+
+## Limits
+
+By default a key can send one pack purchase every 60 seconds and open 100 packs per UTC day. One request can open several packs, so to open five, send one request with `quantity: 5`, not five requests. [Get account](/partner-api/endpoints/get-account) shows how many packs you have left today and `next_purchase_at`, the earliest your next purchase is allowed. To change your limits, ask us. [Rate limits](/partner-api/rate-limits#pack-purchases)
+
+## When something goes wrong
+
+Resend the **same** order id, never a new one: a new id is a second order.
+
+| You get | Do this |
+|---|---|
+| A timeout, a dropped connection or a `503` | Resend with the same order id. If the order went through you get it back, with `"idempotent_replay": true`. If it didn't, it runs now. Never charged twice |
+| `409 IDEMPOTENCY_IN_PROGRESS` | The order is still running, or being settled. Wait and resend, or follow it with [Get an order](/partner-api/endpoints/get-order) |
+| `429 RATE_LIMITED` | Wait `retry_after_seconds`, then send |
+| `429 DAILY_LIMIT_REACHED` | Wait until `resets_at`, the next midnight UTC |
+| `500` with `needs_review: true`, or `PAYMENT_OUTCOME_UNKNOWN` | Stop. We're alerted and settle the order ourselves. Follow it with [Get an order](/partner-api/endpoints/get-order), and quote its `checkout_id` if you contact us |
+
+The full rules, including what an order we close for you returns: [Idempotency](/partner-api/idempotency).
+
+## Packs to avoid in an API flow
+
+The Starter and sealed mystery packs pull sealed products. A sealed product isn't in [Get vault](/partner-api/endpoints/get-vault), and the API can't sell it back, list it or ship it. Don't buy them from a flow that only uses the API.

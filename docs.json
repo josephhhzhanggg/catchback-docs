@@ -83,11 +83,15 @@
           {
             "group": "Guides",
             "pages": [
-              "partner-api/funding",
-              "partner-api/testing",
+              "partner-api/opening-packs",
               "partner-api/verify-a-pull",
+              "partner-api/trading-cards",
+              "partner-api/vault-and-sell-backs",
+              "partner-api/funding",
               "partner-api/shipping",
-              "partner-api/webhooks"
+              "partner-api/webhooks",
+              "partner-api/testing",
+              "partner-api/going-live"
             ]
           },
           {
