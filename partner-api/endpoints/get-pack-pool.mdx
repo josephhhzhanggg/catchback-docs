@@ -26,7 +26,7 @@ A sold-out pack still returns `200` with `available: false`, not an error; its p
   `pokemon`, `onepiece`, `sports`, `riftbound` or `watches`.
 </ParamField>
 <ParamField query="risk_level" type="string" default="standard">
-  `chill`, `standard` or `aggressive` (Hot in the app). Odds change with the risk level, and so can which cards are hittable. Use one of the pack's `risk_levels` from [List packs](/partner-api/endpoints/list-packs); any other is a `400`. The Starter pack opens at `standard` only.
+  `chill`, `standard` or `aggressive`: the odds [Buy packs](/partner-api/endpoints/buy-packs) opens at for the same `risk_level`. `standard` is Classic odds; `chill` and `aggressive` are the earlier Chill and Hot odds. Odds change with the risk level, and so can which cards are hittable. Use one of the pack's `risk_levels` from [List packs](/partner-api/endpoints/list-packs); any other is a `400`. The Starter pack opens at `standard` only.
 </ParamField>
 
 ## Response

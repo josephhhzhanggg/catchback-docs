@@ -1,0 +1,58 @@
+---
+title: "Going live"
+description: "What a production integration should do before it spends real money: keys, retries, limits, inventory, records and reconciliation."
+---
+
+Your key acts on a real balance and real cards, so an integration that works in a demo can still lose money in production. Check each item before you go live.
+
+## Your key
+
+- [ ] The key lives in a secret manager, on your servers only: never in browser, mobile or other client code, and never in source control. [Keeping your key safe](/partner-api/authentication#keeping-your-key-safe)
+- [ ] On startup, your integration calls [Who am I](/partner-api/endpoints/get-me) and stops if `linked` isn't `true` or a scope it needs is missing.
+- [ ] The key has only the scopes you use. Ask us to remove the rest.
+- [ ] You know how to replace the key if it leaks or someone with access leaves: [Getting set up](/partner-api/onboarding#changing-or-replacing-a-key).
+
+## Orders and retries
+
+- [ ] Every purchase gets a new order id, and you store it **before** sending the request.
+- [ ] On a timeout, a dropped connection or a `5xx`, you resend the **same** order id. Never a new one: that's a second order.
+- [ ] On `409 IDEMPOTENCY_IN_PROGRESS` you wait before resending, never in a tight loop, or follow the order with [Get an order](/partner-api/endpoints/get-order).
+- [ ] On any response with `needs_review: true` you stop resending and follow the order with Get an order. We settle those orders ourselves.
+- [ ] Card buys send a `max_price`, and sell-backs a `min_payout` when you're selling at a quoted price, so a price that moved is refused instead of charged.
+
+[Idempotency](/partner-api/idempotency) has every case.
+
+## Limits
+
+- [ ] You open several packs in one request (`quantity`), not one request per pack.
+- [ ] You wait for `next_purchase_at` from [Get account](/partner-api/endpoints/get-account) before your next pack purchase, and honor `Retry-After` on a `429`.
+- [ ] You handle the daily ceilings, which reset at midnight UTC, without retrying in a loop. [Rate limits](/partner-api/rate-limits)
+
+## Inventory
+
+- [ ] You treat every catalog, pool and search response as a cache that can be stale, and let the purchase response be the final word. A card you saw a moment ago can be gone. [Why](/partner-api/errors-and-limits#inventory-is-point-in-time)
+- [ ] You handle `PRICE_CHANGED`, `CARD_NO_LONGER_AVAILABLE` and `PACK_UNAVAILABLE` as normal outcomes, not failures.
+
+## Your records
+
+- [ ] You record which of your customers each order and pull is for. A key acts as one CatchBack account, so we can't tell your customers apart.
+- [ ] You store each pull's `pull_id` and `proof`. No other endpoint returns the proof. [Verify a pull](/partner-api/verify-a-pull)
+- [ ] You open packs at `standard` unless you mean to use the earlier Chill or Hot odds, which sell back at 90% instead of 100%.
+- [ ] You decide on each pull within 5 minutes if you want the fresh sell-back rate. [Your vault and sell-backs](/partner-api/vault-and-sell-backs)
+
+## Reconciliation
+
+- [ ] You reconcile your balance regularly with [Balance history](/partner-api/endpoints/get-balance-history) and [List orders](/partner-api/endpoints/list-orders).
+- [ ] If you use [webhooks](/partner-api/webhooks), you check every signature, answer quickly, dedupe on `event.id` (delivery is at least once and unordered), and reconcile against the list endpoints after an outage.
+
+## Parsing and changes
+
+- [ ] Your parser ignores fields and enum values it doesn't know. `v1` responses gain fields over time.
+- [ ] You branch on `code`, not on the `error` text, which can change. [Errors](/partner-api/errors-and-limits)
+- [ ] Someone on your team follows the [Changelog](/partner-api/changelog).
+
+## Before the first real order
+
+- [ ] You've tried packs on a [test account](/partner-api/testing), or with one cheap real order.
+- [ ] You've sent the same purchase twice on purpose and got `"idempotent_replay": true` back, with your balance unchanged.
+- [ ] We have a technical contact for you, and you have ours: [support@catchbackcards.com](mailto:support@catchbackcards.com). Quote your `account.id`, and the `checkout_id` of any order you ask about.

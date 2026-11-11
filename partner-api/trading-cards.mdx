@@ -1,0 +1,45 @@
+---
+title: "Buying and listing cards"
+description: "Buy graded cards from the shop and other users, and sell the cards you hold on the marketplace at your own price."
+---
+
+Besides opening packs, you can trade single cards: buy them from the CatchBack shop and other users' listings, and list the cards you hold for other users to buy.
+
+## Buy a card
+
+It takes the `buy:cards` scope.
+
+<Steps>
+  <Step title="Find it">
+    [Search cards](/partner-api/endpoints/search-cards) lists every card for sale, from the shop and from other users' fixed-price listings, with its current `price`. Your own listings are left out. To look a card up by id or by the cert on its slab, with its price history and recent sales, see [Get a card](/partner-api/endpoints/get-card) and [Find a card by cert](/partner-api/endpoints/find-card-by-cert).
+  </Step>
+  <Step title="Buy it">
+    [Buy a card](/partner-api/endpoints/buy-card) with its `card_id`, a `max_price` (normally the `price` the search showed) and an `Idempotency-Key`. You pay the price plus a $1 buyer fee, from your Wallet Balance.
+  </Step>
+  <Step title="It's in your vault">
+    The card lands in your vault, where you can hold it, list it, sell it back or ship it: [Your vault and sell-backs](/partner-api/vault-and-sell-backs).
+  </Step>
+</Steps>
+
+A search result is a snapshot, so a buy can fail. Nothing is charged when it does:
+
+| You get | It means |
+|---|---|
+| `409 PRICE_CHANGED` | The price went above your `max_price`. The body has the new `price`: buy again with it if you still want the card |
+| `409 CARD_NO_LONGER_AVAILABLE` | Someone else got it first, or it was delisted. Search again |
+| `409 CARD_MOVED_TO_AUCTION` | It's now in an auction, which the API doesn't buy from |
+
+Retries work as for packs: resend the same order id, never a new one ([Idempotency](/partner-api/idempotency)). Card buys have no per-minute limit, but by default a key can buy 25 cards and spend $50,000, fees included, per UTC day ([Rate limits](/partner-api/rate-limits#card-purchases)).
+
+For 7 days after you buy a card, its sell-back offer is based on the lower of what you paid and its market value when you bought it. A card bought from another user can carry over that seller's lock instead, if it's lower and still running ([Buy a card](/partner-api/endpoints/buy-card)).
+
+## List a card
+
+It takes the `write:listings` scope, and the account needs a verified phone number.
+
+1. **List it.** [List a card](/partner-api/endpoints/list-card) with the `card_id` of a card in your vault and a price: at least $5, and at most the larger of $5 and twice its market value. A card worth $40 can be listed from $5 to $80.
+2. **Reprice it in place.** [Change a listing's price](/partner-api/endpoints/update-listing-price) keeps the listing and its `listing_id`. Don't delist and list again to change a price.
+3. **Watch it.** [Your listings](/partner-api/endpoints/get-listings) shows each active listing and what it pays you if it sells: the price less a $1 seller fee. A [`listing.sold`](/partner-api/webhook-events#listing-sold) webhook tells you when one sells, and the payout lands in your Wallet Balance.
+4. **Take it down.** [Delist a card](/partner-api/endpoints/delist-card) puts it back in your vault. A listed card can't be sold back or shipped until you delist it.
+
+Energy cards, luxury goods, raw singles, and cards from a pack that holds its cards can't be listed. They sell back, and goods and singles can also ship.

@@ -9,14 +9,14 @@ The Partner API lets companies, bots and AI agents work with CatchBack programma
   <Card title="Browse inventory" icon="magnifying-glass" href="/partner-api/endpoints/list-packs">
     The packs you can buy, every card each pack can pull, and every card for sale.
   </Card>
-  <Card title="Open packs" icon="box-open" href="/partner-api/endpoints/buy-packs">
+  <Card title="Open packs" icon="box-open" href="/partner-api/opening-packs">
     Open packs with your Wallet Balance and get every hit back with its CatchBack offer and a proof you can verify.
   </Card>
-  <Card title="Buy cards" icon="cart-shopping" href="/partner-api/endpoints/buy-card">
-    Buy graded cards from the shop or user listings, with a price guard.
+  <Card title="Buy and list cards" icon="cart-shopping" href="/partner-api/trading-cards">
+    Buy graded cards from the shop or user listings with a price guard, and list your own at a fixed price.
   </Card>
-  <Card title="Manage what you hold" icon="vault" href="/partner-api/endpoints/get-vault">
-    Hold cards in your vault, sell them back to us, or list and reprice them on the marketplace. Reconcile every order.
+  <Card title="Manage what you hold" icon="vault" href="/partner-api/vault-and-sell-backs">
+    Hold cards in your vault or sell them back to us at guaranteed rates, and reconcile every order.
   </Card>
   <Card title="Look up any card" icon="id-card" href="/partner-api/endpoints/get-card">
     Any card by id or by the cert on its slab, with its price history and recent sales.
@@ -24,8 +24,11 @@ The Partner API lets companies, bots and AI agents work with CatchBack programma
   <Card title="Ship to your customers" icon="truck" href="/partner-api/shipping">
     Ship cards you hold to your customers' addresses, paid from your balance, and track them.
   </Card>
+  <Card title="Fund and withdraw" icon="wallet" href="/partner-api/funding">
+    Top up your balance with USDC, and withdraw it back to your own address on Base.
+  </Card>
   <Card title="Get webhooks" icon="bell" href="/partner-api/webhooks">
-    A signed `POST` when an order finishes, a listing sells or a shipment moves.
+    A signed `POST` when an order finishes, a listing sells, a shipment moves or a withdrawal settles.
   </Card>
   <Card title="Connect an AI agent" icon="robot" href="/partner-api/mcp">
     The same actions as MCP tools, with the same key.
@@ -42,12 +45,9 @@ The Partner API lets companies, bots and AI agents work with CatchBack programma
 
 ## How a partner account works
 
-1. **You get an account and a key.** You sign up for a CatchBack account; we create your API key with the scopes you need, link it to that account and send it to you. There's no page in the app to make a key yourself: [Getting set up](/partner-api/onboarding).
-2. **You fund it.** You send USDC to your deposit address, or wire funds and we credit them ([Funding in USDC](/partner-api/funding)). Either way it lands in your Wallet Balance, and purchases spend only that balance, at the same list price as everyone else.
-3. **Cards land in your vault.** Every card you pull or buy is held by CatchBack in your account. From there you can keep it, [sell it back](/partner-api/endpoints/sell-back) at our guaranteed rates, or [list it](/partner-api/endpoints/list-card) on the marketplace.
-4. **It stays off our main public surfaces.** A partner account stays off the VIP and Top Gifters leaderboards, earns no CatchPoints, and its pulls stay out of our recent-pull feeds and aren't posted to chat automatically.
+You sign up for a CatchBack account and we link a key to it ([Getting set up](/partner-api/onboarding)). You fund it, every card you pull or buy is held in its vault, and from there you hold, sell back, list or ship each card. The whole lifecycle on one page: [How it works](/partner-api/how-it-works).
 
-The whole flow, step by step: [How it works](/partner-api/how-it-works).
+A partner account stays off our main public surfaces: it stays off the VIP and Top Gifters leaderboards, earns no CatchPoints, and its pulls stay out of our recent-pull feeds and aren't posted to chat automatically.
 
 <Note>
   Interested in becoming a partner, or want to talk terms (funding, pricing, revenue share or your limits)? Contact us at [support@catchbackcards.com](mailto:support@catchbackcards.com).
