@@ -1,0 +1,52 @@
+---
+title: "Your vault and sell-backs"
+description: "Where your cards are held, the four things you can do with each one, and exactly what a sell-back pays."
+---
+
+Every card you pull or buy is held by CatchBack in your account's vault. [Get vault](/partner-api/endpoints/get-vault) lists it, with each card's sell-back offer right now. A pull can land in a different catalog from its pack's (a raw single from a Pokémon pack, for example), so read every category you might hold, `goods`, `singles` and `energy` included.
+
+## What you can do with a card
+
+<CardGroup cols={2}>
+  <Card title="Hold" icon="vault">
+    Keep it in your vault. The offer to buy it back never expires.
+  </Card>
+  <Card title="Sell back" icon="rotate-left" href="/partner-api/endpoints/sell-back">
+    Sell it to CatchBack, paid to your Wallet Balance at our guaranteed rates.
+  </Card>
+  <Card title="List" icon="tag" href="/partner-api/trading-cards#list-a-card">
+    Put it on the marketplace at your own price. A sale pays you the price less a $1 seller fee.
+  </Card>
+  <Card title="Ship" icon="truck" href="/partner-api/shipping">
+    Send it to your customer, paid from your balance at the carrier's full rate.
+  </Card>
+</CardGroup>
+
+## What a sell-back pays
+
+The same as any customer:
+
+| The card was… | Within 5 minutes | For 7 days | After that |
+|---|---|---|---|
+| Pulled from a pack | 90% of the value at pull | 80% of the value at pull | 80% of market value |
+| Bought | 80% of the lower of the price you paid and its market value at purchase | same | 80% of market value |
+
+For the first 7 days the offer is fixed to the card's value when you got it, whether the market moves up or down. After that it follows the market. Because the 90% window is so short, decide on each pull as soon as the pack response arrives.
+
+Some cards follow other rules:
+
+- **Energy cards** from base packs pay 100% of their value, with no window and no lock.
+- **Luxury goods** sell back only within 5 minutes of the pull.
+- **A card from a pack that holds its cards** pays a flat 90% for the hold. It can't be kept, listed or shipped through the API, and we sell it back for you when the hold ends.
+- **A card bought from another user** can carry over that seller's lock, if it's lower and still running ([Buy a card](/partner-api/endpoints/buy-card)).
+- **Sealed products** aren't in your vault, and can't be sold back through the API.
+
+The full rules: [Liquidity](/about-catchback/liquidity).
+
+## Selling back
+
+1. **Quote it, if you like.** [Quote a sell-back](/partner-api/endpoints/quote-sell-back) gives every amount a card will pay from now on, with the exact UTC time each one starts and ends. It moves no money and reserves nothing.
+2. **Sell.** [Sell back cards](/partner-api/endpoints/sell-back) takes 1–10 cards, each with its `pull_id` (for a pulled card) or `purchase_id` (for a bought one), from Get vault or the purchase response. To sell at a quoted price and nothing less, send that amount as `min_payout`: if the sell-back would now pay less, nothing is sold and you get the new amount.
+3. **Read each result.** Each card comes back `sold`, `already_sold` or `failed`, and one failing doesn't stop the rest. A listed card fails until you [delist it](/partner-api/endpoints/delist-card).
+
+Each pull or purchase pays out only once, so a retry is always safe: selling the same card again returns `already_sold` with the earlier sale. Sell-backs have no rate limit per key.
