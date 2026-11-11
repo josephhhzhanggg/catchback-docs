@@ -1,0 +1,69 @@
+---
+title: "Getting set up"
+description: "From first contact to a working key: what you do, what we do, which scopes to ask for, and how to check it worked."
+---
+
+There's no self-serve sign-up for the Partner API, and no page in the app to create a key. You make a normal CatchBack account; we create the key, link it to that account and send it to you. Here's the whole path.
+
+<Steps>
+  <Step title="Talk to us">
+    [Contact us](mailto:support@catchbackcards.com) with what you want to build. We agree the terms with you: [which scopes](#which-scopes-to-ask-for) your key gets, your [limits](/partner-api/rate-limits) if the defaults don't fit, how you'll fund the account, and a technical contact for incidents.
+  </Step>
+  <Step title="Create a CatchBack account">
+    Sign up on [catchbackcards.com](https://catchbackcards.com) the way any customer does, ideally with a company email you use only for this. Send us that email. This account is the one your key acts as: its balance is what you spend, and its vault is where your cards land.
+  </Step>
+  <Step title="We create your key and send it">
+    We create an API key with your scopes and link it to the account at that email. We send it to you once, over a secure channel, never by email or chat. We store only a hash of it, so we can't show it to you again: put it in a secret manager straight away ([Keeping your key safe](/partner-api/authentication#keeping-your-key-safe)).
+  </Step>
+  <Step title="Check the key">
+    Call [Who am I](/partner-api/endpoints/get-me). It works with any key.
+
+    ```bash
+    curl "https://catchbackcards.com/api/partner/v1/me" \
+      -H "Authorization: Bearer $CATCHBACK_KEY"
+    ```
+
+    You want `"linked": true`, the account you signed up with under `account`, and the scopes you agreed under `key.scopes`. If `linked` is `false`, every call on your balance or cards is a `403` (`"This API key is not linked to a CatchBack account"`): tell us the email you signed up with and we'll link it. Your key doesn't change when we do. Quote `account.id` whenever you contact us.
+  </Step>
+  <Step title="Fund the account">
+    Send USDC to your deposit address, from [Get funding details](/partner-api/endpoints/get-funding), or wire funds and we credit them. Either way it lands in the account's Wallet Balance, in dollars, and [Get account](/partner-api/endpoints/get-account) shows it. [Funding in USDC](/partner-api/funding)
+  </Step>
+  <Step title="Try it">
+    Run the [Quickstart](/partner-api/quickstart): it opens one pack and sells a pull back. To try packs on a test balance first, see [Testing](/partner-api/testing). If your integration is an AI agent, [connect it over MCP](/partner-api/mcp) with the same key.
+  </Step>
+</Steps>
+
+## Which scopes to ask for
+
+Ask for the scopes your integration uses, and no more: every scope that moves money is one more thing a leaked key can do. What each scope unlocks: [Scopes](/partner-api/authentication#scopes).
+
+| You want to | Ask for |
+|---|---|
+| Browse packs and cards, look cards up | `read:catalog` |
+| See your balance, vault, listings and orders | `read:account` |
+| Open packs and sell the pulls back | `rip:packs`, `sell:cards` |
+| Buy cards from the shop and user listings | `buy:cards` |
+| List cards you hold on the marketplace | `write:listings` |
+| Ship cards to your customers | `ship:cards` (opt-in) |
+| Withdraw your balance as USDC | `withdraw:funds` (opt-in) |
+| See the revenue-share report of pack purchases | `read:pulls` (opt-in) |
+| Make test logins with a test balance | `create:test_accounts` (opt-in) |
+
+A pack-opening bot usually needs `read:catalog`, `read:account`, `rip:packs` and `sell:cards`. A trading integration adds `buy:cards` and `write:listings`. Opt-in scopes are never on a key unless you ask for them. To add a scope later, ask us: it's on the same key from its next request, and an AI agent sees the new tools once it reconnects.
+
+## What else to send us
+
+Some features need something from you that we set on your account or key. Send them whenever you're ready; none of them blocks getting started.
+
+| For | Send us | Details |
+|---|---|---|
+| Webhooks | Your key's name and an `https` URL. We send you a signing secret, once | [Webhooks](/partner-api/webhooks#setup) |
+| Withdrawals | Your escrow address on Base, the only address withdrawals go to | [Funding in USDC](/partner-api/funding#withdraw) |
+| Driving a test account through the API | The test account, so we can link a separate key to it | [Testing](/partner-api/testing#test-accounts) |
+| Higher limits | The limit and what you need it for | [Rate limits](/partner-api/rate-limits) |
+
+## Changing or replacing a key
+
+- **Someone with access leaves, or the key leaks:** tell us and we disable it from its next request. Your account, balance and cards are untouched. We send you a new key with the same scopes.
+- **A second key**, say one per service or one per agent: ask us. Every key linked to the same account acts on the same balance and vault.
+- **Pausing:** we can disable a key and turn it back on later. A disabled key gets `401` `"Invalid API key"`.

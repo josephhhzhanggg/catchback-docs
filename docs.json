@@ -74,6 +74,7 @@
             "group": "Get started",
             "pages": [
               "partner-api/introduction",
+              "partner-api/onboarding",
               "partner-api/quickstart",
               "partner-api/how-it-works",
               "partner-api/authentication",

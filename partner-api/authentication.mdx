@@ -17,7 +17,7 @@ A missing or malformed key is a `401` with `"error": "Missing or malformed API k
 
 ## Scopes
 
-Each key carries a set of scopes, and every endpoint except [Who am I](/partner-api/endpoints/get-me) and [Public card metadata](/partner-api/endpoints/get-public-card) requires exactly one. Calling an endpoint your key has no scope for is a `403` (`"error": "API key lacks required scope: <scope>"`). We grant scopes per key; ask us if you need one you don't have.
+Each key carries a set of scopes, and every endpoint except [Who am I](/partner-api/endpoints/get-me) and [Public card metadata](/partner-api/endpoints/get-public-card) requires exactly one. Calling an endpoint your key has no scope for is a `403` (`"error": "API key lacks required scope: <scope>"`). We grant scopes per key; ask us if you need one you don't have ([which to ask for](/partner-api/onboarding#which-scopes-to-ask-for)).
 
 | Scope | Lets you | Moves money | Granted |
 |---|---|---|---|
@@ -28,12 +28,13 @@ Each key carries a set of scopes, and every endpoint except [Who am I](/partner-
 | `sell:cards` | Sell cards back to CatchBack, paid to your Wallet Balance | **Yes** | Standard |
 | `write:listings` | List held cards on the marketplace at a fixed price, change a listing's price, and take listings down | No | Standard |
 | `ship:cards` | Ship cards you hold to your customers, paid from your Wallet Balance, and track those shipments. Each shipment stores its customer's address | **Yes** | **Opt-in** |
+| `withdraw:funds` | Withdraw your balance as USDC on Base to the one address we set for your account, and see those withdrawals | **Yes** | **Opt-in** |
 | `read:pulls` | Revenue-share report of completed pack purchases | No | **Opt-in** |
 | `create:test_accounts` | Create test logins with a test balance, and see the ones you made | No: test balance only | **Opt-in** |
 
-Standard scopes are the usual set for a partner key; we may leave out any you don't need. `ship:cards`, `read:pulls` and `create:test_accounts` are opt-in: they're never on a new key by default, and we grant them on request.
+Standard scopes are the usual set for a partner key; we may leave out any you don't need. `ship:cards`, `withdraw:funds`, `read:pulls` and `create:test_accounts` are opt-in: they're never on a new key by default, and we grant them on request.
 
-Account actions (`read:account`, `rip:packs`, `buy:cards`, `sell:cards`, `write:listings`, `ship:cards`) also need the key to be linked to a CatchBack account. An unlinked key gets a `403` on them (`"error": "This API key is not linked to a CatchBack account"`). If we can't read the link just then, the answer is the same `403`, so one retry is worth it. [Who am I](/partner-api/endpoints/get-me) shows whether your key is linked, and to which account.
+Account actions (`read:account`, `rip:packs`, `buy:cards`, `sell:cards`, `write:listings`, `ship:cards`, `withdraw:funds`) also need the key to be linked to a CatchBack account. An unlinked key gets a `403` on them (`"error": "This API key is not linked to a CatchBack account"`). If we can't read the link just then, the answer is the same `403`, so one retry is worth it. [Who am I](/partner-api/endpoints/get-me) shows whether your key is linked, and to which account.
 
 ## Which scope each endpoint needs
 
