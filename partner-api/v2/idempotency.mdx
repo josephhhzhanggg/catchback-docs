@@ -20,7 +20,7 @@ A missing or malformed key is `400 BAD_IDEMPOTENCY_KEY`.
 ## What counts as the same request
 
 - **An order** is the same request when `pack_type`, `category`, `odds`, `quantity`, `recipient` and `refund_address` match. `partner_user_ref` is not compared. `odds` is compared as resolved, so leaving it out and naming the pack's default are the same request (and so are `quantity: 1` and no `quantity`).
-- **A shipment** is the same request when the token (or the set of `token_ids`, in any order), `holder`, `address` and `rate` match, and, on `POST /shipments`, `cover_amount` too. Send the same `cover_amount` on a retry either way.
+- **A shipment** is the same request when the token (or the set of `token_ids`, in any order), `holder`, `address`, `rate` and `cover_amount` all match.
 
 ## Getting a lost response back
 
