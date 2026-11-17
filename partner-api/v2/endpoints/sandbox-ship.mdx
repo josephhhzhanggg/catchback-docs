@@ -1,0 +1,47 @@
+---
+title: "Mark a shipment shipped or delivered"
+sidebarTitle: "Simulate shipping"
+api: "POST /api/partner/v2/sandbox/shipments/{id}"
+description: "Sandbox only: play our shipping team, so you can build and test your tracking screens."
+---
+
+Scope: `nft:orders` · **Sandbox only:** `404` outside the [sandbox](/partner-api/v2/quickstart)
+
+Plays our shipping team. `{ "status": "shipped" }` marks a burned shipment shipped, with a test USPS tracking number, a tracking link, `shipped_at` and an `expected_delivery` three days out. `{ "status": "delivered" }` then sets `delivered_at`. Read the result with [Get a shipment](/partner-api/v2/endpoints/get-shipment). It also delivers any webhooks the change produced.
+
+<ParamField path="id" type="string" required>
+  A `shipment_id` or a `quote_id`.
+</ParamField>
+<ParamField body="status" type="string" required>
+  `shipped` or `delivered`.
+</ParamField>
+
+## Response
+
+<ResponseField name="ok" type="boolean">`true`.</ResponseField>
+<ResponseField name="status" type="string">The status you set.</ResponseField>
+<ResponseField name="webhooks" type="object">The webhook deliveries this call made.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | | `status` isn't `shipped` or `delivered` |
+| `404` | `UNKNOWN_SHIPMENT` | No such shipment in your program |
+| `404` | | Not the sandbox |
+| `409` | `NOT_BURNED` | The shipment has no shipping order yet: burn every token, then [tick](/partner-api/v2/endpoints/sandbox-tick) |
+
+<RequestExample>
+```bash cURL
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/shipments/7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "status": "shipped" }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{ "ok": true, "status": "shipped", "webhooks": { "delivered": 1, "retrying": 0 } }
+```
+</ResponseExample>

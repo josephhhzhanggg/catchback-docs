@@ -1,0 +1,124 @@
+---
+title: "Quote a sell-back"
+api: "POST /api/partner/v2/tokens/{tokenId}/quote"
+description: "A signed sell-back quote (EVM) or an unsigned transaction (Solana) for the holder to burn with. Pays exactly amount_usd in USDC."
+---
+
+Scope: `nft:orders`
+
+A quote fixes the amount, the payer and the payout destination, and **expires 10 minutes** after it is issued, or when the 5-minute fresh window ends if the quote is at the fresh rate (whichever is sooner). Every call issues a new quote; an unused quote just expires. This endpoint takes no `Idempotency-Key`.
+
+What the holder does with it: [Sell-back](/partner-api/v2/sell-back).
+
+<ParamField path="tokenId" type="string" required>
+  The token's decimal `token_id`.
+</ParamField>
+<ParamField body="kind" type="string" default="sellback">
+  `sellback`. Shipments start at [Create a shipment](/partner-api/v2/endpoints/create-shipment).
+</ParamField>
+<ParamField body="holder" type="string" required>
+  The wallet that holds the token now. Checked on chain.
+</ParamField>
+<ParamField body="payout_chain" type="string">
+  `evm:8453` (Base) or `solana:mainnet`. Default: the token's family, Base for an EVM program and Solana for a Solana program. Solana payouts answer `PAYOUT_CHAIN_NOT_ENABLED` until they are switched on.
+</ParamField>
+<ParamField body="payout_address" type="string">
+  Where the USDC goes. Defaults to `holder` when the payout chain is the same family as your mint chain. **Required when the payout chain isn't your mint chain's family**, so today a Solana program sends `payout_chain: "evm:8453"` with a Base `payout_address`.
+</ParamField>
+
+## Response
+
+**201.** Both families have:
+
+<ResponseField name="quote_id" type="string">Follow it with [Get a quote](/partner-api/v2/endpoints/get-quote).</ResponseField>
+<ResponseField name="chain" type="string">The token's chain.</ResponseField>
+<ResponseField name="amount_usd" type="number">What the payout sends, exactly.</ResponseField>
+<ResponseField name="expires_at" type="string" />
+<ResponseField name="payout" type="object">`chain` and `address`.</ResponseField>
+<ResponseField name="family" type="string">`evm` or `solana`.</ResponseField>
+
+On an **EVM** program:
+
+<ResponseField name="contract" type="string">The contract to call `burnWithQuote` on.</ResponseField>
+<ResponseField name="quote" type="object">
+  The `Quote` tuple: `tokenId`, `kind` (`1` = sell-back), `quoteId`, `holder`, `payoutHash`, `amount` (USDC with 6 decimals) and `expiresAt` (unix seconds). `tokenId`, `amount` and `expiresAt` are decimal strings: convert them to bigints. Pass it exactly as returned.
+</ResponseField>
+<ResponseField name="signature" type="string" />
+
+On a **Solana** program:
+
+<ResponseField name="collection" type="string" />
+<ResponseField name="asset" type="string" />
+<ResponseField name="vault" type="string" />
+<ResponseField name="transaction" type="string">A base64 unsigned transaction that moves the asset to our vault, with the quote id as a memo. The holder is its fee payer and only signer.</ResponseField>
+<ResponseField name="last_valid_block_height" type="integer">The transaction must land before this (about a minute) and before `expires_at`.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_JSON` | The body isn't JSON |
+| `400` | `USE_SHIPMENT_ENDPOINT` | `kind: "shipment"`; shipments start at `POST /shipments` |
+| `400` | | `kind` is something other than `sellback` |
+| `400` | `BAD_HOLDER` | `holder` is not a wallet address on your mint chain |
+| `400` | `PAYOUT_CHAIN_NOT_SUPPORTED` | `payout_chain` is not `evm:8453` or `solana:mainnet` |
+| `400` | `PAYOUT_CHAIN_NOT_ENABLED` | Payouts on that chain aren't switched on yet (today: `solana:mainnet`) |
+| `400` | `BAD_PAYOUT_ADDRESS` | No usable `payout_address` for the payout chain |
+| `403` | `NOT_HOLDER` | That wallet does not hold the token on chain right now |
+| `403` | `WALLET_REFUSED` | The holder or payout address failed sanctions screening |
+| `404` | `UNKNOWN_TOKEN` | No such token on your program's contract |
+| `409` | `TOKEN_NOT_MINTED` | The token's mint hasn't confirmed yet |
+| `409` | `TOKEN_BURNED` | The token was already sold back or shipped |
+| `409` | `NO_OFFER` | The item has no sell-back offer right now |
+| `409` | | Your program has no contract yet |
+| `503` | `CHAIN_UNAVAILABLE` | We couldn't read the token's owner from the chain; retry shortly |
+| `503` | `SCREENING_UNAVAILABLE` | Wallet screening is briefly unavailable; retry shortly |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/quote \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "kind": "sellback", "holder": "0x8f3c...e21a", "payout_chain": "evm:8453", "payout_address": "0x8f3c...e21a" }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201 EVM
+{
+  "quote_id": "0x5e0c...91ab",
+  "chain": "evm:196",
+  "amount_usd": 330,
+  "expires_at": "2026-11-16T18:30:00.000Z",
+  "payout": { "chain": "evm:8453", "address": "0x8f3c...e21a" },
+  "family": "evm",
+  "contract": "0x7b1e...c0de",
+  "quote": {
+    "tokenId": "81264573985362058461377125337283195667",
+    "kind": 1,
+    "quoteId": "0x5e0c...91ab",
+    "holder": "0x8f3c...e21a",
+    "payoutHash": "0x2c71...",
+    "amount": "330000000",
+    "expiresAt": "1795372200"
+  },
+  "signature": "0x4a1f...1b"
+}
+```
+
+```json 201 Solana
+{
+  "quote_id": "0x5e0c...91ab",
+  "chain": "solana:mainnet",
+  "amount_usd": 330,
+  "expires_at": "2026-11-16T18:30:00.000Z",
+  "payout": { "chain": "evm:8453", "address": "0x8f3c...e21a" },
+  "family": "solana",
+  "collection": "CoLL...",
+  "asset": "AsSt...",
+  "vault": "VauL...",
+  "transaction": "<base64 unsigned transaction>",
+  "last_valid_block_height": 312345678
+}
+```
+</ResponseExample>

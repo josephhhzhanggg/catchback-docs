@@ -1,0 +1,17 @@
+---
+title: "Changelog"
+description: "What changed in Partner API v2, newest first."
+---
+
+Changes to `v2` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. Dates are US Pacific time.
+
+<Update label="November 17, 2026" description="Partner API v2: wallets & NFTs">
+  - New: Partner API v2 under `/api/partner/v2`, scope `nft:orders`. Each customer pays for their own pack in USDC on Base or Solana, and each pulled item is delivered as an NFT to the customer's own wallet. See the [overview](/partner-api/v2/overview).
+  - Packs and orders: [List packs](/partner-api/v2/endpoints/list-packs), [Get a pack's odds and pool](/partner-api/v2/endpoints/get-pack-pool) with the Standard, Hot, Chill and Classic [odds](/partner-api/v2/odds), [Create an order](/partner-api/v2/endpoints/create-order) for 1-10 packs, [List orders](/partner-api/v2/endpoints/list-orders), [Get an order](/partner-api/v2/endpoints/get-order) and its [provably-fair proof](/partner-api/v2/endpoints/get-order-verification).
+  - Tokens and sell-back: [Wallet tokens](/partner-api/v2/endpoints/list-wallet-tokens), [Get a token](/partner-api/v2/endpoints/get-token) with its sell-back schedule, [sell-back quotes](/partner-api/v2/endpoints/create-sellback-quote) to burn with, paid in USDC, and [Get a quote](/partner-api/v2/endpoints/get-quote) / [List quotes](/partner-api/v2/endpoints/list-quotes).
+  - Shipping: one token or up to 25 in one box, paid once, burned per token, with renewal and carrier tracking. See [Shipping](/partner-api/v2/shipping).
+  - Self-serve [webhooks](/partner-api/v2/webhooks): `nft_order.updated`, `sellback.updated`, `nft_shipment.updated` and `ping`.
+  - Keys: [read](/partner-api/v2/endpoints/get-key), [rotate](/partner-api/v2/endpoints/rotate-key) and [revoke the previous key](/partner-api/v2/endpoints/revoke-previous-key).
+  - [Revenue statement](/partner-api/v2/endpoints/get-revenue), a [sandbox](/partner-api/v2/quickstart) with simulated payments on a public testnet, and keyless [token metadata](/partner-api/v2/endpoints/get-token-metadata).
+  - v2 replaces v1: the [v1 Partner API](/partner-api/introduction) (a prefunded balance, balance-paid purchases, withdrawals) is retired for every partner.
+</Update>

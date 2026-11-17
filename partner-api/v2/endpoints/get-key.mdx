@@ -1,0 +1,56 @@
+---
+title: "Get your key"
+api: "GET /api/partner/v2/keys"
+description: "The key you call with: name, scopes, dates, program, and its successor once rotated. Never a secret."
+---
+
+Scope: `nft:orders`
+
+The key you call with. Never a secret. Rotation and handling: [Authentication and keys](/partner-api/v2/authentication).
+
+## Response
+
+<ResponseField name="key" type="object">
+  <Expandable title="key">
+    <ResponseField name="id" type="string" />
+    <ResponseField name="name" type="string" />
+    <ResponseField name="scopes" type="string[]">`["nft:orders"]`.</ResponseField>
+    <ResponseField name="created_at" type="string" />
+    <ResponseField name="last_used_at" type="string | null" />
+    <ResponseField name="expires_at" type="string | null">Set once the key has been rotated: when it stops working.</ResponseField>
+    <ResponseField name="rotated_from" type="string | null">The key this one replaced.</ResponseField>
+    <ResponseField name="successor" type="object | null">Once rotated, the key that replaced it: `id` and `name`.</ResponseField>
+    <ResponseField name="program" type="string">Your program.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `401` | `INVALID_KEY` | The key is disabled, or a rotated key past its 24 hours |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v2/keys \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "key": {
+    "id": "c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17",
+    "name": "okx-prod",
+    "scopes": ["nft:orders"],
+    "created_at": "2026-11-16T12:00:00.000Z",
+    "last_used_at": "2026-11-17T09:58:12.000Z",
+    "expires_at": null,
+    "rotated_from": null,
+    "successor": null,
+    "program": "okx"
+  }
+}
+```
+</ResponseExample>

@@ -1,0 +1,103 @@
+---
+title: "Get a pack's odds and pool"
+api: "GET /api/partner/v2/catalog/packs/pool"
+description: "What one pack can pull at one odds choice: the value bands and their chances, whether those odds are selling, and every item."
+---
+
+Scope: `nft:orders`
+
+What one pack can pull at one [odds choice](/partner-api/v2/odds): the value bands with their chances, whether those odds are selling right now, and every item a pull can produce. This is the same information as the odds panel in our app, so show it to your customers before they buy.
+
+<ParamField query="pack_type" type="string" required>
+  A `pack_type` from [List packs](/partner-api/v2/endpoints/list-packs).
+</ParamField>
+<ParamField query="category" type="string" default="pokemon">
+  As for [List packs](/partner-api/v2/endpoints/list-packs).
+</ParamField>
+<ParamField query="odds" type="string">
+  `standard`, `hot`, `chill` or `classic`: one the pack sells. Default: the pack's `default_odds`.
+</ParamField>
+
+## Response
+
+<ResponseField name="pack_type" type="string" />
+<ResponseField name="name" type="string" />
+<ResponseField name="category" type="string" />
+<ResponseField name="price" type="number">What the customer pays, in dollars.</ResponseField>
+<ResponseField name="odds" type="string">The odds choice this response describes.</ResponseField>
+<ResponseField name="label" type="string">Its display label, e.g. `Hot`.</ResponseField>
+<ResponseField name="tagline" type="string">A short description, e.g. `Fewer hits, bigger chase`.</ResponseField>
+<ResponseField name="available" type="boolean">Whether these odds are selling right now.</ResponseField>
+<ResponseField name="fresh_buyback_rate" type="number">The sell-back rate in the fresh window, as a fraction (`1` = 100%). See [Sell-back](/partner-api/v2/sell-back#what-a-sell-back-pays).</ResponseField>
+<ResponseField name="consolation_probability" type="number | null">The chance of the pack's consolation prize, where it has one, else null.</ResponseField>
+<ResponseField name="bands" type="object[]">
+  `band` (its key, e.g. `7.5-15`), `min_value`, `max_value`, `odds` (the chance, 0 to 1, of a pull landing in that band at these odds) and `cards` (how many items sit in it). A band at 0 can't pull at these odds.
+</ResponseField>
+<ResponseField name="odds_choices" type="object[]">
+  Every odds choice the pack sells: `odds`, `label` and `available`.
+</ResponseField>
+<ResponseField name="total_cards" type="integer" />
+<ResponseField name="cards" type="object[]">
+  Every item a pull can produce at these odds, highest value first, each with the `band` it sits in. Each item carries its catalog fields (name, set, year, grade, cert, images, `market_value`).
+</ResponseField>
+
+### Packs that sell only their own odds
+
+A pack that sells only its own odds answers `odds: "classic"` with its own band shape:
+
+- `bands[]` with `bucket_id`, `label`, `min_value`, `max_value`, `odds`, `is_consolation` and `hittable_cards`;
+- `cards[]` with `bucket_id`;
+- `chase`: `{ card, probability, odds_label, label, ends_at }` when a chase item is on offer, else null;
+- `odds_choices: [{ "odds": "classic", "label": "Classic", "available": true }]`, the same shape as every other pack.
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_PACK` | `pack_type` missing |
+| `400` | `BAD_CATEGORY` | Unknown `category` |
+| `400` | `BAD_ODDS` | `odds` isn't `standard`, `hot`, `chill` or `classic`, or the pack doesn't sell it; in the second case `odds` lists the choices it sells |
+| `404` | `PACK_NOT_OFFERED` | That pack isn't sold through your program |
+| `409` | `ODDS_UNAVAILABLE` | Those odds aren't selling right now |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v2/catalog/packs/pool?pack_type=bronze&category=pokemon&odds=hot" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "pack_type": "bronze",
+  "name": "Bronze Pack",
+  "category": "pokemon",
+  "price": 25,
+  "odds": "hot",
+  "label": "Hot",
+  "tagline": "Fewer hits, bigger chase",
+  "available": true,
+  "fresh_buyback_rate": 1,
+  "consolation_probability": null,
+  "bands": [
+    { "band": "7.5-15", "min_value": 7.5, "max_value": 15, "odds": 0.61, "cards": 380 },
+    { "band": "250-1000", "min_value": 250, "max_value": 1000, "odds": 0.004, "cards": 41 }
+  ],
+  "odds_choices": [
+    { "odds": "standard", "label": "Standard", "available": true },
+    { "odds": "hot", "label": "Hot", "available": true },
+    { "odds": "chill", "label": "Chill", "available": true },
+    { "odds": "classic", "label": "Classic", "available": true }
+  ],
+  "total_cards": 1043,
+  "cards": [
+    { "id": "0e94dc61-...", "category": "pokemon", "name": "Charizard ex", "grading_company": "PSA", "grading_rank": 10, "market_value": 410, "render_image": "https://...", "band": "250-1000" }
+  ]
+}
+```
+
+```json 400
+{ "error": "bronze sells standard, hot, chill, classic", "code": "BAD_ODDS", "odds": ["standard", "hot", "chill", "classic"] }
+```
+</ResponseExample>

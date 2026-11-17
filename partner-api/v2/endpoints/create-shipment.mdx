@@ -1,0 +1,139 @@
+---
+title: "Create a shipment"
+api: "POST /api/partner/v2/shipments"
+description: "Create and pay for one box carrying 1-25 tokens held by one wallet."
+---
+
+Scope: `nft:orders`
+
+One box for 1-25 tokens: we re-quote the chosen rate for all the tokens together and open one payment for the shipping. Once paid, [Get a shipment](/partner-api/v2/endpoints/get-shipment) returns a burn per token; the box ships once every token is burned. The whole flow: [Shipping](/partner-api/v2/shipping).
+
+<Warning>
+  Always send an `Idempotency-Key`, and reuse it when retrying. See [Idempotency](/partner-api/v2/idempotency).
+</Warning>
+
+<ParamField header="Idempotency-Key" type="string" required>
+  Your own shipment id: 8-128 characters of `A-Za-z0-9_-`. Shared key space with [Create a one-token shipment](/partner-api/v2/endpoints/create-token-shipment).
+</ParamField>
+<ParamField body="token_ids" type="string[]" required>
+  1-25 distinct decimal token ids of your program, all held by `holder`. Send them as strings.
+</ParamField>
+<ParamField body="holder" type="string" required>
+  The wallet that holds every token now. Checked on chain. Every burn must come from it.
+</ParamField>
+<ParamField body="address" type="object" required>
+  As for [Estimate a shipment](/partner-api/v2/endpoints/estimate-shipment).
+</ParamField>
+<ParamField body="rate" type="object" required>
+  `{ "carrier": "...", "token": "..." }` from an estimate's `rates`.
+</ParamField>
+<ParamField body="max_cost" type="number" required>
+  The most the holder will pay for shipping, in dollars: pass the estimate's `total`. If the rate now costs more, nothing is created and you get `PRICE_CHANGED` with the current `amount`.
+</ParamField>
+<ParamField body="cover_amount" type="number | null">
+  Shipping insurance cover in dollars, as for the estimate.
+</ParamField>
+
+## Response
+
+**201** (200 with `"idempotent_replay": true` on a replay).
+
+<ResponseField name="shipment" type="object">
+  <Expandable title="shipment">
+    <ResponseField name="shipment_id" type="string">Names the whole box.</ResponseField>
+    <ResponseField name="status" type="string">`awaiting_payment`. See [Shipping statuses](/partner-api/v2/shipping#statuses).</ResponseField>
+    <ResponseField name="shipping_cost" type="number" />
+    <ResponseField name="holder" type="string" />
+    <ResponseField name="expires_at" type="string">The burn window's end, set to 24 hours from payment once paid.</ResponseField>
+    <ResponseField name="paid_at" type="string | null" />
+    <ResponseField name="tokens" type="object[]">
+      Listed by token id: `token_id`, `quote_id` (what the token burns with), `status`, `burned_at`, `burn_tx` and `burn` (null until paid).
+    </ResponseField>
+    <ResponseField name="fulfilment" type="object | null">Null until every burn is seen.</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="payment" type="object | null">
+  Pay it exactly like an order ([Payments](/partner-api/v2/payments)). A replay with the same key returns `payment` again while the shipment is unpaid (`null` once paid). An unpaid shipment never expires: it stays `awaiting_payment` and can be paid at any time.
+</ResponseField>
+<ResponseField name="idempotent_replay" type="boolean">Present and `true` on a replay.</ResponseField>
+
+## Errors
+
+A refusal about particular tokens lists them in `token_ids`.
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_IDEMPOTENCY_KEY` | `Idempotency-Key` missing or malformed |
+| `400` | `BAD_JSON` | The body isn't JSON |
+| `400` | `BAD_TOKEN_IDS` | `token_ids` isn't a list of 1-25 distinct decimal token ids |
+| `400` | `BAD_HOLDER` | `holder` is not a wallet address on your mint chain |
+| `400` | `BAD_ADDRESS` | The shipping address is invalid; `fields` maps each bad field to a message |
+| `400` | `BAD_COVER` | `cover_amount` isn't a positive dollar amount with at most two decimals |
+| `400` | `COVER_NOT_ALLOWED` | `cover_amount` is outside what the items can be insured for; the body has `order_value`, `min_cover` and `max_cover` |
+| `400` | `BAD_MAX_COST` | `max_cost` missing or not positive |
+| `400` | `NOT_SHIPPABLE` | An item can't ship |
+| `400` | `PARTNER_GOODS` | An item is held by its brand partner and can't ship through CatchBack; it can still be sold back |
+| `400` | `COUNTRY_NOT_SUPPORTED` | We don't ship to that country |
+| `400` | `OVER_CUSTOMS_CAP` | The items are worth more than we can ship internationally |
+| `403` | `NOT_HOLDER` | `holder` doesn't hold these tokens on chain right now |
+| `403` | `WALLET_REFUSED` | The holder failed sanctions screening |
+| `404` | `UNKNOWN_TOKEN` | No such token on your program's contract |
+| `409` | `TOKEN_NOT_LIVE` | A token isn't minted yet, or was already burned |
+| `409` | `TOKEN_IN_SHIPMENT` | A token already has a paid shipment waiting for its burn. Burn or renew that shipment instead |
+| `409` | `RATE_UNAVAILABLE` | The carrier no longer offers that rate; estimate again |
+| `409` | `COVER_UNAVAILABLE` | The chosen service has no cover option; choose another rate or leave `cover_amount` out |
+| `409` | `PRICE_CHANGED` | The shipping cost is now above `max_cost`; the body has the current `amount` |
+| `422` | `IDEMPOTENCY_KEY_REUSED` | The key was already used for a different shipment |
+| `503` | `CHAIN_UNAVAILABLE` | We couldn't read the tokens' owner from the chain; retry shortly |
+| `503` | `SCREENING_UNAVAILABLE` | Wallet screening is briefly unavailable; retry shortly |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/shipments \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Idempotency-Key: okx-ship-1c9e04" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token_ids": ["81264573985362058461377125337283195667", "90311820476190023716442901288201455"],
+    "holder": "0x8f3c...e21a",
+    "address": { "name": "Alice Tester", "address1": "1 Market St", "city": "San Francisco", "state": "CA", "zip": "94105", "country": "US", "phone": "4155550100" },
+    "rate": { "carrier": "USPS", "token": "usps_priority" },
+    "max_cost": 9.85,
+    "cover_amount": null
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201
+{
+  "shipment": {
+    "shipment_id": "7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73",
+    "status": "awaiting_payment",
+    "shipping_cost": 9.85,
+    "holder": "0x8f3c...e21a",
+    "expires_at": "2026-11-17T18:40:00.000Z",
+    "paid_at": null,
+    "tokens": [
+      { "token_id": "90311820476190023716442901288201455", "quote_id": "0x1b7c...e4a0", "status": "awaiting_payment", "burned_at": null, "burn_tx": null, "burn": null },
+      { "token_id": "81264573985362058461377125337283195667", "quote_id": "0xa93f...0c2d", "status": "awaiting_payment", "burned_at": null, "burn_tx": null, "burn": null }
+    ],
+    "fulfilment": null
+  },
+  "payment": {
+    "intent_id": "pi_01JE...",
+    "client_secret": "pi_01JE..._secret_...",
+    "publishable_key": "pk_live_...",
+    "amount": 9.85,
+    "deposit_addresses": [
+      { "chain": "evm:8453", "address": "0x..." },
+      { "chain": "solana:mainnet", "address": "..." }
+    ]
+  }
+}
+```
+
+```json 409
+{ "error": "This rate is no longer available. Estimate again.", "code": "RATE_UNAVAILABLE" }
+```
+</ResponseExample>

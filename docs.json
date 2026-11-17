@@ -71,6 +71,91 @@
         "tab": "Partner API",
         "groups": [
           {
+            "group": "Partner API v2 (wallets & NFTs)",
+            "pages": [
+              "partner-api/v2/overview",
+              "partner-api/v2/quickstart",
+              "partner-api/v2/authentication",
+              {
+                "group": "Concepts",
+                "pages": [
+                  "partner-api/v2/orders",
+                  "partner-api/v2/odds",
+                  "partner-api/v2/payments",
+                  "partner-api/v2/sell-back",
+                  "partner-api/v2/shipping",
+                  "partner-api/v2/webhooks",
+                  "partner-api/v2/chains-and-metadata",
+                  "partner-api/v2/idempotency",
+                  "partner-api/v2/errors",
+                  "partner-api/v2/limits-and-compliance"
+                ]
+              },
+              {
+                "group": "Packs & orders",
+                "pages": [
+                  "partner-api/v2/endpoints/list-packs",
+                  "partner-api/v2/endpoints/get-pack-pool",
+                  "partner-api/v2/endpoints/create-order",
+                  "partner-api/v2/endpoints/list-orders",
+                  "partner-api/v2/endpoints/get-order",
+                  "partner-api/v2/endpoints/get-order-verification"
+                ]
+              },
+              {
+                "group": "Tokens & sell-back",
+                "pages": [
+                  "partner-api/v2/endpoints/list-wallet-tokens",
+                  "partner-api/v2/endpoints/get-token",
+                  "partner-api/v2/endpoints/create-sellback-quote",
+                  "partner-api/v2/endpoints/list-quotes",
+                  "partner-api/v2/endpoints/get-quote",
+                  "partner-api/v2/endpoints/get-token-metadata"
+                ]
+              },
+              {
+                "group": "Shipments",
+                "pages": [
+                  "partner-api/v2/endpoints/estimate-shipment",
+                  "partner-api/v2/endpoints/create-shipment",
+                  "partner-api/v2/endpoints/estimate-token-shipment",
+                  "partner-api/v2/endpoints/create-token-shipment",
+                  "partner-api/v2/endpoints/list-shipments",
+                  "partner-api/v2/endpoints/get-shipment",
+                  "partner-api/v2/endpoints/renew-shipment"
+                ]
+              },
+              {
+                "group": "Webhook endpoints",
+                "pages": [
+                  "partner-api/v2/endpoints/register-webhook",
+                  "partner-api/v2/endpoints/list-webhooks",
+                  "partner-api/v2/endpoints/delete-webhook",
+                  "partner-api/v2/endpoints/test-webhook"
+                ]
+              },
+              {
+                "group": "Keys & revenue",
+                "pages": [
+                  "partner-api/v2/endpoints/get-key",
+                  "partner-api/v2/endpoints/rotate-key",
+                  "partner-api/v2/endpoints/revoke-previous-key",
+                  "partner-api/v2/endpoints/get-revenue"
+                ]
+              },
+              {
+                "group": "Sandbox",
+                "pages": [
+                  "partner-api/v2/endpoints/sandbox-pay",
+                  "partner-api/v2/endpoints/sandbox-tick",
+                  "partner-api/v2/endpoints/sandbox-ship"
+                ]
+              },
+              "partner-api/v2/go-live-checklist",
+              "partner-api/v2/changelog"
+            ]
+          },
+          {
             "group": "Get started",
             "pages": [
               "partner-api/introduction",

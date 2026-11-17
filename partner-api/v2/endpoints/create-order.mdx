@@ -1,0 +1,167 @@
+---
+title: "Create an order"
+api: "POST /api/partner/v2/orders"
+description: "Buy 1-10 packs of one kind for one wallet, paid with one payment."
+---
+
+Scope: `nft:orders` · Rate limit: 30 a minute
+
+One order buys 1-10 packs of one kind for one wallet, paid with one payment. The response has the order and how to pay it ([Payments](/partner-api/v2/payments)). The pack opens and the NFT mints once the payment settles. Follow it with [Get an order](/partner-api/v2/endpoints/get-order) or the `nft_order.updated` [webhook](/partner-api/v2/webhooks).
+
+A refused order creates nothing. There is no limit on how much a wallet buys.
+
+<Warning>
+  Always send an `Idempotency-Key`, and reuse it when retrying the same order. See [Idempotency](/partner-api/v2/idempotency).
+</Warning>
+
+<ParamField header="Idempotency-Key" type="string" required>
+  Your own order id: 8-128 characters of `A-Za-z0-9_-`, one per order. It becomes the order's `order_id`.
+</ParamField>
+<ParamField body="pack_type" type="string" required>
+  A `pack_type` from [List packs](/partner-api/v2/endpoints/list-packs).
+</ParamField>
+<ParamField body="category" type="string" default="pokemon">
+  As for [List packs](/partner-api/v2/endpoints/list-packs).
+</ParamField>
+<ParamField body="odds" type="string">
+  `standard`, `hot`, `chill` or `classic`: one the pack sells. Default: the pack's `default_odds`. See [Odds](/partner-api/v2/odds).
+</ParamField>
+<ParamField body="quantity" type="integer" default="1">
+  1-10 packs. 2 or more makes a [multi-pack order](/partner-api/v2/orders#multi-pack-orders).
+</ParamField>
+<ParamField body="recipient" type="string" required>
+  The customer's self-custody wallet on your mint chain. Never an exchange deposit address: the NFTs are minted to it.
+</ParamField>
+<ParamField body="refund_address" type="string">
+  An EVM wallet that can receive USDC on Base, for refunds. Defaults to `recipient` on an EVM program. **Required when you mint on Solana.**
+</ParamField>
+<ParamField body="partner_user_ref" type="string">
+  Your opaque user id (`A-Z a-z 0-9 _ . : -`, up to 128). Never put personal data here.
+</ParamField>
+
+## Response
+
+**201** (200 with `"idempotent_replay": true` on a replay).
+
+<ResponseField name="order" type="object">
+  The order, as [Get an order](/partner-api/v2/endpoints/get-order) returns it. A multi-pack order has `quantity`, `unit_price`, `price` (the total) and `units`.
+  <Expandable title="order">
+    <ResponseField name="order_id" type="string">Your `Idempotency-Key`.</ResponseField>
+    <ResponseField name="id" type="string">Our id. Either works in `GET /orders/{id}`.</ResponseField>
+    <ResponseField name="status" type="string">`awaiting_payment`. See [Orders and statuses](/partner-api/v2/orders).</ResponseField>
+    <ResponseField name="pack_type" type="string" />
+    <ResponseField name="category" type="string" />
+    <ResponseField name="odds" type="string">The odds the pack is opened at.</ResponseField>
+    <ResponseField name="price" type="number">The amount due, in dollars.</ResponseField>
+    <ResponseField name="recipient" type="string" />
+    <ResponseField name="mint_chain" type="string" />
+    <ResponseField name="paid_at" type="string | null" />
+    <ResponseField name="pull" type="object | null">Null until the pack opens.</ResponseField>
+    <ResponseField name="token" type="object | null">Null until the NFT is minted.</ResponseField>
+    <ResponseField name="failure_reason" type="string | null" />
+    <ResponseField name="created_at" type="string" />
+  </Expandable>
+</ResponseField>
+<ResponseField name="payment" type="object">
+  `intent_id`, `client_secret`, `publishable_key`, `amount` and `deposit_addresses`. See [Payments](/partner-api/v2/payments). Once the order is past `awaiting_payment`, a replay's `payment` has no `client_secret` and no deposit addresses: there is nothing left to pay.
+</ResponseField>
+<ResponseField name="idempotent_replay" type="boolean">Present and `true` on a replay.</ResponseField>
+
+If the chosen odds stop selling before the payment settles, the pack isn't opened at other odds: the order goes to `refund_due` and the customer is refunded.
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_IDEMPOTENCY_KEY` | `Idempotency-Key` missing or malformed |
+| `400` | `BAD_JSON` | The body isn't JSON |
+| `400` | `BAD_RECIPIENT` | `recipient` is not a wallet address on your mint chain |
+| `400` | `BAD_PACK` | `pack_type` missing |
+| `400` | `BAD_CATEGORY` | Unknown `category` |
+| `400` | `BAD_ODDS` | `odds` isn't a known choice, or the pack doesn't sell it (`odds` lists the choices) |
+| `400` | `BAD_QUANTITY` | `quantity` isn't a whole number from 1 to 10 |
+| `400` | `BAD_REFUND_ADDRESS` | No usable EVM `refund_address` (required when you mint on Solana) |
+| `403` | `WALLET_REFUSED` | A wallet in the request failed sanctions screening |
+| `403` | `WALLET_BLOCKED` | This wallet may not buy from CatchBack |
+| `404` | `PACK_NOT_OFFERED` | That pack isn't sold through your program |
+| `409` | `ODDS_UNAVAILABLE` | Those odds aren't selling right now. Nothing is created |
+| `409` | `PACK_UNAVAILABLE` | A pack that sells only its own odds can't open right now; `reason` says why. Nothing is created |
+| `422` | `IDEMPOTENCY_KEY_REUSED` | The key was already used for a different order |
+| `503` | `SCREENING_UNAVAILABLE` | Wallet screening is briefly unavailable; retry shortly |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/orders \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Idempotency-Key: okx-ord-7f3a9c21" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pack_type": "bronze",
+    "category": "pokemon",
+    "odds": "standard",
+    "quantity": 1,
+    "recipient": "0x8f3c...e21a",
+    "refund_address": "0x8f3c...e21a",
+    "partner_user_ref": "okx-uid-102938"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201
+{
+  "order": {
+    "order_id": "okx-ord-7f3a9c21",
+    "id": "3d2b8f0e-6c1a-4f7e-9a51-2b0d8c4e7f13",
+    "status": "awaiting_payment",
+    "pack_type": "bronze",
+    "category": "pokemon",
+    "odds": "standard",
+    "price": 25,
+    "recipient": "0x8f3c...e21a",
+    "mint_chain": "evm:196",
+    "paid_at": null,
+    "pull": null,
+    "token": null,
+    "failure_reason": null,
+    "created_at": "2026-11-16T18:02:11.420Z"
+  },
+  "payment": {
+    "intent_id": "pi_01JD...",
+    "client_secret": "pi_01JD..._secret_...",
+    "publishable_key": "pk_live_...",
+    "amount": 25,
+    "deposit_addresses": [
+      { "chain": "evm:8453", "address": "0x5a4d...0001" },
+      { "chain": "solana:mainnet", "address": "9xQe...Vf2p" }
+    ]
+  }
+}
+```
+
+```json 201 multi-pack
+{
+  "order": {
+    "order_id": "okx-ord-9b21e4c0",
+    "id": "5f1c2a90-8d3e-4b6a-9e1f-7c0a2b4d6e81",
+    "status": "awaiting_payment",
+    "quantity": 3,
+    "pack_type": "bronze",
+    "category": "pokemon",
+    "odds": "standard",
+    "unit_price": 25,
+    "price": 75,
+    "recipient": "0x8f3c...e21a",
+    "mint_chain": "evm:196",
+    "paid_at": null,
+    "units": [
+      { "order_id": "okx-ord-9b21e4c0", "id": "a0e1...", "batch_id": "5f1c2a90-8d3e-4b6a-9e1f-7c0a2b4d6e81", "unit": 1, "status": "awaiting_payment", "pack_type": "bronze", "category": "pokemon", "odds": "standard", "price": 25, "recipient": "0x8f3c...e21a", "mint_chain": "evm:196", "paid_at": null, "pull": null, "token": null, "failure_reason": null, "created_at": "2026-11-16T18:02:11.420Z" },
+      { "order_id": "okx-ord-9b21e4c0", "id": "b7d2...", "batch_id": "5f1c2a90-8d3e-4b6a-9e1f-7c0a2b4d6e81", "unit": 2, "status": "awaiting_payment", "...": "..." },
+      { "order_id": "okx-ord-9b21e4c0", "id": "c4f9...", "batch_id": "5f1c2a90-8d3e-4b6a-9e1f-7c0a2b4d6e81", "unit": 3, "status": "awaiting_payment", "...": "..." }
+    ],
+    "created_at": "2026-11-16T18:02:11.420Z"
+  },
+  "payment": { "intent_id": "pi_01JD...", "client_secret": "...", "publishable_key": "pk_live_...", "amount": 75, "deposit_addresses": ["..."] }
+}
+```
+</ResponseExample>

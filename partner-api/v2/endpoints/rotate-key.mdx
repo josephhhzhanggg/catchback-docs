@@ -1,0 +1,65 @@
+---
+title: "Rotate your key"
+api: "POST /api/partner/v2/keys/rotate"
+description: "Issue a replacement key for the same program, with the same scopes. The old key keeps working for 24 hours."
+---
+
+Scope: `nft:orders`
+
+Issues a new key for the same program, with the same scopes. No body; an `Idempotency-Key` is required. Call it with your **current** key.
+
+- **The old key keeps working for 24 hours** (`previous_key.expires_at`), then answers `401`. Move every server to the new key within that window.
+- **Store `key.secret` straight away.** If the response is lost, call again with the same old key and the same `Idempotency-Key` within **10 minutes**, before you use the new key: you get the same new key and secret back. After that (or once the new key has made a call) the replay is `409 ALREADY_ROTATED`, so a leaked old key can never fetch the new one.
+- **A key is rotated once.** Rotating it again with a different `Idempotency-Key` is `409 ALREADY_ROTATED`, with the `successor`; rotate the new key next time.
+- **Your webhook moves with the rotation.** The new key takes over the old key's webhook (same URL, same secret), and the old key's stops, so deliveries never pause and you change nothing.
+- If you rotated because a key may have leaked, call [Revoke the previous key](/partner-api/v2/endpoints/revoke-previous-key) with the new key once every server uses it.
+
+<ParamField header="Idempotency-Key" type="string" required>
+  8-128 characters of `A-Za-z0-9_-`.
+</ParamField>
+
+## Response
+
+**201** (200 with `"idempotent_replay": true` on a replay).
+
+<ResponseField name="key" type="object">
+  The new key: `id`, `name`, `secret` (`cb_live_...`, shown only here) and `created_at`.
+</ResponseField>
+<ResponseField name="previous_key" type="object">
+  The key you called with: `id` and `expires_at`, 24 hours from now.
+</ResponseField>
+<ResponseField name="idempotent_replay" type="boolean">Present and `true` on a replay.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_IDEMPOTENCY_KEY` | `Idempotency-Key` missing or malformed |
+| `401` | `INVALID_KEY` | The key is disabled, or a rotated key past its 24 hours |
+| `409` | `ALREADY_ROTATED` | This key was already rotated with a different `Idempotency-Key`, or the replay window has passed; the body has `successor` (`id`, `name`) and `expires_at` |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/keys/rotate \
+  -H "Authorization: Bearer cb_live_<current key>" \
+  -H "Idempotency-Key: okx-rotate-2026-11"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201
+{
+  "key": { "id": "9a41d7e2-...", "name": "okx-prod-r2", "secret": "cb_live_7c1e...", "created_at": "2026-11-17T10:00:00.000Z" },
+  "previous_key": { "id": "c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17", "expires_at": "2026-11-18T10:00:00.000Z" }
+}
+```
+
+```json 409
+{
+  "error": "This key was already rotated. Use its successor, or retry with the original Idempotency-Key.",
+  "code": "ALREADY_ROTATED",
+  "successor": { "id": "9a41d7e2-...", "name": "okx-prod-r2" },
+  "expires_at": "2026-11-18T10:00:00.000Z"
+}
+```
+</ResponseExample>

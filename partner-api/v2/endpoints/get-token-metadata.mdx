@@ -1,0 +1,66 @@
+---
+title: "Token metadata"
+api: "GET /api/partner-nfts/metadata/{chainId}/{tokenId}"
+authMethod: "none"
+description: "A token's standard NFT metadata, which wallets and marketplaces read with no key. No prices."
+---
+
+No key · No scope
+
+Every token carries a standard metadata URL that wallets and marketplaces read without a key, from anywhere. On EVM it is the token's `tokenURI`; on Solana it is the asset's `uri`.
+
+| Mint chain | URL |
+|---|---|
+| EVM | `https://catchbackcards.com/api/partner-nfts/metadata/{chainId}/{tokenId}` |
+| Solana | `https://catchbackcards.com/api/partner-nfts/metadata/{id}` (our id for the asset) |
+
+- **It never includes a price** or value of any kind.
+- It is cached for a few minutes.
+- A token whose mint hasn't been sent yet answers `404`.
+- A trailing `.json` on the last path segment is accepted.
+
+<ParamField path="chainId" type="string" required>
+  EVM: the numeric chain id of your mint chain, e.g. `196`.
+</ParamField>
+<ParamField path="tokenId" type="string" required>
+  EVM: the decimal `token_id`.
+</ParamField>
+
+## Response
+
+<ResponseField name="name" type="string">The item's name, with its grade where it has one, e.g. `Charizard ex 199/165 (PSA 10)`.</ResponseField>
+<ResponseField name="description" type="string" />
+<ResponseField name="image" type="string | null">The item's image.</ResponseField>
+<ResponseField name="external_url" type="string" />
+<ResponseField name="attributes" type="object[]">
+  `{ "trait_type", "value" }` pairs: `Category`, `Set`, `Year`, `Number`, `Grade`, `Cert`, `Language`, `Brand`, `Size` and `Condition` where the item has them, and `Status` (`Vaulted`, or `Redeemed` once burned).
+</ResponseField>
+
+## Errors
+
+| Status | When |
+|---|---|
+| `404` | No such token, or its mint hasn't been sent yet (`"error": "Unknown token"`) |
+| `503` | Briefly unavailable; retry shortly |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner-nfts/metadata/196/81264573985362058461377125337283195667
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "name": "Charizard ex 199/165 (PSA 10)",
+  "description": "A physical collectible held in the CatchBack vault. Burn this token to sell it back or have it shipped.",
+  "image": "https://...",
+  "external_url": "https://catchbackcards.com",
+  "attributes": [
+    { "trait_type": "Category", "value": "pokemon" },
+    { "trait_type": "Grade", "value": "PSA 10" },
+    { "trait_type": "Status", "value": "Vaulted" }
+  ]
+}
+```
+</ResponseExample>

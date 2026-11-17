@@ -1,0 +1,37 @@
+---
+title: "Run the background work"
+api: "POST /api/partner/v2/sandbox/tick"
+description: "Sandbox only: run one pass of the background work now, then deliver the webhooks it produced."
+---
+
+Scope: `nft:orders` · **Sandbox only:** `404` outside the [sandbox](/partner-api/v2/quickstart)
+
+Runs one pass of what production does every two minutes: open paid packs, mint, confirm mints, watch the chain for transfers and burns, pay out, create shipments, close lapsed multi-token shipments, expire unpaid orders. Then it **delivers the webhooks** those steps produced. No body.
+
+Call it between the steps of a flow instead of waiting.
+
+## Response
+
+<ResponseField name="ran" type="boolean" />
+<ResponseField name="errors" type="integer">How many steps of the pass reported an error.</ResponseField>
+<ResponseField name="webhooks" type="object">`delivered` and `retrying`: the webhook deliveries this call made.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `404` | | Not the sandbox |
+| `502` | | The pass didn't run; `ran` is false. Retry |
+
+<RequestExample>
+```bash cURL
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/tick" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{ "ran": true, "errors": 0, "webhooks": { "delivered": 2, "retrying": 0 } }
+```
+</ResponseExample>

@@ -1,0 +1,98 @@
+---
+title: "Get a shipment"
+api: "GET /api/partner/v2/shipments/{id}"
+description: "One shipment: the burn details once paid, then carrier tracking."
+---
+
+Scope: `nft:orders`
+
+Once the shipping payment settles, `status` becomes `ready` and each token's `burn` holds what the holder burns it with. After every burn is seen, `fulfilment` carries the delivery. Statuses: [Shipping](/partner-api/v2/shipping#statuses).
+
+This response never includes the `payment` object: replay the create POST to get it. We never return the delivery address or the shipping label.
+
+<ParamField path="id" type="string" required>
+  A `shipment_id`, or any `quote_id` (a token in a multi-token shipment returns its whole shipment).
+</ParamField>
+
+## Response
+
+<ResponseField name="shipment" type="object">
+  <Expandable title="shipment">
+    <ResponseField name="shipment_id" type="string">Multi-token shipments only.</ResponseField>
+    <ResponseField name="status" type="string">`awaiting_payment`, `ready`, `expired`, `redeemed` or `partially_redeemed`.</ResponseField>
+    <ResponseField name="shipping_cost" type="number" />
+    <ResponseField name="holder" type="string">Every burn must come from this wallet.</ResponseField>
+    <ResponseField name="expires_at" type="string">The end of the burn window: 24 hours from payment, shared by every token.</ResponseField>
+    <ResponseField name="paid_at" type="string | null" />
+    <ResponseField name="tokens" type="object[]">
+      Multi-token shipments only: `token_id`, `quote_id`, `status` (`awaiting_payment`, `ready`, `expired`, `redeemed` or `dropped`), `burned_at`, `burn_tx` and `burn`.
+    </ResponseField>
+    <ResponseField name="quote_id" type="string">One-token shipments only (with `burn` at the top level).</ResponseField>
+    <ResponseField name="burn" type="object | null">
+      What the holder burns with, while the token is `ready`. **EVM:** `{ "quote": { ...the Quote tuple, "kind": 2, "amount": "0" }, "signature": "0x..." }`: call `burnWithQuote` exactly as for a [sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote). **Solana:** `{ "transaction": "<base64>", "vault": "...", "last_valid_block_height": ... }`: each GET builds a fresh transaction, so fetch it right before signing.
+    </ResponseField>
+    <ResponseField name="fulfilment" type="object | null">
+      Null until every burn is seen. Then `status` (`pending`, `processing`, `shipped`, `delivered`, `cancelled` or `needs_review`), `carrier`, `service`, `tracking_number`, `tracking_url` (the carrier's own tracking page), `shipped_at`, `expected_delivery` (a `YYYY-MM-DD` date), `delivered_at` and `created_at`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `404` | `UNKNOWN_SHIPMENT` | No such shipment in your program |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v2/shipments/7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73 \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 shipped
+{
+  "shipment": {
+    "shipment_id": "7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73",
+    "status": "redeemed",
+    "shipping_cost": 9.85,
+    "holder": "0x8f3c...e21a",
+    "expires_at": "2026-11-17T18:41:02.000Z",
+    "paid_at": "2026-11-16T18:41:02.000Z",
+    "tokens": [
+      { "token_id": "90311820476190023716442901288201455", "quote_id": "0x1b7c...e4a0", "status": "redeemed", "burned_at": "2026-11-16T19:02:10.000Z", "burn_tx": "0x51c0...", "burn": null },
+      { "token_id": "81264573985362058461377125337283195667", "quote_id": "0xa93f...0c2d", "status": "redeemed", "burned_at": "2026-11-16T19:04:55.000Z", "burn_tx": "0x3be1...", "burn": null }
+    ],
+    "fulfilment": {
+      "status": "shipped",
+      "carrier": "USPS",
+      "service": "Priority Mail",
+      "tracking_number": "9400111899223456789012",
+      "tracking_url": "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223456789012",
+      "shipped_at": "2026-11-17T16:02:11.000Z",
+      "expected_delivery": "2026-11-20",
+      "delivered_at": null,
+      "created_at": "2026-11-16T19:05:30.000Z"
+    }
+  }
+}
+```
+
+```json 200 ready
+{
+  "shipment": {
+    "shipment_id": "7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73",
+    "status": "ready",
+    "shipping_cost": 9.85,
+    "holder": "0x8f3c...e21a",
+    "expires_at": "2026-11-17T18:41:02.000Z",
+    "paid_at": "2026-11-16T18:41:02.000Z",
+    "tokens": [
+      { "token_id": "81264573985362058461377125337283195667", "quote_id": "0xa93f...0c2d", "status": "ready", "burned_at": null, "burn_tx": null, "burn": { "quote": { "tokenId": "...", "kind": 2, "...": "..." }, "signature": "0x..." } }
+    ],
+    "fulfilment": null
+  }
+}
+```
+</ResponseExample>

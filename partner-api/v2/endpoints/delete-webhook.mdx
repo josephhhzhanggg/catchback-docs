@@ -1,0 +1,37 @@
+---
+title: "Delete a webhook"
+api: "DELETE /api/partner/v2/webhooks/{id}"
+description: "Remove your webhook and its secret, and stop every event not yet delivered."
+---
+
+Scope: `nft:orders`
+
+Removes the webhook and its secret and stops every event not yet delivered. Register again to get a new secret.
+
+<ParamField path="id" type="string" required>
+  The webhook's `id`.
+</ParamField>
+
+## Response
+
+<ResponseField name="deleted" type="boolean">`true`.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `404` | `UNKNOWN_WEBHOOK` | No such webhook on this key |
+| `503` | `WEBHOOKS_UNAVAILABLE` | Webhooks aren't available on this server yet |
+
+<RequestExample>
+```bash cURL
+curl -X DELETE https://catchbackcards.com/api/partner/v2/webhooks/c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17 \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{ "deleted": true }
+```
+</ResponseExample>

@@ -1,0 +1,60 @@
+---
+title: "List sell-back quotes"
+sidebarTitle: "List quotes"
+api: "GET /api/partner/v2/quotes"
+description: "Your program's sell-back quotes, newest first, paged."
+---
+
+Scope: `nft:orders`
+
+Newest first, each in the [Get a quote](/partner-api/v2/endpoints/get-quote) shape.
+
+<ParamField query="wallet" type="string">
+  The `holder` the quote was issued to, on your mint chain. Default: all.
+</ParamField>
+<ParamField query="limit" type="integer" default="25">
+  1-100.
+</ParamField>
+<ParamField query="cursor" type="string">
+  The `next_cursor` of the previous page.
+</ParamField>
+
+## Response
+
+<ResponseField name="quotes" type="object[]">Each in the [Get a quote](/partner-api/v2/endpoints/get-quote) shape.</ResponseField>
+<ResponseField name="next_cursor" type="string | null">Null on the last page.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_CURSOR` | `cursor` isn't a `next_cursor` from a previous page |
+| `400` | `BAD_LIMIT` | `limit` isn't 1-100 |
+| `400` | `BAD_ADDRESS` | `wallet` is not an address on your mint chain |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v2/quotes?wallet=0x8f3c...e21a&limit=25" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "quotes": [
+    {
+      "quote_id": "0x5e0c...91ab",
+      "status": "redeemed",
+      "amount_usd": 330,
+      "holder": "0x8f3c...e21a",
+      "payout": { "chain": "evm:8453", "address": "0x8f3c...e21a", "status": "sent", "tx_hash": "0x77d0...", "held": false },
+      "expires_at": "2026-11-16T18:30:00.000Z",
+      "redeemed_at": "2026-11-16T18:21:13.000Z",
+      "burn_tx": "0x3be1..."
+    }
+  ],
+  "next_cursor": null
+}
+```
+</ResponseExample>

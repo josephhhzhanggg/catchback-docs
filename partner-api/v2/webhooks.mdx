@@ -1,0 +1,106 @@
+---
+title: "Webhooks"
+description: "Get a signed POST when an order, a sell-back payout or a shipment changes: events, the envelope, checking the signature, retries, and polling as a fallback."
+---
+
+We tell your server when an order, a sell-back payout or a shipment changes, so you don't have to poll. Polling still works and is the fallback when your receiver was down for longer than our retries.
+
+## Set up
+
+Your key registers its own webhook:
+
+```bash
+curl -X POST https://catchbackcards.com/api/partner/v2/webhooks \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "https://partner.example.com/catchback/webhooks" }'
+```
+
+The response is **201** the first time, with the signing secret. **The secret is shown once; store it.** It starts `whsec_`.
+
+- **One webhook per key.** Calling [`POST /webhooks`](/partner-api/v2/endpoints/register-webhook) again changes the URL and answers **200** with `"secret": null`: the secret stays the same. To get a new secret, [`DELETE`](/partner-api/v2/endpoints/delete-webhook) the webhook and register again.
+- **The URL** must be a public `https://` URL on port 443, with a hostname (not an IP address) and no login in it, up to 2048 characters. In the [sandbox](/partner-api/v2/quickstart), `http://localhost`, `http://127.0.0.1` and `http://[::1]` on any port also work.
+- [`GET /webhooks`](/partner-api/v2/endpoints/list-webhooks) shows it (never the secret), and [`POST /webhooks/{id}/test`](/partner-api/v2/endpoints/test-webhook) sends a signed `ping` right now and tells you how your receiver answered.
+- **Your webhook moves with a key rotation**: the new key takes over the same URL and secret. See [Authentication and keys](/partner-api/v2/authentication#rotate).
+
+## Events
+
+Every event is a JSON `POST` with this envelope:
+
+```json
+{
+  "id": "evt_4b8e0f2a91c3d5e7f6a0b1c2d3e4f5a6",
+  "type": "nft_order.updated",
+  "created_at": "2026-11-16T18:04:52.118Z",
+  "data": { "order": { "order_id": "okx-ord-7f3a9c21", "id": "3d2b8f0e-...", "status": "minted", "...": "..." } }
+}
+```
+
+| `type` | When | `data` |
+|---|---|---|
+| `nft_order.updated` | An order changes status after you created it: `paid`, `rolled`, `minted`, `mint_failed`, `expired`, `refund_due`, `refunded` | `{ "order": ... }`, as [`GET /orders/{id}`](/partner-api/v2/endpoints/get-order) returns it |
+| `sellback.updated` | A sell-back payout changes status: `pending` (the burn was seen), `sending`, `sent`, `held`, `failed` | `{ "quote": ... }`, as [`GET /quotes/{quoteId}`](/partner-api/v2/endpoints/get-quote) returns it |
+| `nft_shipment.updated` | A shipment is paid (`ready`), a token is burned (`redeemed`), or the box moves: `fulfilment.status` `pending`, `processing`, `shipped`, `delivered`, `cancelled`, `needs_review` | `{ "shipment": ... }`: the token's shipment with its `fulfilment` (below) |
+| `ping` | You called [`POST /webhooks/{id}/test`](/partner-api/v2/endpoints/test-webhook) | `{ "webhook_id": "<id>" }` |
+
+- `created_at` is when the change happened.
+- **The payload is the current state, not a diff.** It is built when we pick the change up (every two minutes), so several quick changes can arrive as one event carrying the latest status, and an intermediate status may never be sent on its own. Act on the status in the payload.
+- **Multi-pack orders:** `nft_order.updated` fires for each unit, carrying the order's `order_id`, its `batch_id` and the `unit` number.
+- **Shipments:** `data.shipment` has the fields of the one-token shape: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `burn` and `fulfilment`. In a multi-token shipment each event is about one token (its `quote_id`); `GET /shipments/{quote_id}` returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction.
+- **A burn window lapsing sends no event.** Watch `expires_at` and [renew](/partner-api/v2/endpoints/renew-shipment).
+
+## Delivery and retries
+
+- **A 2xx response is delivered.** Anything else is a failure: another status, a redirect (we never follow one), no answer within **5 seconds**, or a connection error. Answer fast and do the work afterwards.
+- **Retries:** after a failure we try again **1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours and 24 hours** later: **8 attempts** in all, over about 45 hours. After the eighth failure the event is dropped; poll to catch up.
+- **At least once.** The same event can arrive more than once (and events can arrive out of order). **Dedupe on `id`**: a retry carries the same `id` and the same body.
+- We send events every two minutes or so, so an event usually arrives within a few minutes of the change.
+
+Headers on every delivery:
+
+| Header | Value |
+|---|---|
+| `X-CatchBack-Signature` | `t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>")>` |
+| `X-CatchBack-Event` | The event `type` |
+| `X-CatchBack-Event-Id` | The event `id` |
+| `X-CatchBack-Attempt` | `1` for the first try, then `2`, `3`, ... |
+| `Content-Type` | `application/json` |
+
+## Verify the signature
+
+Check every delivery before trusting it: recompute the HMAC over the **raw** body (before any JSON parsing), compare in constant time, and refuse a timestamp more than **300 seconds** from your clock. Each retry is signed afresh, so a late retry still verifies.
+
+The secret is the whole `whsec_...` string, used as the HMAC key as is.
+
+```ts
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+function verifyCatchBackSignature(secret: string, header: string | undefined, rawBody: string, nowSeconds = Math.floor(Date.now() / 1000)): boolean {
+  if (!header) return false;
+  const parts = new Map(header.split(',').map((p) => {
+    const i = p.indexOf('=');
+    return [p.slice(0, i).trim(), p.slice(i + 1).trim()] as const;
+  }));
+  const t = Number(parts.get('t'));
+  const v1 = parts.get('v1') ?? '';
+  if (!Number.isInteger(t) || !/^[0-9a-f]{64}$/.test(v1)) return false;
+  if (Math.abs(nowSeconds - t) > 300) return false;
+  const expected = createHmac('sha256', secret).update(`${t}.${rawBody}`).digest();
+  return timingSafeEqual(Buffer.from(v1, 'hex'), expected);
+}
+```
+
+## Polling (the fallback)
+
+Poll, within the [request limits](/partner-api/v2/limits-and-compliance), when you have no webhook or missed events:
+
+| Waiting for | Poll | Every | Until |
+|---|---|---|---|
+| An order to finish | `GET /orders/{id}` | 5-10 s while `paid` or `rolled`; 30 s while `awaiting_payment` | `minted`, `expired`, `refunded` (or `completed` for a multi-pack order) |
+| A sell-back payout | `GET /quotes/{quoteId}` | 15-30 s | `payout.status` is `sent` (or `held`: then hourly) |
+| A shipping payment | `GET /shipments/{id}` | 10-30 s | `status` is `ready` |
+| A shipment | `GET /shipments/{id}` | every few minutes until `delivered`; hourly once `shipped` is fine | `fulfilment.status` reaches `delivered` |
+| Holdings after a trade | `GET /wallets/{address}/tokens` | on demand | |
+| Catching up after downtime | `GET /orders`, `GET /quotes`, `GET /shipments` | once | You reach items you already know |
+
+Our background processing runs every two minutes, so most steps finish within a few minutes of the event that triggers them.

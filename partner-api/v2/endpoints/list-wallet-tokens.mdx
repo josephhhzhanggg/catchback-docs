@@ -1,0 +1,67 @@
+---
+title: "List a wallet's tokens"
+api: "GET /api/partner/v2/wallets/{address}/tokens"
+description: "The live tokens of your program that a wallet holds, newest first, each with what a sell-back would pay right now."
+---
+
+Scope: `nft:orders`
+
+The live tokens of your program that a wallet holds, newest first, each with what a sell-back would pay right now.
+
+- Ownership comes from our chain watcher, so a transfer shows up within a few minutes. A quote always re-reads the owner on chain.
+- At most 200 tokens are returned; `truncated: true` means there are more.
+
+<ParamField path="address" type="string" required>
+  A wallet address on your mint chain.
+</ParamField>
+
+## Response
+
+<ResponseField name="holder" type="string">The address, normalized (EVM lowercase).</ResponseField>
+<ResponseField name="tokens" type="object[]">
+  <Expandable title="token">
+    <ResponseField name="chain" type="string" />
+    <ResponseField name="contract" type="string">EVM. On a Solana program, `collection` and `asset` instead.</ResponseField>
+    <ResponseField name="token_id" type="string">Decimal. Keep it as a string or bigint.</ResponseField>
+    <ResponseField name="status" type="string">The mint status; a token that is not yet `confirmed` can't be quoted.</ResponseField>
+    <ResponseField name="card" type="object">`id`, `category` and `name` of the item.</ResponseField>
+    <ResponseField name="minted_at" type="string" />
+    <ResponseField name="sellback" type="object">
+      Indicative; only a [quote](/partner-api/v2/endpoints/create-sellback-quote) fixes the amount. `amount`, `rate`, `fresh` (true inside the fresh window) and `locked_until` (when the value lock ends). See [Sell-back](/partner-api/v2/sell-back#what-a-sell-back-pays).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="truncated" type="boolean">True when the wallet holds more than the 200 tokens returned.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_ADDRESS` | `{address}` is not an address on your mint chain |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v2/wallets/0x8f3c...e21a/tokens \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "holder": "0x8f3c...e21a",
+  "tokens": [
+    {
+      "chain": "evm:196",
+      "contract": "0x7b1e...c0de",
+      "token_id": "81264573985362058461377125337283195667",
+      "status": "confirmed",
+      "card": { "id": "a1c4...", "category": "pokemon", "name": "Charizard ex 199/165 PSA 10" },
+      "minted_at": "2026-11-16T18:04:45.110Z",
+      "sellback": { "amount": 330, "rate": 0.8, "fresh": false, "locked_until": "2026-11-23T18:04:41.317Z" }
+    }
+  ],
+  "truncated": false
+}
+```
+</ResponseExample>

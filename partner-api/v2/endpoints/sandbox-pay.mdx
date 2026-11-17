@@ -1,0 +1,49 @@
+---
+title: "Simulate a payment"
+api: "POST /api/partner/v2/sandbox/payments/{intentId}"
+description: "Sandbox only: pay an order's or a shipment's sandbox Payment Intent, exactly as a settled payment would."
+---
+
+Scope: `nft:orders` · **Sandbox only:** `404` outside the [sandbox](/partner-api/v2/quickstart)
+
+Pays an order's, a multi-pack order's, a shipment's or a multi-token shipment's sandbox intent, exactly as a settled payment would. Paying twice changes nothing. It also delivers any webhooks the payment produced.
+
+<ParamField path="intentId" type="string" required>
+  The `payment.intent_id` from the create response. Sandbox intent ids start `sbx_pi_`.
+</ParamField>
+<ParamField body="amount" type="number">
+  Dollars paid. Default: the full amount. Send less to test the [1% tolerance](/partner-api/v2/payments#rules) and an `underpaid` refund.
+</ParamField>
+
+## Response
+
+<ResponseField name="paid" type="boolean">`true`.</ResponseField>
+<ResponseField name="kind" type="string">`order` or `shipment`.</ResponseField>
+<ResponseField name="status" type="string">The order's status (the multi-pack order's status for one), or the shipment's, after the payment.</ResponseField>
+<ResponseField name="webhooks" type="object">The webhook deliveries this call made.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `404` | `UNKNOWN_PAYMENT` | No such payment in your program |
+| `404` | | Not the sandbox |
+
+<RequestExample>
+```bash cURL
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/payments/sbx_pi_01JD..." \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "amount": 25 }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 order
+{ "paid": true, "kind": "order", "status": "paid" }
+```
+
+```json 200 shipment
+{ "paid": true, "kind": "shipment", "status": "ready" }
+```
+</ResponseExample>

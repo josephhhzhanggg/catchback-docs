@@ -1,0 +1,59 @@
+---
+title: "Authentication and keys"
+description: "The bearer key, the nft:orders scope, your program, and how to rotate, revoke and handle a key."
+---
+
+Every v2 request sends your key as a bearer token:
+
+```http
+Authorization: Bearer cb_live_...
+```
+
+The only endpoint that takes no key is the [public token metadata](/partner-api/v2/endpoints/get-token-metadata), which wallets and marketplaces read.
+
+## Scope and program
+
+- **Scope:** every v2 endpoint needs the scope `nft:orders` on your key.
+- **Program:** your key is linked to your partner program, which fixes the chain your NFTs mint on (`mint_chain`) and your collection contract. Every endpoint acts within your program: an order, token, quote or shipment from another program answers `404`.
+
+## Errors every endpoint can return first
+
+These come before an endpoint does anything else:
+
+| Status | `code` | When |
+|---|---|---|
+| `401` | | `Missing or malformed API key` (no `Bearer cb_live_...` header) or `Invalid API key` (unknown, disabled, or a rotated key past its 24 hours) |
+| `403` | | `API key lacks required scope: nft:orders` |
+| `429` | `RATE_LIMITED` | Too many requests from this key ([limits](/partner-api/v2/limits-and-compliance)); the body has `retry_after_seconds` and the response a `Retry-After` header |
+| `403` | `NO_PROGRAM` | The key isn't linked to a partner program |
+| `403` | `PROGRAM_INACTIVE` | Your program is not live |
+| `403` | `NOT_AVAILABLE` | Wallet orders aren't switched on for your program yet |
+| `503` | `AUTH_UNAVAILABLE` | We couldn't check your key right now (never means the key is bad); retry after `Retry-After` |
+| `503` | | We couldn't load your program; retry shortly |
+
+## Read the key
+
+[`GET /keys`](/partner-api/v2/endpoints/get-key) returns the key you call with: its `id`, `name`, `scopes`, dates, `program`, the key it replaced (`rotated_from`) and, once rotated, its `successor` and `expires_at`. It never returns a secret.
+
+## Rotate
+
+[`POST /keys/rotate`](/partner-api/v2/endpoints/rotate-key) issues a new key for the same program, with the same scopes. No body; an `Idempotency-Key` is required.
+
+- **The old key keeps working for 24 hours** (`previous_key.expires_at`), then answers `401`. Move every server to the new key within that window.
+- **Store `key.secret` straight away.** If the response is lost, call again with the same old key and the same `Idempotency-Key` within **10 minutes**, before you use the new key: you get the same new key and secret back. After that (or once the new key has made a call) the replay is `409 ALREADY_ROTATED`, so a leaked old key can never fetch the new one.
+- **A key is rotated once.** Rotating it again with a different `Idempotency-Key` is `409 ALREADY_ROTATED`, with the `successor`; rotate the new key next time.
+- **Your webhook moves with the rotation.** The new key takes over the old key's webhook (same URL, same secret), and the old key's stops, so deliveries never pause and you change nothing.
+- **A key that has been rotated can't register or re-enable a webhook** (`409 KEY_ROTATED`).
+
+## End the old key now
+
+[`POST /keys/revoke-previous`](/partner-api/v2/endpoints/revoke-previous-key), called with the **new** key once every server uses it, ends the key it replaced immediately instead of at the end of the 24 hours, and its webhook stops with it. Do this whenever you rotate because a key may have leaked.
+
+## Handling
+
+<Warning>
+  Keep the key server-side only: never in browser, app or wallet code.
+</Warning>
+
+- If it leaks: rotate, move your servers to the new key, call `POST /keys/revoke-previous`, and tell us. Disabling a key on our side also disables every key rotated from it, so a leaked key that was rotated by someone else is shut off too.
+- Use a separate key per environment (sandbox, production).
