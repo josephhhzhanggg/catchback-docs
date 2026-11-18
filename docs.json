@@ -276,7 +276,7 @@
       },
       {
         "tab": "API Reference",
-        "openapi": "partner-api/openapi.yaml",
+        "openapi": ["partner-api/openapi.yaml", "partner-api/v2/openapi.yaml"],
         "groups": [
           {
             "group": "Gacha",
