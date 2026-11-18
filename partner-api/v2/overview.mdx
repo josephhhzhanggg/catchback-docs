@@ -58,7 +58,7 @@ Your platform is the storefront. CatchBack does everything behind it.
 
 ## How it works, technically
 
-Each pack holds one real item (a graded card, a raw single, streetwear or jewelry) kept in our vault. The customer gets a digital representation of it in their wallet. Whoever holds the digital representation can trade it, sell it back for USDC, or have the item shipped. Selling back and shipping burn the digital representation.
+At purchase, each pack algorithmically selects one real item from our vault. The customer receives an NFT (a digital representation showing ownership) of that item in their wallet. They can then trade it, sell the hit back, or have the collectible shipped. Selling back and shipping burn the NFT.
 
 ```text
  1. POST /orders  (quantity 1-10) ──▶ order awaiting_payment + payment details (one payment)
@@ -77,10 +77,6 @@ Each pack holds one real item (a graded card, a raw single, streetwear or jewelr
      GET /quotes/{quote_id} → payout.tx_hash        webhook nft_shipment.updated, or
                                                     GET  /shipments/{id}  → tracking
 ```
-
-- **One item, one live digital representation.**
-- **We pay mint gas.** The holder pays gas for transfers and burns.
-- **The sell-back offer travels with the token.** A trade doesn't change what a burn pays. See [Sell-back](/partner-api/v2/sell-back).
 
 ### Who delivers the digital representation?
 
