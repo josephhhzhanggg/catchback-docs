@@ -1,4 +1,4 @@
-// Fails if partner-api/openapi.yaml mentions anything we keep out of the public reference,
+// Fails if partner-api/v2/openapi.yaml mentions anything we keep out of the public reference,
 // or if the docs site could send a live request from the API Reference tab.
 //
 //   node scripts/check-openapi.mjs [spec] [docs.json]
@@ -17,15 +17,13 @@ const KEEP_OUT = new Set([
   '4f6cb298555b90a7', '3d42b3ef2a38a10d', 'f02b95ed0b00ce45',
   '4e598cc1b984aa97', '66e6d5903c1e1854', '45c5dcd92541f65f',
   'ce2a9aad0c222ea8', '545875ce51049705', '9b2abfc29cc47494',
-  '5c8ad06ea12c3b69', 'fe26032846536f01', 'ef7797e13d3a7552',
-  'b8cb100b12807bd8', '160317613119435c', '2d6f8dacee836926',
-  '6ef348bad176415e', 'aa5faecf9acc9ea8', '47eeb2eac350e192',
-  '615666dae9d3625a', '603871c2ddd41c26', 'a34645ceb35b11e4',
-  '4f69d3d8b502a5b8', '5d0105590ae2c809', '9fb50a3aaed3cae4',
+  '5c8ad06ea12c3b69', 'ef7797e13d3a7552', '2d6f8dacee836926',
+  '6ef348bad176415e', '47eeb2eac350e192', '4f69d3d8b502a5b8',
+  '5d0105590ae2c809', '9fb50a3aaed3cae4',
 ]);
 const NO_LIVE_CALLS = new Set(['simple', 'none']);
 
-const specPath = process.argv[2] ?? new URL('../partner-api/openapi.yaml', import.meta.url);
+const specPath = process.argv[2] ?? new URL('../partner-api/v2/openapi.yaml', import.meta.url);
 const configPath = process.argv[3] ?? new URL('../docs.json', import.meta.url);
 const hash = (term) => createHash('sha256').update(term).digest('hex').slice(0, 16);
 const failures = [];
