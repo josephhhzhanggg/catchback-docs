@@ -74,6 +74,7 @@
             "group": "Get started",
             "pages": [
               "partner-api/v2/overview",
+              "partner-api/v2/mcp",
               "partner-api/v2/quickstart",
               "partner-api/v2/authentication"
             ]
@@ -327,7 +328,7 @@
     },
     {
       "source": "/partner-api/mcp",
-      "destination": "/partner-api/v2/overview"
+      "destination": "/partner-api/v2/mcp"
     },
     {
       "source": "/partner-api/pagination",
