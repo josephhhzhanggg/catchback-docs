@@ -111,35 +111,6 @@ Every payment and payout moves between the customer and CatchBack directly.
   `recipient` must be a self-custody wallet the customer controls, **never an exchange deposit address**. A digital representation minted to a deposit address lands in the exchange's wallet, and the customer may never be able to reach it.
 </Warning>
 
-## What you build
-
-<CardGroup cols={2}>
-  <Card title="A pack shop" icon="box-open" href="/partner-api/v2/endpoints/list-packs">
-    List packs, show odds, let the customer pick an odds mode.
-  </Card>
-  <Card title="A checkout" icon="credit-card" href="/partner-api/v2/payments">
-    Create an order; the customer pays in USDC on Base or Solana.
-  </Card>
-  <Card title="Order tracking" icon="list-check" href="/partner-api/v2/orders">
-    Follow each order from payment to mint, with the provably-fair proof.
-  </Card>
-  <Card title="Holdings" icon="wallet" href="/partner-api/v2/endpoints/list-wallet-tokens">
-    A wallet's CatchBack digital representations and today's sell-back value.
-  </Card>
-  <Card title="Sell-back" icon="arrow-rotate-left" href="/partner-api/v2/sell-back">
-    Quote, burn, get paid in USDC.
-  </Card>
-  <Card title="Shipping" icon="truck" href="/partner-api/v2/shipping">
-    Ship 1-25 items in one box, with tracking.
-  </Card>
-  <Card title="Webhooks" icon="bell" href="/partner-api/v2/webhooks">
-    Signed events for orders, sell-backs and shipments.
-  </Card>
-  <Card title="Sandbox" icon="flask" href="/partner-api/v2/quickstart">
-    The full flow on testnet with simulated payments.
-  </Card>
-</CardGroup>
-
 ## Basics
 
 - **Base URL:** `https://catchbackcards.com/api/partner/v2`. [Token metadata](/partner-api/v2/endpoints/get-token-metadata) is public, under `/api/partner-nfts/metadata`.
