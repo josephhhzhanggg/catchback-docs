@@ -1,11 +1,122 @@
 ---
-title: "Quickstart and sandbox"
-description: "Run the whole v2 flow without real money: buy, pay, mint, transfer, sell back and ship on a public testnet."
+title: "Quickstart"
+description: "Buy a pack for a test wallet, watch it open and mint, then sell the item back, all in the sandbox with no real money."
 ---
 
-The sandbox runs the whole flow without real money: payments are simulated, and mints, transfers and burns are real transactions on a public testnet. We give you a sandbox base URL, a sandbox key, the test chain and your sandbox contract address. The API is the same as production, plus three sandbox-only endpoints.
+In about 15 minutes you'll run the whole flow a customer goes through: buy a pack, receive the item, and sell it back. It all happens in the **sandbox**, a test copy of the API. Payments there are simulated, so no real money moves, but the digital representations are real tokens on a public test network.
 
-## How the sandbox differs
+## Before you start
+
+**What we send you.** Email [support@catchbackcards.com](mailto:support@catchbackcards.com) and we'll set you up with:
+
+- a **sandbox base URL**, where the test API lives;
+- a **sandbox API key**, which only works there;
+- your **test chain** and **sandbox contract address**.
+
+**What you need.** A test wallet address on that chain, standing in for your customer. Any EVM wallet works (MetaMask, Rabby, or one your code creates). Selling back needs the wallet to sign one transaction, so give it a little testnet gas from a public faucet.
+
+Save the two values you'll use in every call:
+
+```bash
+export CATCHBACK_BASE_URL="https://…"     # the sandbox base URL we sent
+export CATCHBACK_KEY="cb_live_…"          # your sandbox key (keys look the same in every environment)
+export WALLET="0x…"                       # your test wallet address
+```
+
+## 1. Check your key
+
+```bash
+curl "$CATCHBACK_BASE_URL/api/partner/v2/keys" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+
+You should see your key with `"scopes": ["nft:orders"]` and your `program`. A `401` means the key is wrong; a `403` means it's missing the `nft:orders` scope, so contact us.
+
+## 2. Pick a pack
+
+List the packs you can sell:
+
+```bash
+curl "$CATCHBACK_BASE_URL/api/partner/v2/catalog/packs?category=pokemon" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+
+Each pack has a `pack_type` (for example `bronze`), a `price` in dollars, and `available`. Pick one where `available` is `true`. To see its odds and every item it can pull, the same view you'd show a customer, call [Get a pack's odds and pool](/partner-api/v2/endpoints/get-pack-pool) with that `pack_type`.
+
+## 3. Create an order for your test wallet
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/orders" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Idempotency-Key: quickstart-001" \
+  -H "Content-Type: application/json" \
+  -d "{ \"pack_type\": \"bronze\", \"category\": \"pokemon\", \"recipient\": \"$WALLET\" }"
+```
+
+- `recipient` is the wallet the item is delivered to.
+- `Idempotency-Key` is your own id for the order. If a call fails or times out, send it again with the same key and you'll get the same order back, never a second one. You'll also use it to look the order up.
+
+The response has the `order`, with `"status": "awaiting_payment"`, and a `payment`. In production you'd hand `payment` to your customer to pay. Here, copy `payment.intent_id`: it starts with `sbx_pi_`.
+
+## 4. Pay for it (simulated)
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/payments/sbx_pi_…" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+This marks the payment as settled, exactly as a real customer payment would.
+
+## 5. Open the pack and receive the item
+
+In production our background work runs every two minutes. In the sandbox it runs when you call **tick**, so you don't have to wait:
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/tick" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+
+curl "$CATCHBACK_BASE_URL/api/partner/v2/orders/quickstart-001" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+
+Repeat both calls until `order.status` reaches `minted`. Along the way it moves:
+
+| Status | What happened |
+|---|---|
+| `paid` | The payment settled |
+| `rolled` | The pack opened. `order.pull` shows the item: its name and value |
+| `minted` | The digital representation is in your test wallet. `order.token.token_id` is its id |
+
+That's the moment your app shows the customer what they pulled. Check your test wallet: the token is there.
+
+## 6. Sell it back
+
+Ask for a quote. It fixes the price for 10 minutes:
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/tokens/TOKEN_ID/quote" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{ \"kind\": \"sellback\", \"holder\": \"$WALLET\" }"
+```
+
+`amount_usd` is what the customer gets. To accept, the **wallet holder** signs one transaction that burns the token with the signed `quote`. The code for that is on the [Sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote) page. Then tick and check the quote:
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/tick" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+
+curl "$CATCHBACK_BASE_URL/api/partner/v2/quotes/QUOTE_ID" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+
+When `quote.payout.status` is `sent`, the sale is complete, and in the sandbox the payout lands instantly.
+
+That's the whole flow. To try shipping instead, see [Shipping](/partner-api/v2/shipping): estimate, create and pay a shipment, burn, then mark it shipped with [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship).
+
+## How the sandbox differs from production
 
 | Production | Sandbox |
 |---|---|
@@ -26,58 +137,13 @@ All three sandbox endpoints return **404** outside the sandbox.
 | [`POST /sandbox/tick`](/partner-api/v2/endpoints/sandbox-tick) | Runs one pass of the background work (open, mint, watch the chain, pay out, ship) and delivers the webhooks it produced |
 | [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship) | Plays our shipping team: marks a burned shipment `shipped`, then `delivered` |
 
-## The flow, step by step
-
-<Steps>
-  <Step title="Pick a pack and read its odds">
-    ```bash
-    curl "$CATCHBACK_BASE_URL/api/partner/v2/catalog/packs?category=pokemon" \
-      -H "Authorization: Bearer $CATCHBACK_KEY"
-
-    curl "$CATCHBACK_BASE_URL/api/partner/v2/catalog/packs/pool?pack_type=bronze&category=pokemon" \
-      -H "Authorization: Bearer $CATCHBACK_KEY"
-    ```
-  </Step>
-  <Step title="Create an order for the customer's wallet">
-    ```bash
-    curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/orders" \
-      -H "Authorization: Bearer $CATCHBACK_KEY" \
-      -H "Idempotency-Key: ord-0001-test" \
-      -H "Content-Type: application/json" \
-      -d '{ "pack_type": "bronze", "category": "pokemon", "recipient": "0x8f3c...e21a" }'
-    ```
-    Keep `payment.intent_id` from the response.
-  </Step>
-  <Step title="Pay it (sandbox)">
-    ```bash
-    curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/payments/sbx_pi_..." \
-      -H "Authorization: Bearer $CATCHBACK_KEY" \
-      -H "Content-Type: application/json" \
-      -d '{}'
-    ```
-  </Step>
-  <Step title="Tick until the NFT is minted">
-    ```bash
-    curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/tick" \
-      -H "Authorization: Bearer $CATCHBACK_KEY"
-
-    curl "$CATCHBACK_BASE_URL/api/partner/v2/orders/ord-0001-test" \
-      -H "Authorization: Bearer $CATCHBACK_KEY"
-    ```
-    Repeat until `order.status` is `minted`; `order.token.token_id` is the NFT.
-  </Step>
-  <Step title="Sell it back, or ship it">
-    Get a [sell-back quote](/partner-api/v2/endpoints/create-sellback-quote) and have the holder burn with it, or [estimate](/partner-api/v2/endpoints/estimate-shipment) and [create](/partner-api/v2/endpoints/create-shipment) a shipment, pay it, and burn. Tick between steps.
-  </Step>
-</Steps>
-
 ## A full run (TypeScript + viem)
 
 The same flow our own certification suite runs against the sandbox. `burnForQuote` and `CATCHBACK_CARDS_ABI` are on the [Sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote) page; `alice`, `bob`, their viem wallets and `CONTRACT` are yours.
 
 ```ts
 const BASE = process.env.CATCHBACK_BASE_URL!;
-const KEY = process.env.CATCHBACK_API_KEY!;
+const KEY = process.env.CATCHBACK_KEY!;
 
 async function api(method: string, path: string, body?: unknown, idem?: string) {
   const res = await fetch(`${BASE}/api/partner/v2${path}`, {
@@ -134,4 +200,8 @@ await settle(async () => {
   Use a separate key per environment (sandbox, production).
 </Tip>
 
-Next: the [go-live checklist](/partner-api/v2/go-live-checklist).
+## Next steps
+
+- [Webhooks](/partner-api/v2/webhooks): get each status change pushed to you instead of polling.
+- [Orders](/partner-api/v2/orders): every status, including refunds and multi-pack orders.
+- [Go-live checklist](/partner-api/v2/go-live-checklist): what to confirm before switching to your production key.
