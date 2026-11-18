@@ -4,13 +4,59 @@ sidebarTitle: "Overview"
 description: "Sell CatchBack packs to your users' own web3 wallets: each pulled item arrives as an NFT they can hold, trade, sell back for USDC or have shipped."
 ---
 
-For exchanges and wallet platforms whose users buy CatchBack packs from their own web3 wallets.
+CatchBack sells packs of real collectibles: graded trading cards, raw singles, streetwear and jewelry. Partner API v2 lets an exchange or wallet platform sell those packs to its own users. Your platform runs the storefront, and we handle everything behind it.
+
+## CatchBack in one minute
+
+1. **A user buys a mystery pack** in your app. Each pack holds one real item, drawn with [provably fair](/partner-api/v2/verify-a-pull) odds the user can see before buying.
+2. **The user receives the item they pulled.** It arrives in their wallet as an NFT, the claim on the real item, which stays safe in our vault.
+3. **The user keeps it, sells it back, or has it shipped.**
+   - **Keep it**, or trade it on any NFT marketplace.
+   - **Sell it back to us for USDC:** up to 100% of its value in the first 5 minutes, then a guaranteed 80% with no expiry.
+   - **Have it shipped:** we mail the real item to their door.
+
+## Why partners integrate
+
+- **A new product with no inventory.** We source, store and ship every item, and back every NFT with the real thing.
+- **Revenue share on every pack.** The standard share is 3% of what your users spend, and premier partners earn more. See [your revenue statement](/partner-api/v2/endpoints/get-revenue).
+- **No capital and no custody.** You don't prefund anything. Your users pay us directly, and NFTs and payouts go straight to their wallets, so you never hold their tokens or funds.
+- **A safety net your users can see.** The guaranteed buyback means every item they pull keeps a cash value.
+
+## New to crypto?
+
+You don't need crypto expertise to integrate. The API is ordinary JSON over HTTPS, and we handle every on-chain step for you:
+
+- **Payments:** we give you a hosted payment screen, or an address to pay to. You never build a checkout or hold user funds.
+- **Minting and gas:** we create each NFT and pay the network fee.
+- **Payouts and refunds:** we send USDC straight to the user.
+- **Shipping:** we pack and post the real item.
+
+The one thing your users do need is **their own crypto wallet**, the kind where only they hold the keys. Their NFTs go there, and they sign a transaction from it for each item they sell back or ship. If your users already have wallets, as on an exchange or wallet app, there's nothing extra to set up.
+
+| Term | In plain terms |
+|---|---|
+| **Wallet** | The user's crypto account. It holds their NFTs and USDC. |
+| **NFT** | A digital certificate of ownership. Here, each one stands for one real item in our vault. |
+| **USDC** | A digital dollar, designed to stay worth $1. Users pay and get paid in it. |
+| **Burn** | Permanently destroying an NFT. A user burns one to sell it back or ship it, so the same item can never be claimed twice. |
+| **Chain** | The network the NFT lives on. Each partner program uses one, set when you join. |
+
+## Who does what
+
+| | Your platform | CatchBack |
+|---|---|---|
+| **Packs and odds** | Shows them in your app | Supplies the catalog, prices and odds |
+| **Payment** | Hands the user our payment screen or deposit address | Collects the payment and refunds it if anything goes wrong |
+| **Opening** | Shows the result | Opens the pack, with a proof anyone can check |
+| **The NFT** | Passes the user's wallet address | Mints it to that wallet and pays the gas |
+| **Sell-back** | Offers the option | Quotes a price and pays USDC once the user burns the NFT |
+| **Shipping** | Collects the address | Packs and ships the item, with tracking and optional insurance |
 
 <Note>
   **v2 replaces v1.** The v1 Partner API is retired. v2 has no partner balance or prefunding: each customer pays for their own pack and gets each item as an NFT in their wallet.
 </Note>
 
-## How it works
+## How it works, technically
 
 Each pack holds one real item (a graded card, a raw single, streetwear or jewelry) kept in our vault. The customer gets an NFT for it in their wallet. Whoever holds the NFT can trade it, sell it back for USDC, or have the item shipped. Selling back and shipping burn the NFT.
 
