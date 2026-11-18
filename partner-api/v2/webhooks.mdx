@@ -19,7 +19,7 @@ curl -X POST https://catchbackcards.com/api/partner/v2/webhooks \
 The response is **201** the first time, with the signing secret. **The secret is shown once; store it.** It starts `whsec_`.
 
 - **One webhook per key.** Calling [`POST /webhooks`](/partner-api/v2/endpoints/register-webhook) again changes the URL and answers **200** with `"secret": null`: the secret stays the same. To get a new secret, [`DELETE`](/partner-api/v2/endpoints/delete-webhook) the webhook and register again.
-- **The URL** must be a public `https://` URL on port 443, with a hostname (not an IP address) and no login in it, up to 2048 characters. In the [sandbox](/partner-api/v2/quickstart), `http://localhost`, `http://127.0.0.1` and `http://[::1]` on any port also work.
+- **The URL** must be a public `https://` URL on port 443, with a hostname (not an IP address) and no login in it, up to 2048 characters. The [sandbox](/partner-api/v2/quickstart) has the same rule: to receive on your own machine, use a tunnel such as ngrok.
 - [`GET /webhooks`](/partner-api/v2/endpoints/list-webhooks) shows it (never the secret), and [`POST /webhooks/{id}/test`](/partner-api/v2/endpoints/test-webhook) sends a signed `ping` right now and tells you how your receiver answered.
 - **Your webhook moves with a key rotation**: the new key takes over the same URL and secret. See [Authentication and keys](/partner-api/v2/authentication#rotate).
 

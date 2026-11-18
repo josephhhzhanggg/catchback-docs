@@ -12,7 +12,7 @@ Registers this key's webhook (**201**, with the signing secret, shown once), or 
 - A key that has been rotated can't register or re-enable a webhook (`409 KEY_ROTATED`). A rotation moves the webhook to the new key by itself.
 
 <ParamField body="url" type="string" required>
-  A public `https://` URL on port 443, with a hostname (not an IP address) and no login in it, up to 2048 characters. In the sandbox, `http://localhost`, `http://127.0.0.1` and `http://[::1]` on any port also work.
+  A public `https://` URL on port 443, with a hostname (not an IP address) and no login in it, up to 2048 characters. The sandbox has the same rule: to receive on your own machine, use a tunnel such as ngrok.
 </ParamField>
 
 ## Response
