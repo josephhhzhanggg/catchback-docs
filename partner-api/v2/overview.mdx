@@ -44,14 +44,13 @@ We're also working with partners to give users automatically provisioned wallets
 
 ## Who does what
 
-| | Your platform | CatchBack |
+Your platform is the storefront. CatchBack does everything behind it.
+
+| Step | Your platform | CatchBack |
 |---|---|---|
-| **Packs and odds** | Shows them in your app | Supplies the catalog, prices and odds |
-| **Payment** | Hands the user our payment screen or deposit address | Collects the payment and refunds it if anything goes wrong |
-| **Opening** | Shows the result | Opens the pack, with a proof anyone can check |
-| **The digital representation** | Passes the user's wallet address | Mints it to that wallet and pays the gas |
-| **Sell-back** | Offers the option | Quotes a price and pays USDC once the user burns the digital representation |
-| **Shipping** | Collects the address | Packs and ships the item, with tracking and optional insurance |
+| **1. The user buys a pack** | Shows the packs and their odds, sends us the user's wallet address, and opens our payment screen | Supplies the packs, prices and odds, takes the payment, and refunds it if anything goes wrong |
+| **2. The user receives their item** | Shows what they pulled | Opens the pack fairly and delivers the digital representation to their wallet, paying the network fee |
+| **3. The user keeps it, sells it back, or ships it** | Shows those options, and collects the shipping address | Buys it back at the guaranteed price, or packs and ships the real item with tracking |
 
 <Note>
   **v2 replaces v1.** The v1 Partner API is retired. v2 has no partner balance or prefunding: each customer pays for their own pack and gets each item as a digital representation in their wallet.
