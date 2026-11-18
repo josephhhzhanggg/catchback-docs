@@ -1,39 +1,33 @@
 ---
 title: "Verify a pull"
-description: "Check that a pack pull followed from its seed, using the proof every pull carries: one request with no key, or a replay of your own."
+description: "Check that an order's pull followed from its seed: one request with no key, or a replay of your own."
 ---
 
-Every pull from [Buy packs](/partner-api/endpoints/buy-packs) carries a `proof`: the provably fair record of how it was drawn. You can ask us to replay it with one request that needs no key, or replay it yourself from the published algorithm. It is the same check the Verify button in our app runs. How the draw works: [Provably Fair](/about-catchback/provably-fair).
+Every pack is opened provably fairly. [Verify an order's pull](/partner-api/v2/endpoints/get-order-verification) returns the proof and a public `verify_url` that re-runs the check with no key: the same check the Verify button in our app runs. You can also replay the draw yourself from the published algorithm. How the draw works: [Provably Fair](/about-catchback/provably-fair).
 
-## The proof
+## Get the proof
 
-Each entry in a Buy packs response's `pulls` has a `proof` object, or `null` for a guaranteed pull, which no roll chose:
+```bash
+curl https://catchbackcards.com/api/partner/v2/orders/okx-ord-7f3a9c21/verification \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
 
-<ResponseField name="seed" type="number">
-  The number the draw started from. For a card, or a consolation pull, it is the first 8 hex digits of `pull_id` read as an integer. For the Starter or a sealed mystery pack, it is a random seed recorded with the result.
-</ResponseField>
-<ResponseField name="verification_hash" type="string | null">
-  The result hash: SHA-256, in hex, of the draw's inputs and its result. For a card, `sha256("result:<seed>:<bucket index>:<card index>:<card id>")`. `null` for a consolation pull.
-</ResponseField>
-<ResponseField name="seed_commit_hash" type="string | null">
-  `sha256("seed_commit:<seed>:<timestamp>")`, recorded with the pull. Card pulls only.
-</ResponseField>
-<ResponseField name="timestamp" type="string | null">When the pull was drawn (ISO 8601). It is part of `seed_commit_hash`, and of a sealed pack's result hash.</ResponseField>
-<ResponseField name="verify_path" type="string | null">
-  The check that replays this pull, on `https://catchbackcards.com`. `null` for a pull from the Steph Curry pack, which this check doesn't cover.
-</ResponseField>
+<ResponseField name="pull_id" type="string">The pull's id. Its first 8 hex digits are the seed.</ResponseField>
+<ResponseField name="card_id" type="string">The item you received.</ResponseField>
+<ResponseField name="verify_url" type="string">The public check for this pull. Share it with your customer.</ResponseField>
+<ResponseField name="proof" type="object">What `verify_url` returns: the step-by-step replay below.</ResponseField>
 
-Keep the `proof` with the pull: [Get an order](/partner-api/endpoints/get-order) doesn't return it. The `verification_hash` you were sent at purchase lets you show later that the seed, bucket, place and card haven't changed. It doesn't cover the odds or the card list, and a passing check can be cached for up to a day.
+A multi-pack order returns one proof per unit. A passing check can be cached for up to a day.
 
 ## Ask us to check it
 
-Send a `GET` to `verify_path`. It needs no key.
+Send a `GET` to `verify_url`. It needs no key.
 
 ```bash
 curl "https://catchbackcards.com/api/verify-pull?transaction_id=fe04349b-…&card_source=pokemon"
 ```
 
-Send `verify_path` as it is. The check takes only `transaction_id`, `card_source` and `pack_type`, and answers any other parameter with a `400`. If you no longer have the proof, `/api/verify-pull?transaction_id=<pull_id>` works too: without the `card_source` hint, it looks in every catalog.
+Send `verify_url` as it is. The check takes only `transaction_id`, `card_source` and `pack_type`, and answers any other parameter with a `400`. `/api/verify-pull?transaction_id=<pull_id>` works too: without the `card_source` hint, it looks in every catalog.
 
 The response replays the draw step by step. Trimmed to the fields this guide uses, a card pull looks like this:
 
@@ -49,7 +43,7 @@ The response replays the draw step by step. Trimmed to the fields this guide use
   "draws_before_bucket": { "count": 0, "chase": null, "consolation": null },
   "step3_bucket_selection": { "probabilities": [0.72, 0.2, 0.06, 0.02], "stored_bucket_index": 0, "recomputed_bucket_index": 0, "matches": true },
   "step4_card_selection": { "cards_in_bucket": 412, "stored_card_index": 37, "recomputed_card_index": 37, "matches": true, "available_cards": [{ "id": "…", "name": "…" }] },
-  "step5_result_verification": { "delivered_card_id": "2b814ce0-…", "delivered_by": "seed", "hash_matches": true },
+  "step5_result_verification": { "delivered_card_id": "2b814ce0-…", "delivered_by": "seed", "stored_result_hash": "9c1e…", "hash_matches": true },
   "summary": { "all_steps_passed": true, "message": "All verification steps passed: the seed reproduces this pull's draws, and the result hash binds the card delivered." }
 }
 ```
@@ -61,7 +55,7 @@ Read `verification_type` first, then `verified`: `verification_type` says what w
 | `provably_fair` | A card, or a consolation pull (a sealed pack instead of a card) | The draw is replayed from the seed. Every step is in the response, and `verified` is `true` only when all of them match |
 | `hash_only` | The Starter or a sealed mystery pack | Its seed is random, not taken from the pull id, so the draw can't be replayed from the id. The result hash is recomputed from the recorded seed, pick and time; `result_hash.formula` names the inputs |
 | `legacy_hash` | An older pull, or a pull from a custom pack | Nothing is recomputed. `verified: true` here only means a record exists, so don't treat it as a check |
-| `none` | A pull with no record | Nothing. A pull from Buy packs has a full proof |
+| `none` | A pull with no record | Nothing. An order's pull has a full proof |
 
 `algorithm` names the draw: `shuffle-scaled-v3` is the current one, and older pulls name the version they were drawn with.
 
@@ -83,7 +77,7 @@ For a card pull drawn with `shuffle-scaled-v3`:
 
 <Steps>
   <Step title="Derive the seed">
-    Take the first 8 hex digits of `pull_id` and read them as an integer: `fe04349b` is `4261688475`. It equals `proof.seed`.
+    Take the first 8 hex digits of `pull_id` and read them as an integer: `fe04349b` is `4261688475`. It equals `step1_seed_derivation.stored_seed`.
   </Step>
   <Step title="Generate the draws">
     The draws come from a linear congruential generator: `state = (0x41C64E6D × state + 0x6073) mod 2^32`, starting from the seed, one draw per step. Compute it in IEEE-754 double precision, as JavaScript does. `0x41C64E6D × state` can exceed 2^53 and is rounded, every pull was drawn with that rounding, and exact integer arithmetic gives different draws.
@@ -98,7 +92,7 @@ For a card pull drawn with `shuffle-scaled-v3`:
     The shuffle draws reorder the bucket (`for i = n−1 down to 1: j = floor(draw / 2^32 × (i + 1)), swap(i, j)`), and the card draw picks place `floor(draw / 2^32 × n)` in the shuffled list, `step4_card_selection.available_cards`.
   </Step>
   <Step title="Recompute the result hash">
-    `sha256("result:<seed>:<bucket index>:<card index>:<card id>")` in hex, with the card you received, equals the `verification_hash` you were sent.
+    `sha256("result:<seed>:<bucket index>:<card index>:<card id>")` in hex, with the card you received, equals `step5_result_verification.stored_result_hash`, the hash recorded when the pack opened.
   </Step>
 </Steps>
 
@@ -107,18 +101,18 @@ The same steps in Node 18 or later, reading the bucket's odds and size from the 
 ```js
 import { createHash } from 'node:crypto';
 
-// `pull` is one entry of `pulls` from a Buy packs response.
-export async function checkPull(pull) {
-  // Only a card draw replays here. A guaranteed pull has no proof, a Steph Curry pull
-  // no verify_path, and a sealed pack is hash-checked by the endpoint instead.
-  if (pull.kind !== 'card' || !pull.proof?.verify_path) return null;
-  const res = await fetch(`https://catchbackcards.com${pull.proof.verify_path}`);
+// `verification` is the object from GET /api/partner/v2/orders/{id}/verification.
+export async function checkPull(verification) {
+  // Fetch the replay from the public check, which needs no key.
+  const res = await fetch(verification.verify_url);
   const v = await res.json();
+  // Only a card draw replays here; a sealed pack is hash-checked by the endpoint instead.
+  if (v.verification_type !== 'provably_fair') return null;
   if (v.algorithm !== 'shuffle-scaled-v3') throw new Error(`not a current card draw: ${v.algorithm}`);
   const M = 2 ** 32;
 
   // The seed: the first 8 hex digits of the pull id.
-  const seed = parseInt(pull.pull_id.replace(/-/g, '').slice(0, 8), 16);
+  const seed = parseInt(verification.pull_id.replace(/-/g, '').slice(0, 8), 16);
 
   // Every draw up to the card draw, in float64 exactly as JavaScript computes it.
   const before = v.draws_before_bucket.count;
@@ -142,7 +136,7 @@ export async function checkPull(pull) {
   const card = Math.floor((draws[before + n] / M) * n);
 
   // The result hash binds the bucket, the place and the card you received.
-  const delivered = pull.item.id;
+  const delivered = verification.card_id;
   const hash = createHash('sha256').update(`result:${seed}:${bucket}:${card}:${delivered}`).digest('hex');
 
   // Unless a chase draw or a collision re-roll replaced it, the card you received
@@ -151,11 +145,11 @@ export async function checkPull(pull) {
   const atPlace = v.step4_card_selection.available_cards[card]?.id === delivered;
 
   return {
-    seed: seed === pull.proof.seed,
+    seed: seed === v.step1_seed_derivation.stored_seed,
     bucket: bucket === v.step3_bucket_selection.stored_bucket_index,
     card: card === v.step4_card_selection.stored_card_index,
     delivered: by === 'seed' ? atPlace : null,
-    hash: hash === pull.proof.verification_hash,
+    hash: hash === v.step5_result_verification.stored_result_hash,
   };
 }
 ```
@@ -164,4 +158,4 @@ Two things can make the card you received differ from the one at that place, and
 
 ## What the check shows
 
-It shows that the seed lands on this bucket and this place in the recorded list, and that the card you received is at that place. The list's order is only confirmed when `step4_card_selection.shuffle.restores_card_id_order` is `true`. Against the `verification_hash` you were sent, it also shows that the seed, bucket, place and card haven't changed since. The seed is the pull id, which CatchBack generates when the pull is made.
+It shows that the seed lands on this bucket and this place in the recorded list, and that the card you received is at that place. The list's order is only confirmed when `step4_card_selection.shuffle.restores_card_id_order` is `true`. Against the result hash recorded when the pack opened, it also shows that the seed, bucket, place and card haven't changed since. The seed is the pull id, which CatchBack generates when the pull is made.

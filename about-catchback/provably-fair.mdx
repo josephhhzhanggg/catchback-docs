@@ -145,7 +145,7 @@ A pull's card is chosen in these steps:
 5. **Card.** The next draw picks a place in the shuffled list.
 6. **Result hash.** A SHA-256 hash of the seed, bucket, place and card id is recorded with the pull.
 
-The current algorithm is named `shuffle-scaled-v3`. The full steps, with code you can run, are in [Verify a pull](/partner-api/verify-a-pull).
+The current algorithm is named `shuffle-scaled-v3`. The full steps, with code you can run, are in [Verify a pull](/partner-api/v2/verify-a-pull).
 
 ## Card Pulling Process
 
@@ -155,7 +155,7 @@ Once our optimization system has calculated the fair probabilities for each valu
 
 ### Permanent Audit Trail
 
-Every pull is recorded with its seed, selected card, timestamp and a result hash. You can check any pull by taking the id we provide, running it through the algorithm above and confirming you got the card you should have received, or by using [Verify a pull](/partner-api/verify-a-pull). You can check that your result follows from its seed and that the record hasn't changed. CatchBack generates the seed when the pull is made.
+Every pull is recorded with its seed, selected card, timestamp and a result hash. You can check any pull by taking the id we provide, running it through the algorithm above and confirming you got the card you should have received, or by using [Verify a pull](/partner-api/v2/verify-a-pull). You can check that your result follows from its seed and that the record hasn't changed. CatchBack generates the seed when the pull is made.
 
 
 ---

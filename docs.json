@@ -71,289 +71,185 @@
         "tab": "Partner API",
         "groups": [
           {
-            "group": "Partner API v2 (wallets & NFTs)",
+            "group": "Get started",
             "pages": [
               "partner-api/v2/overview",
               "partner-api/v2/quickstart",
-              "partner-api/v2/authentication",
-              {
-                "group": "Concepts",
-                "pages": [
-                  "partner-api/v2/orders",
-                  "partner-api/v2/odds",
-                  "partner-api/v2/payments",
-                  "partner-api/v2/sell-back",
-                  "partner-api/v2/shipping",
-                  "partner-api/v2/webhooks",
-                  "partner-api/v2/chains-and-metadata",
-                  "partner-api/v2/idempotency",
-                  "partner-api/v2/errors",
-                  "partner-api/v2/limits-and-compliance"
-                ]
-              },
-              {
-                "group": "Packs & orders",
-                "pages": [
-                  "partner-api/v2/endpoints/list-packs",
-                  "partner-api/v2/endpoints/get-pack-pool",
-                  "partner-api/v2/endpoints/create-order",
-                  "partner-api/v2/endpoints/list-orders",
-                  "partner-api/v2/endpoints/get-order",
-                  "partner-api/v2/endpoints/get-order-verification"
-                ]
-              },
-              {
-                "group": "Tokens & sell-back",
-                "pages": [
-                  "partner-api/v2/endpoints/list-wallet-tokens",
-                  "partner-api/v2/endpoints/get-token",
-                  "partner-api/v2/endpoints/create-sellback-quote",
-                  "partner-api/v2/endpoints/list-quotes",
-                  "partner-api/v2/endpoints/get-quote",
-                  "partner-api/v2/endpoints/get-token-metadata"
-                ]
-              },
-              {
-                "group": "Shipments",
-                "pages": [
-                  "partner-api/v2/endpoints/estimate-shipment",
-                  "partner-api/v2/endpoints/create-shipment",
-                  "partner-api/v2/endpoints/estimate-token-shipment",
-                  "partner-api/v2/endpoints/create-token-shipment",
-                  "partner-api/v2/endpoints/list-shipments",
-                  "partner-api/v2/endpoints/get-shipment",
-                  "partner-api/v2/endpoints/renew-shipment"
-                ]
-              },
-              {
-                "group": "Webhook endpoints",
-                "pages": [
-                  "partner-api/v2/endpoints/register-webhook",
-                  "partner-api/v2/endpoints/list-webhooks",
-                  "partner-api/v2/endpoints/delete-webhook",
-                  "partner-api/v2/endpoints/test-webhook"
-                ]
-              },
-              {
-                "group": "Keys & revenue",
-                "pages": [
-                  "partner-api/v2/endpoints/get-key",
-                  "partner-api/v2/endpoints/rotate-key",
-                  "partner-api/v2/endpoints/revoke-previous-key",
-                  "partner-api/v2/endpoints/get-revenue"
-                ]
-              },
-              {
-                "group": "Sandbox",
-                "pages": [
-                  "partner-api/v2/endpoints/sandbox-pay",
-                  "partner-api/v2/endpoints/sandbox-tick",
-                  "partner-api/v2/endpoints/sandbox-ship"
-                ]
-              },
+              "partner-api/v2/authentication"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "partner-api/v2/orders",
+              "partner-api/v2/verify-a-pull",
+              "partner-api/v2/odds",
+              "partner-api/v2/payments",
+              "partner-api/v2/sell-back",
+              "partner-api/v2/shipping",
+              "partner-api/v2/webhooks",
+              "partner-api/v2/chains-and-metadata",
+              "partner-api/v2/idempotency",
+              "partner-api/v2/errors",
+              "partner-api/v2/limits-and-compliance"
+            ]
+          },
+          {
+            "group": "Packs & orders",
+            "pages": [
+              "partner-api/v2/endpoints/list-packs",
+              "partner-api/v2/endpoints/get-pack-pool",
+              "partner-api/v2/endpoints/create-order",
+              "partner-api/v2/endpoints/list-orders",
+              "partner-api/v2/endpoints/get-order",
+              "partner-api/v2/endpoints/get-order-verification"
+            ]
+          },
+          {
+            "group": "Tokens & sell-back",
+            "pages": [
+              "partner-api/v2/endpoints/list-wallet-tokens",
+              "partner-api/v2/endpoints/get-token",
+              "partner-api/v2/endpoints/create-sellback-quote",
+              "partner-api/v2/endpoints/list-quotes",
+              "partner-api/v2/endpoints/get-quote",
+              "partner-api/v2/endpoints/get-token-metadata"
+            ]
+          },
+          {
+            "group": "Shipments",
+            "pages": [
+              "partner-api/v2/endpoints/estimate-shipment",
+              "partner-api/v2/endpoints/create-shipment",
+              "partner-api/v2/endpoints/estimate-token-shipment",
+              "partner-api/v2/endpoints/create-token-shipment",
+              "partner-api/v2/endpoints/list-shipments",
+              "partner-api/v2/endpoints/get-shipment",
+              "partner-api/v2/endpoints/renew-shipment"
+            ]
+          },
+          {
+            "group": "Webhook endpoints",
+            "pages": [
+              "partner-api/v2/endpoints/register-webhook",
+              "partner-api/v2/endpoints/list-webhooks",
+              "partner-api/v2/endpoints/delete-webhook",
+              "partner-api/v2/endpoints/test-webhook"
+            ]
+          },
+          {
+            "group": "Keys & revenue",
+            "pages": [
+              "partner-api/v2/endpoints/get-key",
+              "partner-api/v2/endpoints/rotate-key",
+              "partner-api/v2/endpoints/revoke-previous-key",
+              "partner-api/v2/endpoints/get-revenue"
+            ]
+          },
+          {
+            "group": "Sandbox",
+            "pages": [
+              "partner-api/v2/endpoints/sandbox-pay",
+              "partner-api/v2/endpoints/sandbox-tick",
+              "partner-api/v2/endpoints/sandbox-ship"
+            ]
+          },
+          {
+            "group": "Going live",
+            "pages": [
               "partner-api/v2/go-live-checklist",
               "partner-api/v2/changelog"
-            ]
-          },
-          {
-            "group": "Get started",
-            "pages": [
-              "partner-api/introduction",
-              "partner-api/onboarding",
-              "partner-api/quickstart",
-              "partner-api/how-it-works",
-              "partner-api/mcp"
-            ]
-          },
-          {
-            "group": "Guides",
-            "pages": [
-              "partner-api/opening-packs",
-              "partner-api/verify-a-pull",
-              "partner-api/trading-cards",
-              "partner-api/vault-and-sell-backs",
-              "partner-api/funding",
-              "partner-api/shipping",
-              "partner-api/webhooks",
-              "partner-api/testing",
-              "partner-api/going-live"
-            ]
-          },
-          {
-            "group": "Core concepts",
-            "pages": [
-              "partner-api/authentication",
-              "partner-api/errors-and-limits",
-              "partner-api/rate-limits",
-              "partner-api/idempotency",
-              "partner-api/pagination",
-              "partner-api/card-object"
-            ]
-          },
-          {
-            "group": "Gacha",
-            "pages": [
-              "partner-api/endpoints/list-packs",
-              "partner-api/endpoints/get-pack-pool",
-              "partner-api/endpoints/buy-packs"
-            ]
-          },
-          {
-            "group": "Marketplace",
-            "pages": [
-              "partner-api/endpoints/search-cards",
-              "partner-api/endpoints/buy-card",
-              "partner-api/endpoints/get-listings",
-              "partner-api/endpoints/list-card",
-              "partner-api/endpoints/update-listing-price",
-              "partner-api/endpoints/delist-card"
-            ]
-          },
-          {
-            "group": "Metadata",
-            "pages": [
-              "partner-api/endpoints/get-card",
-              "partner-api/endpoints/find-card-by-cert",
-              "partner-api/endpoints/get-price-history",
-              "partner-api/endpoints/get-card-activity",
-              "partner-api/endpoints/card-catalog",
-              "partner-api/endpoints/get-public-card"
-            ]
-          },
-          {
-            "group": "Account & vault",
-            "pages": [
-              "partner-api/endpoints/get-me",
-              "partner-api/endpoints/get-account",
-              "partner-api/endpoints/get-vault",
-              "partner-api/endpoints/quote-sell-back",
-              "partner-api/endpoints/sell-back"
-            ]
-          },
-          {
-            "group": "Funding",
-            "pages": [
-              "partner-api/endpoints/get-funding",
-              "partner-api/endpoints/create-withdrawal",
-              "partner-api/endpoints/list-withdrawals",
-              "partner-api/endpoints/get-withdrawal"
-            ]
-          },
-          {
-            "group": "Shipping",
-            "pages": [
-              "partner-api/endpoints/estimate-shipment",
-              "partner-api/endpoints/create-shipment",
-              "partner-api/endpoints/list-shipments",
-              "partner-api/endpoints/get-shipment"
-            ]
-          },
-          {
-            "group": "Orders",
-            "pages": [
-              "partner-api/endpoints/list-orders",
-              "partner-api/endpoints/get-order",
-              "partner-api/endpoints/get-balance-history"
-            ]
-          },
-          {
-            "group": "Webhooks",
-            "pages": [
-              "partner-api/webhook-events"
-            ]
-          },
-          {
-            "group": "Testing",
-            "pages": [
-              "partner-api/endpoints/create-test-account",
-              "partner-api/endpoints/list-test-accounts"
-            ]
-          },
-          {
-            "group": "Reporting",
-            "pages": [
-              "partner-api/endpoints/purchase-report"
-            ]
-          },
-          {
-            "group": "Updates",
-            "pages": [
-              "partner-api/changelog"
             ]
           }
         ]
       },
       {
         "tab": "API Reference",
-        "openapi": ["partner-api/openapi.yaml", "partner-api/v2/openapi.yaml"],
+        "openapi": "partner-api/v2/openapi.yaml",
         "groups": [
           {
-            "group": "Gacha",
+            "group": "Packs",
             "pages": [
-              "GET /api/partner/v1/catalog/packs",
-              "GET /api/partner/v1/catalog/packs/pool",
-              "POST /api/partner/v1/packs/purchase",
-              "POST /api/partner/v1/cards/sell-back",
-              "GET /api/partner/v1/pulls",
-              "GET /api/verify-pull"
+              "GET /api/partner/v2/catalog/packs",
+              "GET /api/partner/v2/catalog/packs/pool"
             ]
           },
           {
-            "group": "Marketplace",
+            "group": "Orders",
             "pages": [
-              "GET /api/partner/v1/marketplace/listings",
-              "POST /api/partner/v1/cards/purchase",
-              "GET /api/partner/v1/listings",
-              "POST /api/partner/v1/listings",
-              "PATCH /api/partner/v1/listings/{listing_id}",
-              "DELETE /api/partner/v1/listings"
+              "POST /api/partner/v2/orders",
+              "GET /api/partner/v2/orders",
+              "GET /api/partner/v2/orders/{id}",
+              "GET /api/partner/v2/orders/{id}/verification"
             ]
           },
           {
-            "group": "Metadata",
+            "group": "Tokens",
             "pages": [
-              "GET /api/partner/v1/cards/{id}",
-              "GET /api/partner/v1/cards",
-              "GET /api/partner/v1/cards/{id}/price-history",
-              "GET /api/partner/v1/cards/{id}/activity",
-              "GET /api/partner/v1/catalog/cards",
-              "GET /api/public/v1/cards/{id}"
+              "GET /api/partner/v2/wallets/{address}/tokens",
+              "GET /api/partner/v2/tokens/{tokenId}"
             ]
           },
           {
-            "group": "Shipping",
+            "group": "Sell-back",
             "pages": [
-              "POST /api/partner/v1/shipments/estimate",
-              "POST /api/partner/v1/shipments",
-              "GET /api/partner/v1/shipments",
-              "GET /api/partner/v1/shipments/{id}",
-              "GET /api/shipping-countries"
+              "POST /api/partner/v2/tokens/{tokenId}/quote",
+              "GET /api/partner/v2/quotes",
+              "GET /api/partner/v2/quotes/{quoteId}"
             ]
           },
           {
-            "group": "Account",
+            "group": "Shipments",
             "pages": [
-              "GET /api/partner/v1/me",
-              "GET /api/partner/v1/account",
-              "GET /api/partner/v1/vault",
-              "GET /api/partner/v1/orders",
-              "GET /api/partner/v1/orders/{checkout_id}"
-            ]
-          },
-          {
-            "group": "Testing",
-            "pages": [
-              "POST /api/partner/v1/test-accounts",
-              "GET /api/partner/v1/test-accounts"
+              "POST /api/partner/v2/shipments/estimate",
+              "POST /api/partner/v2/shipments",
+              "GET /api/partner/v2/shipments",
+              "POST /api/partner/v2/tokens/{tokenId}/shipment/estimate",
+              "POST /api/partner/v2/tokens/{tokenId}/shipment",
+              "GET /api/partner/v2/shipments/{id}",
+              "POST /api/partner/v2/shipments/{id}/renew"
             ]
           },
           {
             "group": "Webhooks",
             "pages": [
-              "WEBHOOK order.completed",
-              "WEBHOOK listing.sold",
-              "WEBHOOK shipment.updated",
-              "WEBHOOK withdrawal.updated"
+              "POST /api/partner/v2/webhooks",
+              "GET /api/partner/v2/webhooks",
+              "DELETE /api/partner/v2/webhooks/{id}",
+              "POST /api/partner/v2/webhooks/{id}/test"
+            ]
+          },
+          {
+            "group": "Webhook events",
+            "pages": [
+              "WEBHOOK nft_order.updated",
+              "WEBHOOK sellback.updated",
+              "WEBHOOK nft_shipment.updated",
+              "WEBHOOK ping"
+            ]
+          },
+          {
+            "group": "Keys & revenue",
+            "pages": [
+              "GET /api/partner/v2/keys",
+              "POST /api/partner/v2/keys/rotate",
+              "POST /api/partner/v2/keys/revoke-previous",
+              "GET /api/partner/v2/revenue"
+            ]
+          },
+          {
+            "group": "Sandbox",
+            "pages": [
+              "POST /api/partner/v2/sandbox/payments/{intentId}",
+              "POST /api/partner/v2/sandbox/tick",
+              "POST /api/partner/v2/sandbox/shipments/{id}"
+            ]
+          },
+          {
+            "group": "Metadata",
+            "pages": [
+              "GET /api/partner-nfts/metadata/{chainId}/{tokenId}",
+              "GET /api/partner-nfts/metadata/{id}"
             ]
           }
         ]
@@ -420,6 +316,178 @@
     {
       "source": "/about-catchback/catchcoins",
       "destination": "/about-catchback/wallet-balance"
+    },
+    {
+      "source": "/partner-api/introduction",
+      "destination": "/partner-api/v2/overview"
+    },
+    {
+      "source": "/partner-api/how-it-works",
+      "destination": "/partner-api/v2/overview"
+    },
+    {
+      "source": "/partner-api/mcp",
+      "destination": "/partner-api/v2/overview"
+    },
+    {
+      "source": "/partner-api/pagination",
+      "destination": "/partner-api/v2/overview"
+    },
+    {
+      "source": "/partner-api/trading-cards",
+      "destination": "/partner-api/v2/overview"
+    },
+    {
+      "source": "/partner-api/onboarding",
+      "destination": "/partner-api/v2/authentication"
+    },
+    {
+      "source": "/partner-api/authentication",
+      "destination": "/partner-api/v2/authentication"
+    },
+    {
+      "source": "/partner-api/quickstart",
+      "destination": "/partner-api/v2/quickstart"
+    },
+    {
+      "source": "/partner-api/testing",
+      "destination": "/partner-api/v2/quickstart"
+    },
+    {
+      "source": "/partner-api/opening-packs",
+      "destination": "/partner-api/v2/orders"
+    },
+    {
+      "source": "/partner-api/verify-a-pull",
+      "destination": "/partner-api/v2/verify-a-pull"
+    },
+    {
+      "source": "/partner-api/vault-and-sell-backs",
+      "destination": "/partner-api/v2/sell-back"
+    },
+    {
+      "source": "/partner-api/funding",
+      "destination": "/partner-api/v2/payments"
+    },
+    {
+      "source": "/partner-api/shipping",
+      "destination": "/partner-api/v2/shipping"
+    },
+    {
+      "source": "/partner-api/webhooks",
+      "destination": "/partner-api/v2/webhooks"
+    },
+    {
+      "source": "/partner-api/webhook-events",
+      "destination": "/partner-api/v2/webhooks"
+    },
+    {
+      "source": "/partner-api/going-live",
+      "destination": "/partner-api/v2/go-live-checklist"
+    },
+    {
+      "source": "/partner-api/errors-and-limits",
+      "destination": "/partner-api/v2/errors"
+    },
+    {
+      "source": "/partner-api/rate-limits",
+      "destination": "/partner-api/v2/limits-and-compliance"
+    },
+    {
+      "source": "/partner-api/idempotency",
+      "destination": "/partner-api/v2/idempotency"
+    },
+    {
+      "source": "/partner-api/card-object",
+      "destination": "/partner-api/v2/chains-and-metadata"
+    },
+    {
+      "source": "/partner-api/changelog",
+      "destination": "/partner-api/v2/changelog"
+    },
+    {
+      "source": "/partner-api/endpoints/list-packs",
+      "destination": "/partner-api/v2/endpoints/list-packs"
+    },
+    {
+      "source": "/partner-api/endpoints/get-pack-pool",
+      "destination": "/partner-api/v2/endpoints/get-pack-pool"
+    },
+    {
+      "source": "/partner-api/endpoints/buy-packs",
+      "destination": "/partner-api/v2/endpoints/create-order"
+    },
+    {
+      "source": "/partner-api/endpoints/list-orders",
+      "destination": "/partner-api/v2/endpoints/list-orders"
+    },
+    {
+      "source": "/partner-api/endpoints/get-order",
+      "destination": "/partner-api/v2/endpoints/get-order"
+    },
+    {
+      "source": "/partner-api/endpoints/quote-sell-back",
+      "destination": "/partner-api/v2/endpoints/create-sellback-quote"
+    },
+    {
+      "source": "/partner-api/endpoints/sell-back",
+      "destination": "/partner-api/v2/sell-back"
+    },
+    {
+      "source": "/partner-api/endpoints/get-vault",
+      "destination": "/partner-api/v2/endpoints/list-wallet-tokens"
+    },
+    {
+      "source": "/partner-api/endpoints/estimate-shipment",
+      "destination": "/partner-api/v2/endpoints/estimate-shipment"
+    },
+    {
+      "source": "/partner-api/endpoints/create-shipment",
+      "destination": "/partner-api/v2/endpoints/create-shipment"
+    },
+    {
+      "source": "/partner-api/endpoints/list-shipments",
+      "destination": "/partner-api/v2/endpoints/list-shipments"
+    },
+    {
+      "source": "/partner-api/endpoints/get-shipment",
+      "destination": "/partner-api/v2/endpoints/get-shipment"
+    },
+    {
+      "source": "/partner-api/endpoints/get-me",
+      "destination": "/partner-api/v2/endpoints/get-key"
+    },
+    {
+      "source": "/partner-api/endpoints/create-test-account",
+      "destination": "/partner-api/v2/quickstart"
+    },
+    {
+      "source": "/partner-api/endpoints/list-test-accounts",
+      "destination": "/partner-api/v2/quickstart"
+    },
+    {
+      "source": "/partner-api/endpoints/get-funding",
+      "destination": "/partner-api/v2/payments"
+    },
+    {
+      "source": "/partner-api/endpoints/create-withdrawal",
+      "destination": "/partner-api/v2/payments"
+    },
+    {
+      "source": "/partner-api/endpoints/list-withdrawals",
+      "destination": "/partner-api/v2/payments"
+    },
+    {
+      "source": "/partner-api/endpoints/get-withdrawal",
+      "destination": "/partner-api/v2/payments"
+    },
+    {
+      "source": "/partner-api/endpoints/purchase-report",
+      "destination": "/partner-api/v2/endpoints/get-revenue"
+    },
+    {
+      "source": "/partner-api/endpoints/:slug*",
+      "destination": "/partner-api/v2/overview"
     }
   ]
 }
