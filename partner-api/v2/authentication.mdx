@@ -11,6 +11,13 @@ Authorization: Bearer cb_live_...
 
 The only endpoint that takes no key is the [public token metadata](/partner-api/v2/endpoints/get-token-metadata), which wallets and marketplaces read.
 
+## Base URL and formats
+
+- **Base URL:** `https://catchbackcards.com/api/partner/v2`.
+- **Formats:** JSON, UTF-8. Money is USD in dollars (`25`, `9.85`).
+- **New fields can appear at any time.** Ignore fields you don't recognize.
+- **OpenAPI spec:** the OpenAPI 3.1 spec is the official contract, with every endpoint, error code and webhook event. Generate your client from it: `https://catchbackcards.mintlify.app/partner-api/v2/openapi.yaml`.
+
 ## Scope and program
 
 - **Scope:** every v2 endpoint needs the scope `nft:orders` on your key.

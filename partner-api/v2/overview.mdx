@@ -111,65 +111,6 @@ Every payment and payout moves between the customer and CatchBack directly.
   `recipient` must be a self-custody wallet the customer controls, **never an exchange deposit address**. A digital representation minted to a deposit address lands in the exchange's wallet, and the customer may never be able to reach it.
 </Warning>
 
-## Basics
-
-- **Base URL:** `https://catchbackcards.com/api/partner/v2`. [Token metadata](/partner-api/v2/endpoints/get-token-metadata) is public, under `/api/partner-nfts/metadata`.
-- **Auth:** your key as a bearer token, with the `nft:orders` scope. See [Authentication and keys](/partner-api/v2/authentication).
-- **Your program:** your key sets your mint chain (`mint_chain`) and collection contract. Anything from another program returns `404`.
-- **Formats:** JSON, UTF-8. Money is USD in dollars (`25`, `9.85`). Ignore fields you don't recognize; new ones can appear anytime.
-- **Server-side only.** Never expose the key in a browser or app.
-- **Sanctions:** requests from sanctioned countries get `403 Access denied`.
-
-## Endpoints
-
-Paths are relative to `/api/partner/v2`.
-
-| Method and path | What it does |
-|---|---|
-| [`GET /catalog/packs`](/partner-api/v2/endpoints/list-packs) | The packs you can sell, with price, odds choices, art and chase |
-| [`GET /catalog/packs/pool`](/partner-api/v2/endpoints/get-pack-pool) | One pack's odds and every item it can pull |
-| [`POST /orders`](/partner-api/v2/endpoints/create-order) | Buy 1-10 packs for one wallet (`Idempotency-Key`) |
-| [`GET /orders`](/partner-api/v2/endpoints/list-orders) | Your orders, newest first, paged |
-| [`GET /orders/{id}`](/partner-api/v2/endpoints/get-order) | One order, or a multi-pack order with its units |
-| [`GET /orders/{id}/verification`](/partner-api/v2/endpoints/get-order-verification) | The order's provably-fair proof |
-| [`GET /wallets/{address}/tokens`](/partner-api/v2/endpoints/list-wallet-tokens) | A wallet's live tokens with today's sell-back |
-| [`GET /tokens/{tokenId}`](/partner-api/v2/endpoints/get-token) | One token, live or burned: item, sell-back and its schedule |
-| [`POST /tokens/{tokenId}/quote`](/partner-api/v2/endpoints/create-sellback-quote) | A sell-back quote to burn with |
-| [`GET /quotes`](/partner-api/v2/endpoints/list-quotes) | Your sell-back quotes, newest first, paged |
-| [`GET /quotes/{quoteId}`](/partner-api/v2/endpoints/get-quote) | One sell-back quote and its payout |
-| [`POST /shipments/estimate`](/partner-api/v2/endpoints/estimate-shipment) | Rates to ship 1-25 tokens in one box |
-| [`POST /shipments`](/partner-api/v2/endpoints/create-shipment) | Create and pay for a shipment of 1-25 tokens (`Idempotency-Key`) |
-| [`POST /tokens/{tokenId}/shipment/estimate`](/partner-api/v2/endpoints/estimate-token-shipment) | Rates to ship one token |
-| [`POST /tokens/{tokenId}/shipment`](/partner-api/v2/endpoints/create-token-shipment) | Create and pay for a one-token shipment (`Idempotency-Key`) |
-| [`GET /shipments`](/partner-api/v2/endpoints/list-shipments) | Your shipments, newest first, paged |
-| [`GET /shipments/{id}`](/partner-api/v2/endpoints/get-shipment) | One shipment: burn details, then tracking |
-| [`POST /shipments/{id}/renew`](/partner-api/v2/endpoints/renew-shipment) | A new burn window for a paid shipment |
-| [`POST /webhooks`](/partner-api/v2/endpoints/register-webhook) | Register (or change) your webhook URL |
-| [`GET /webhooks`](/partner-api/v2/endpoints/list-webhooks) | Your webhook |
-| [`DELETE /webhooks/{id}`](/partner-api/v2/endpoints/delete-webhook) | Remove your webhook |
-| [`POST /webhooks/{id}/test`](/partner-api/v2/endpoints/test-webhook) | Send a signed `ping` now |
-| [`GET /revenue`](/partner-api/v2/endpoints/get-revenue) | Your monthly revenue-share statement |
-| [`POST /sandbox/payments/{intentId}`](/partner-api/v2/endpoints/sandbox-pay) | Sandbox only: mark a payment paid |
-| [`POST /sandbox/tick`](/partner-api/v2/endpoints/sandbox-tick) | Sandbox only: run the background work and send webhooks now |
-| [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship) | Sandbox only: mark a shipment shipped or delivered |
-| [`GET /keys`](/partner-api/v2/endpoints/get-key) | The calling key: name, scopes, dates, successor |
-| [`POST /keys/rotate`](/partner-api/v2/endpoints/rotate-key) | Issue a replacement key (`Idempotency-Key`) |
-| [`POST /keys/revoke-previous`](/partner-api/v2/endpoints/revoke-previous-key) | End the key this one replaced, now |
-
-Public, no key:
-
-| Method and path | What it does |
-|---|---|
-| [`GET /api/partner-nfts/metadata/{chainId}/{tokenId}`](/partner-api/v2/endpoints/get-token-metadata) | A token's standard NFT metadata (EVM `tokenURI`; Solana uses `/api/partner-nfts/metadata/{id}`) |
-
-## OpenAPI spec
-
-The OpenAPI 3.1 spec is the official contract: every endpoint, error code and webhook event. Generate your client from it.
-
-```text
-https://catchbackcards.mintlify.app/partner-api/v2/openapi.yaml
-```
-
 <Note>
   Want to become a partner? Email [support@catchbackcards.com](mailto:support@catchbackcards.com).
 </Note>
