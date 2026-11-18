@@ -8,6 +8,8 @@ Scope: `nft:orders`
 
 Your revenue share, month by month: one month with `period`, or the last 12 months (newest first) without it. A sale counts in the month it was paid; a refund in the month it was refunded. Amounts in USD.
 
+**The standard share is 3% of GMV.** Premier partners earn a higher rate, set on their program. `share_pct` is the rate that applies to you.
+
 <ParamField query="period" type="string">
   A month, `YYYY-MM`. Without it, the last 12 months.
 </ParamField>
@@ -55,11 +57,11 @@ curl "https://catchbackcards.com/api/partner/v2/revenue?period=2026-11" \
       "period": "2026-11",
       "orders": 412,
       "gmv": 18250,
-      "share_pct": 5,
-      "share_amount": 912.5,
-      "refunds": { "count": 3, "gmv": 125, "share_amount": 6.25 },
+      "share_pct": 3,
+      "share_amount": 547.5,
+      "refunds": { "count": 3, "gmv": 125, "share_amount": 3.75 },
       "net_gmv": 18125,
-      "net_share": 906.25,
+      "net_share": 543.75,
       "payout": { "status": "open", "amount": null, "reference": null, "paid_at": null }
     }
   ]
