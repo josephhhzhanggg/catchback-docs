@@ -120,7 +120,7 @@ paths:
         - $ref: '#/components/parameters/PackCategory'
         - name: risk_level
           in: query
-          description: Odds change with the risk level, and so can which cards are hittable. `aggressive` is shown as Hot in the app. Use one of the pack's `risk_levels`; any other is a `400`.
+          description: The odds Buy packs opens at for the same `risk_level`. `standard` is Classic odds; `chill` and `aggressive` are the earlier Chill and Hot odds. Odds change with the risk level, and so can which cards are hittable. Use one of the pack's `risk_levels`; any other is a `400`.
           schema: { $ref: '#/components/schemas/RiskLevel' }
       responses:
         '200':
@@ -230,7 +230,7 @@ paths:
                 remaining_balance: 189935
                 summary:
                   total_value: 32.62
-                  catchback_now_total: 29.36
+                  catchback_now_total: 32.62
                   best_pull: { pull_id: fe04349b-…, name: Tyrunt, value: 20.62 }
                 pulls:
                   - pull_id: fe04349b-…
@@ -253,8 +253,8 @@ paths:
                     value: 20.62
                     hit: { rarity_tier: starter, bucket: P0, bucket_odds: 0.72, is_chase: false, chase_label: null }
                     catchback:
-                      amount: 18.56
-                      rate: 0.9
+                      amount: 20.62
+                      rate: 1
                       valid_until: '2026-09-29T20:24:55Z'
                       after: { amount: 16.5, rate: 0.8, valid_until: '2026-10-06T20:19:55Z' }
                     proof:
@@ -378,7 +378,7 @@ paths:
       description: |-
         **Scope:** `sell:cards` (needs a linked account). **Moves money.**
 
-        CatchBack up to 10 cards, paid to your Wallet Balance, at the same rate a customer gets. A pulled card: the pull's fresh rate (90%) within 5 minutes of the pull, then 80% of the value at pull for 7 days, then 80% of market value. A bought card: 80% of the lower of the price you paid and its market value at purchase for 7 days, then 80% of market value.
+        CatchBack up to 10 cards, paid to your Wallet Balance, at the same rate a customer gets. A pulled card: the pull's fresh rate within 5 minutes of the pull (100% for a pack opened at `standard`, 90% at `chill` or `aggressive`), then 80% of the value at pull for 7 days, then 80% of market value. A bought card: 80% of the lower of the price you paid and its market value at purchase for 7 days, then 80% of market value.
 
         An energy card from a base pack pays 100% of its value. A card from a pack with a hold pays 90% until the hold ends. To see every amount and when it changes before you sell, use Quote a sell-back.
 
@@ -474,10 +474,10 @@ paths:
                             - `PRICE_CHANGED`: it would pay less than your `min_payout`. Nothing was sold; `payout_amount` is what it pays now.
                           enum: [CARD_LISTED_ON_MARKETPLACE, GOODS_SELLBACK_WINDOW_CLOSED, CARD_IN_BATTLE, SHOP_PURCHASE_NOT_SELLABLE, PRICE_CHANGED]
               example:
-                total_paid: 16.2
+                total_paid: 18
                 remaining_balance: 189937
                 results:
-                  - { card_id: bee48cce-…, pull_id: 873deb80-…, status: sold, transaction_id: 93727497-…, payout_amount: 16.2, payout_rate: 0.9 }
+                  - { card_id: bee48cce-…, pull_id: 873deb80-…, status: sold, transaction_id: 93727497-…, payout_amount: 18, payout_rate: 1 }
                   - { card_id: e3d7148d-…, pull_id: e9d27918-…, status: already_sold, transaction_id: 2fa30a7d-…, payout_amount: 18 }
                   - { card_id: 4a51bc92-…, purchase_id: e22855d2-…, status: failed, error: No purchase of this card by this account with that purchase_id }
         '400':
@@ -593,11 +593,11 @@ paths:
                     purchase_id: null
                     status: quoted
                     catchback:
-                      amount: 18
-                      rate: 0.9
+                      amount: 20
+                      rate: 1
                       valid_until: '2026-11-02T18:05:00.000Z'
                       schedule:
-                        - { amount: 18, rate: 0.9, basis: value_at_acquisition, basis_value: 20, fixed: true, valid_from: '2026-11-02T18:01:00.000Z', valid_until: '2026-11-02T18:05:00.000Z' }
+                        - { amount: 20, rate: 1, basis: value_at_acquisition, basis_value: 20, fixed: true, valid_from: '2026-11-02T18:01:00.000Z', valid_until: '2026-11-02T18:05:00.000Z' }
                         - { amount: 16, rate: 0.8, basis: value_at_acquisition, basis_value: 20, fixed: true, valid_from: '2026-11-02T18:05:00.000Z', valid_until: '2026-11-09T18:00:00.000Z' }
                         - { amount: 17.6, rate: 0.8, basis: market_value, basis_value: 22, fixed: false, valid_from: '2026-11-09T18:00:00.000Z', valid_until: null }
                       auto_sold_at: null
@@ -3365,6 +3365,7 @@ components:
             enum: [not_in_vault, listed, shipping, on_hold, not_a_card]
     RiskLevel:
       type: string
+      description: '`standard` (the default) opens on Classic odds, and its pulls sell back at 100% for the first 5 minutes. `chill` and `aggressive` open on the earlier Chill and Hot odds, and their pulls sell back at 90% for the first 5 minutes. The app''s newer Standard, Chill and Hot odds modes aren''t available through the API.'
       enum: [chill, standard, aggressive]
       default: standard
     PackCategory:

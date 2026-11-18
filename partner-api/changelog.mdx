@@ -5,6 +5,11 @@ description: "What changed in the Partner API, newest first."
 
 Changes to `v1` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. A breaking change would ship under a new version prefix. Dates are US Pacific time.
 
+<Update label="November 10, 2026" description="100% fresh sell-back">
+  - A pack opened at `risk_level: "standard"` now rolls Classic odds, and its pulls sell back at **100%** of their value for the first 5 minutes, up from 90%: `catchback.rate` is `1` on the pull, and [Get vault](/partner-api/endpoints/get-vault), [Quote a sell-back](/partner-api/endpoints/quote-sell-back) and [Sell back cards](/partner-api/endpoints/sell-back) show and pay it. After 5 minutes it's 80%, as before.
+  - `chill` and `aggressive` keep the earlier Chill and Hot odds, and their pulls still sell back at 90% for the first 5 minutes. The app's newer odds modes aren't available through the API. Nothing in a request changes.
+</Update>
+
 <Update label="November 3, 2026" description="Withdrawal webhook">
   - New webhook event: [`withdrawal.updated`](/partner-api/webhook-events#withdrawal-updated), sent when a USDC withdrawal changes status, with the object [Get a withdrawal](/partner-api/endpoints/get-withdrawal) returns. Every webhook on the account whose key has `withdraw:funds` gets it.
 </Update>
