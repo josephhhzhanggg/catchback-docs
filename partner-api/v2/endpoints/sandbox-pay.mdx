@@ -40,10 +40,10 @@ curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/payments/sbx_pi_01JD...
 
 <ResponseExample>
 ```json 200 order
-{ "paid": true, "kind": "order", "status": "paid" }
+{ "paid": true, "kind": "order", "status": "paid", "order_status": "paid", "webhooks": { "delivered": 1, "retrying": 0 } }
 ```
 
 ```json 200 shipment
-{ "paid": true, "kind": "shipment", "status": "ready" }
+{ "paid": true, "kind": "shipment", "status": "ready", "shipment_status": "ready", "webhooks": { "delivered": 1, "retrying": 0 } }
 ```
 </ResponseExample>
