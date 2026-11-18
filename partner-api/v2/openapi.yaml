@@ -1,0 +1,3257 @@
+openapi: 3.1.0
+info:
+  title: CatchBack Partner API v2 (wallets & NFTs)
+  version: 2.0.0
+  summary: Sell CatchBack packs to your users' own web3 wallets, and let the NFT holder sell back or ship.
+  description: |-
+    The official contract for Partner API v2. Generate clients from this file.
+
+    Each customer pays for their own pack (USDC on Base or Solana, through a Unifold Payment
+    Intent), and each pulled item is minted as an NFT to the customer's wallet. Whoever holds the
+    NFT can trade it, sell it back for USDC, or have the physical item shipped. Selling back and
+    shipping both burn the NFT. Guides: [Overview](/partner-api/v2/overview).
+
+    - **Auth:** every `/api/partner/v2` request sends your key as a bearer token, and every key
+      needs the scope `nft:orders`. The public token metadata needs no key.
+    - **Your program:** your key is linked to your partner program, which fixes the chain your
+      NFTs mint on (`mint_chain`) and your collection contract. An order, token, quote or shipment
+      from another program answers `404`.
+    - **Formats:** JSON, UTF-8. Money is USD as a number in dollars (`25`, `9.85`). New fields can be
+      added to any response; ignore fields you don't know.
+    - **Errors:** bodies are `{ "error": "<message>" }`, and errors your integration should act on
+      also carry a stable `code` (see `ErrorCode`). Branch on the status and the `code`, never on the
+      message text. [Errors](/partner-api/v2/errors).
+    - **Idempotency:** `POST /orders`, `POST /shipments`, `POST /tokens/{tokenId}/shipment` and
+      `POST /keys/rotate` require an `Idempotency-Key`. [Idempotency](/partner-api/v2/idempotency).
+    - **Sandbox:** the sandbox runs the same API with simulated payments on a public testnet. Its base
+      URL is issued on request, with a sandbox key. The operations tagged `Sandbox` exist only there
+      and answer `404` in production.
+  contact:
+    name: CatchBack support
+    email: support@catchbackcards.com
+servers:
+  - url: https://catchbackcards.com
+    description: Production. Every payment is real money. The sandbox base URL is issued on request.
+tags:
+  - name: Packs
+    description: The packs you can sell, their odds and every item they can pull.
+  - name: Orders
+    description: Buy 1-10 packs for one wallet, follow the order to the mint, and prove the pull.
+  - name: Tokens
+    description: A wallet's tokens and one token's item, holder and sell-back schedule.
+  - name: Sell-back
+    description: Quote a sell-back, have the holder burn with it, and follow the USDC payout.
+  - name: Shipments
+    description: Pay shipping for 1-25 tokens, have the holder burn each one, and track the box.
+  - name: Webhooks
+    description: Register, read, test and remove your webhook URL.
+  - name: Webhook events
+    description: Signed POSTs we send to your webhook URL.
+  - name: Keys
+    description: Read, rotate and revoke your API key.
+  - name: Revenue
+    description: Your monthly revenue-share statement.
+  - name: Sandbox
+    description: Sandbox-only helpers. Every one answers `404` in production.
+  - name: Metadata
+    description: Public NFT metadata that wallets and marketplaces read with no key.
+security:
+  - bearerAuth: ['nft:orders']
+# A keyless operation below says `security: [{}]`, not `[]`. With an empty list Mintlify falls
+# back to docs.json's api.mdx.auth and shows a bearer header on the page.
+paths:
+  /api/partner/v2/catalog/packs:
+    get:
+      tags: [Packs]
+      operationId: listPacks
+      summary: List packs
+      description: |-
+        The packs you can sell in one category, with price, the odds choices each sells, art and the chase item on offer. A pack that isn't on sale right now stays listed with `available: false` and a `reason`. Whether a particular odds choice is selling right now is on [Get a pack's pool](#operation/getPackPool).
+      parameters:
+        - $ref: '#/components/parameters/PackCategory'
+      responses:
+        '200':
+          description: The packs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [category, mint_chain, packs]
+                properties:
+                  category: { $ref: '#/components/schemas/PackCategory' }
+                  mint_chain: { $ref: '#/components/schemas/ChainKey' }
+                  packs:
+                    type: array
+                    items: { $ref: '#/components/schemas/PackCatalogItem' }
+              example:
+                category: pokemon
+                mint_chain: 'evm:196'
+                packs:
+                  - pack_type: bronze
+                    name: Bronze Pack
+                    price: 25
+                    available: true
+                    odds: [standard, hot, chill, classic]
+                    default_odds: standard
+                    image_url: https://catchbackcards.com/_next/image?url=%2Fpacks%2Fbronze.png&w=1080&q=75
+                    banner_url: https://catchbackcards.com/_next/image?url=%2Fpacks%2Fbronze-banner.png&w=1080&q=75
+                    description: Graded Pokemon slabs from $7.50 up.
+                    chase:
+                      label: Charizard bounty
+                      odds: '0.05%'
+                      ends_at: '2026-11-30T00:00:00.000Z'
+                      item:
+                        id: 0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e
+                        category: pokemon
+                        name: Charizard ex
+                        grading_company: PSA
+                        grading_rank: 10
+                        render_image: https://...
+                        market_value: 410
+                  - pack_type: gold
+                    name: Gold Pack
+                    price: 100
+                    available: false
+                    reason: Restocking
+                    odds: [standard, hot, chill, classic]
+                    default_odds: standard
+                    image_url: https://...
+                    banner_url: null
+                    description: null
+                    chase: null
+        '400':
+          description: Unknown `category` (no `code`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'Unknown category: pokemn' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/catalog/packs/pool:
+    get:
+      tags: [Packs]
+      operationId: getPackPool
+      summary: Get a pack's pool
+      description: |-
+        What one pack can pull at one odds choice: the value bands with their chances, whether those odds are selling right now, and every item a pull can produce, highest value first. This is the same information as the odds panel in our app; show it to your customers before they buy.
+
+        A pack that sells only its own odds answers `odds: "classic"` with its own band shape (`ClassicPackPool`). Every other pack answers `ModePackPool`.
+      parameters:
+        - name: pack_type
+          in: query
+          required: true
+          description: A `pack_type` from List packs.
+          schema: { type: string, minLength: 1, maxLength: 100 }
+          example: bronze
+        - $ref: '#/components/parameters/PackCategory'
+        - name: odds
+          in: query
+          description: One the pack sells. Default the pack's `default_odds`.
+          schema: { $ref: '#/components/schemas/Odds' }
+      responses:
+        '200':
+          description: The pool at those odds.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PackPool' }
+              example:
+                pack_type: bronze
+                name: Bronze Pack
+                category: pokemon
+                price: 25
+                odds: hot
+                label: Hot
+                tagline: Fewer hits, bigger chase
+                available: true
+                fresh_buyback_rate: 1
+                consolation_probability: null
+                bands:
+                  - { band: 7.5-15, min_value: 7.5, max_value: 15, odds: 0.61, cards: 380 }
+                  - { band: 250-1000, min_value: 250, max_value: 1000, odds: 0.004, cards: 41 }
+                odds_choices:
+                  - { odds: standard, label: Standard, available: true }
+                  - { odds: hot, label: Hot, available: true }
+                  - { odds: chill, label: Chill, available: true }
+                  - { odds: classic, label: Classic, available: true }
+                total_cards: 1043
+                cards:
+                  - id: 0e94dc61-5a2f-4b1e-9c3d-7f8a1b2c3d4e
+                    category: pokemon
+                    name: Charizard ex
+                    grading_company: PSA
+                    grading_rank: 10
+                    market_value: 410
+                    render_image: https://...
+                    band: 250-1000
+        '400':
+          description: |-
+            - `BAD_PACK`: `pack_type` missing (or over 100 characters).
+            - `BAD_CATEGORY`: unknown `category`.
+            - `BAD_ODDS`: `odds` isn't `standard`, `hot`, `chill` or `classic`, or isn't one the pack sells; in the second case `odds` lists the choices it sells.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'bronze sells standard, hot, chill, classic', code: BAD_ODDS, odds: [standard, hot, chill, classic] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: '`PACK_NOT_OFFERED`: that pack isn''t sold through your program.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Unknown pack_type for pokemon. Use one from GET /api/partner/v2/catalog/packs., code: PACK_NOT_OFFERED }
+        '409':
+          description: '`ODDS_UNAVAILABLE`: those odds aren''t published for this pack right now; try another choice or later.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: hot odds are not published for bronze, code: ODDS_UNAVAILABLE }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/orders:
+    post:
+      tags: [Orders]
+      operationId: createOrder
+      summary: Create an order
+      description: |-
+        **Rate limit:** 30 a minute.
+
+        One order buys 1-10 packs of one kind for one wallet, paid with one payment. `quantity` 2-10 makes a multi-pack order (`OrderBatch`): one payment for `quantity` × the pack price, whose units each open, mint and (if they must) refund on their own. The pack opens and the NFT mints once the payment settles; follow it with Get an order or the `nft_order.updated` webhook.
+
+        A refused order creates nothing. A replay with the same `Idempotency-Key` and the same request answers `200` with `idempotent_replay: true` and the order as it stands now; once the order is past `awaiting_payment`, its `payment` has no `client_secret` and no deposit addresses.
+
+        If the odds stop selling before the payment settles, the pack isn't opened at other odds: the order goes to `refund_due` and the customer is refunded.
+      parameters:
+        - $ref: '#/components/parameters/OrderIdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrderRequest' }
+            example:
+              pack_type: bronze
+              category: pokemon
+              odds: standard
+              quantity: 1
+              recipient: 0x8f3c...e21a
+              refund_address: 0x8f3c...e21a
+              partner_user_ref: okx-uid-102938
+      responses:
+        '201':
+          description: The order and how to pay it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateOrderResponse' }
+              examples:
+                single:
+                  summary: One pack
+                  value:
+                    order:
+                      order_id: okx-ord-7f3a9c21
+                      id: 3d2b8f0e-6c1a-4f7e-9a51-2b0d8c4e7f13
+                      status: awaiting_payment
+                      pack_type: bronze
+                      category: pokemon
+                      odds: standard
+                      price: 25
+                      recipient: 0x8f3c...e21a
+                      mint_chain: 'evm:196'
+                      paid_at: null
+                      pull: null
+                      token: null
+                      failure_reason: null
+                      created_at: '2026-11-16T18:02:11.420Z'
+                    payment:
+                      intent_id: pi_01JD...
+                      client_secret: pi_01JD..._secret_...
+                      publishable_key: pk_live_...
+                      amount: 25
+                      deposit_addresses:
+                        - { chain: 'evm:8453', address: 0x5a4d...0001 }
+                        - { chain: 'solana:mainnet', address: 9xQe...Vf2p }
+                multi:
+                  summary: Three packs
+                  value:
+                    order:
+                      order_id: okx-ord-9b21e4c0
+                      id: 5f1c2a90-8d3e-4b6a-9e1f-7c0a2b4d6e81
+                      status: awaiting_payment
+                      quantity: 3
+                      pack_type: bronze
+                      category: pokemon
+                      odds: standard
+                      unit_price: 25
+                      price: 75
+                      recipient: 0x8f3c...e21a
+                      mint_chain: 'evm:196'
+                      paid_at: null
+                      units:
+                        - { order_id: okx-ord-9b21e4c0, id: a0e1c3d5-2b4f-4e6a-8c1d-3f5a7b9c1e20, batch_id: 5f1c2a90-8d3e-4b6a-9e1f-7c0a2b4d6e81, unit: 1, status: awaiting_payment, pack_type: bronze, category: pokemon, odds: standard, price: 25, recipient: 0x8f3c...e21a, mint_chain: 'evm:196', paid_at: null, pull: null, token: null, failure_reason: null, created_at: '2026-11-16T18:02:11.420Z' }
+                        - { order_id: okx-ord-9b21e4c0, id: b7d2e4f6-3c5a-4f7b-9d2e-4a6b8c0d2f31, batch_id: 5f1c2a90-8d3e-4b6a-9e1f-7c0a2b4d6e81, unit: 2, status: awaiting_payment, pack_type: bronze, category: pokemon, odds: standard, price: 25, recipient: 0x8f3c...e21a, mint_chain: 'evm:196', paid_at: null, pull: null, token: null, failure_reason: null, created_at: '2026-11-16T18:02:11.420Z' }
+                        - { order_id: okx-ord-9b21e4c0, id: c4f9a1b3-4d6e-4a8c-8e3f-5b7c9d1e3a42, batch_id: 5f1c2a90-8d3e-4b6a-9e1f-7c0a2b4d6e81, unit: 3, status: awaiting_payment, pack_type: bronze, category: pokemon, odds: standard, price: 25, recipient: 0x8f3c...e21a, mint_chain: 'evm:196', paid_at: null, pull: null, token: null, failure_reason: null, created_at: '2026-11-16T18:02:11.420Z' }
+                      created_at: '2026-11-16T18:02:11.420Z'
+                    payment:
+                      intent_id: pi_01JD...
+                      client_secret: pi_01JD..._secret_...
+                      publishable_key: pk_live_...
+                      amount: 75
+                      deposit_addresses:
+                        - { chain: 'evm:8453', address: 0x5a4d...0001 }
+                        - { chain: 'solana:mainnet', address: 9xQe...Vf2p }
+        '200':
+          description: A replay of an earlier request with the same `Idempotency-Key` (`idempotent_replay` is true). Nothing new is created and nothing is charged twice.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateOrderResponse' }
+        '400':
+          description: |-
+            - `BAD_IDEMPOTENCY_KEY`: `Idempotency-Key` missing, or not 8-128 characters of `A-Za-z0-9_-`.
+            - `BAD_JSON`: the body isn't JSON.
+            - `BAD_RECIPIENT`: `recipient` is not a wallet address on your mint chain.
+            - `BAD_PACK`: `pack_type` missing.
+            - `BAD_CATEGORY`: unknown `category`.
+            - `BAD_ODDS`: `odds` isn't `standard`, `hot`, `chill` or `classic`, or not one the pack sells (then `odds` lists the choices it sells).
+            - `BAD_QUANTITY`: `quantity` isn't a whole number from 1 to 10.
+            - `BAD_REFUND_ADDRESS`: no usable EVM `refund_address` (required when you mint on Solana).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'recipient must be a evm:196 wallet address', code: BAD_RECIPIENT }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: |-
+            - `WALLET_REFUSED`: a wallet in the request failed sanctions screening.
+            - `WALLET_BLOCKED`: this wallet may not buy from CatchBack.
+            - Any of the key and program refusals every endpoint can return (`NO_PROGRAM`, `PROGRAM_INACTIVE`, `NOT_AVAILABLE`, a missing scope, `Access denied`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: This wallet cannot buy here., code: WALLET_REFUSED }
+        '404':
+          description: '`PACK_NOT_OFFERED`: that pack isn''t sold through your program.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: That pack is not sold through this program., code: PACK_NOT_OFFERED }
+        '409':
+          description: |-
+            Nothing is created.
+            - `ODDS_UNAVAILABLE`: those odds aren't selling right now; try another choice or later. `odds` echoes the choice.
+            - `PACK_UNAVAILABLE`: a pack that sells only its own odds can't open right now; `reason` says why.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Bronze Pack isn't selling hot odds right now., code: ODDS_UNAVAILABLE, odds: hot }
+        '422':
+          description: '`IDEMPOTENCY_KEY_REUSED`: the key was already used for a different order.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: This Idempotency-Key was already used for a different order., code: IDEMPOTENCY_KEY_REUSED }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503':
+          description: |-
+            - `SCREENING_UNAVAILABLE`: wallet screening is briefly unavailable; retry shortly with the same `Idempotency-Key`.
+            - `AUTH_UNAVAILABLE`, or no code: we couldn't check your key or load your program; retry after `Retry-After`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Wallet screening is unavailable; try again shortly., code: SCREENING_UNAVAILABLE }
+    get:
+      tags: [Orders]
+      operationId: listOrders
+      summary: List orders
+      description: |-
+        Your orders, newest first, each in the Get an order shape. The units of a multi-pack order are listed one by one, each with the order's `order_id`, its `batch_id` and its `unit` number. `partner_user_ref` matches the wallets you first sent with that ref.
+      parameters:
+        - $ref: '#/components/parameters/WalletFilter'
+        - name: partner_user_ref
+          in: query
+          description: A `partner_user_ref` you sent with an order.
+          schema: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$' }
+        - name: status
+          in: query
+          description: Only orders in this status.
+          schema:
+            type: string
+            enum: [awaiting_payment, paid, rolled, minted, mint_failed, expired, refund_due, refunded]
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of orders.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [orders, next_cursor]
+                properties:
+                  orders:
+                    type: array
+                    items: { $ref: '#/components/schemas/OrderOrUnit' }
+                  next_cursor: { $ref: '#/components/schemas/NextCursor' }
+              example:
+                orders:
+                  - order_id: okx-ord-7f3a9c21
+                    id: 3d2b8f0e-6c1a-4f7e-9a51-2b0d8c4e7f13
+                    status: minted
+                    pack_type: bronze
+                    category: pokemon
+                    odds: standard
+                    price: 25
+                    recipient: 0x8f3c...e21a
+                    mint_chain: 'evm:196'
+                    paid_at: '2026-11-16T18:04:40.002Z'
+                    pull: { card_id: a1c4e2f8-7b3d-4c5e-9f1a-2b3c4d5e6f70, category: pokemon, name: Charizard ex 199/165 PSA 10, value: 412.5, pulled_at: '2026-11-16T18:04:41.317Z' }
+                    token: { chain: 'evm:196', contract: 0x7b1e...c0de, token_id: '81264573985362058461377125337283195667', status: confirmed, tx: 0x9f2a... }
+                    failure_reason: null
+                    created_at: '2026-11-16T18:02:11.420Z'
+                next_cursor: WyIyMDI2LTExLTE2VDE4OjAyOjExLjQyMDEyMyswMDowMCIsIjNkMmI4ZjBlLS4uLiJd
+        '400':
+          description: |-
+            - `BAD_CURSOR`: `cursor` isn't a `next_cursor` from a previous page.
+            - `BAD_LIMIT`: `limit` isn't 1-100.
+            - `BAD_STATUS`: `status` isn't one the list filters on.
+            - `BAD_ADDRESS`: `wallet` is not an address on your mint chain.
+            - `BAD_PARTNER_USER_REF`: `partner_user_ref` isn't 1-128 characters of `A-Za-z0-9_.:-`.
+            - `TOO_MANY_WALLETS`: that `partner_user_ref` covers more than 200 wallets; filter by `wallet` instead.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: limit must be 1-100, code: BAD_LIMIT }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/orders/{id}:
+    get:
+      tags: [Orders]
+      operationId: getOrder
+      summary: Get an order
+      description: |-
+        One order. `{id}` is our `id` or your `Idempotency-Key`, so after a lost response you can always find out how an order ended. A multi-pack order's `id` or `Idempotency-Key` returns the whole order with its `units`; one unit's `id` returns that unit. It never includes the `payment`: replay the POST to get that back.
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [order]
+                properties:
+                  order: { $ref: '#/components/schemas/AnyOrder' }
+              example:
+                order:
+                  order_id: okx-ord-7f3a9c21
+                  id: 3d2b8f0e-6c1a-4f7e-9a51-2b0d8c4e7f13
+                  status: minted
+                  pack_type: bronze
+                  category: pokemon
+                  odds: standard
+                  price: 25
+                  recipient: 0x8f3c...e21a
+                  mint_chain: 'evm:196'
+                  paid_at: '2026-11-16T18:04:40.002Z'
+                  pull:
+                    card_id: a1c4e2f8-7b3d-4c5e-9f1a-2b3c4d5e6f70
+                    category: pokemon
+                    name: Charizard ex 199/165 PSA 10
+                    value: 412.5
+                    pulled_at: '2026-11-16T18:04:41.317Z'
+                  token:
+                    chain: 'evm:196'
+                    contract: 0x7b1e...c0de
+                    token_id: '81264573985362058461377125337283195667'
+                    status: confirmed
+                    tx: 0x9f2a...
+                  failure_reason: null
+                  created_at: '2026-11-16T18:02:11.420Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: '`UNKNOWN_ORDER`: no such order in your program, by id or `Idempotency-Key`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Unknown order, code: UNKNOWN_ORDER }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/orders/{id}/verification:
+    get:
+      tags: [Orders]
+      operationId: getOrderVerification
+      summary: Get an order's proof
+      description: |-
+        The provably-fair proof for an order's pull, and a public `verify_url` your customer can open to re-run the check with no key. `proof` is exactly what `verify_url` returns.
+
+        `{id}` is a single order's `id` or `Idempotency-Key`, or one unit's `id`. A multi-pack order's own `id` or `Idempotency-Key` returns `BatchVerification`: one proof per unit (a unit not yet opened has `verified: null, pending: true`), and `verified` is true only when every unit's is.
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: The proof.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [verification]
+                properties:
+                  verification:
+                    anyOf:
+                      - $ref: '#/components/schemas/Verification'
+                      - $ref: '#/components/schemas/BatchVerification'
+              example:
+                verification:
+                  order_id: okx-ord-7f3a9c21
+                  id: 3d2b8f0e-6c1a-4f7e-9a51-2b0d8c4e7f13
+                  pull_id: 6a0f2c4e-8b1d-4f3a-9c5e-7d9f1b3a5c71
+                  card_id: a1c4e2f8-7b3d-4c5e-9f1a-2b3c4d5e6f70
+                  category: pokemon
+                  verified: true
+                  verification_type: provably_fair
+                  verify_url: https://catchbackcards.com/api/verify-pull?transaction_id=6a0f2c4e-8b1d-4f3a-9c5e-7d9f1b3a5c71&card_source=pokemon
+                  proof: { verified: true, verification_type: provably_fair }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: '`UNKNOWN_ORDER`: no such order in your program.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Unknown order, code: UNKNOWN_ORDER }
+        '409':
+          description: '`NOT_PULLED`: the order''s pack hasn''t been opened yet; `status` is the order''s status. A single order only: a multi-pack order answers `200` with pending units.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: This order has not been opened yet, code: NOT_PULLED, status: paid }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503':
+          description: |-
+            - `VERIFY_UNAVAILABLE`: the proof couldn't be loaded right now; retry shortly.
+            - `AUTH_UNAVAILABLE`, or no code: we couldn't check your key or load your program; retry after `Retry-After`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Could not load this pull right now; try again., code: VERIFY_UNAVAILABLE }
+  /api/partner/v2/wallets/{address}/tokens:
+    get:
+      tags: [Tokens]
+      operationId: listWalletTokens
+      summary: List a wallet's tokens
+      description: |-
+        The live tokens of your program that a wallet holds, newest first, each with what a sell-back would pay right now. Ownership comes from our chain watcher, so a transfer shows up within a few minutes; a quote always re-reads the owner on chain. `sellback` is indicative: only a quote fixes the amount. At most 200 tokens are returned; `truncated: true` means there are more.
+      parameters:
+        - name: address
+          in: path
+          required: true
+          description: A wallet address on your mint chain.
+          schema: { type: string }
+          example: '0x8f3c0a1b2c3d4e5f60718293a4b5c6d7e8f9e21a'
+      responses:
+        '200':
+          description: The wallet's live tokens.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [holder, tokens, truncated]
+                properties:
+                  holder: { type: string, description: 'The address as we store it (EVM lowercase, Solana base58).' }
+                  tokens:
+                    type: array
+                    items: { $ref: '#/components/schemas/WalletToken' }
+                  truncated: { type: boolean, description: 'True when the wallet holds more than the 200 returned.' }
+              example:
+                holder: 0x8f3c...e21a
+                tokens:
+                  - chain: 'evm:196'
+                    contract: 0x7b1e...c0de
+                    token_id: '81264573985362058461377125337283195667'
+                    status: confirmed
+                    card: { id: a1c4e2f8-7b3d-4c5e-9f1a-2b3c4d5e6f70, category: pokemon, name: Charizard ex 199/165 PSA 10 }
+                    minted_at: '2026-11-16T18:04:45.110Z'
+                    sellback: { amount: 330, rate: 0.8, fresh: false, locked_until: '2026-11-23T18:04:41.317Z' }
+                truncated: false
+        '400':
+          description: '`BAD_ADDRESS`: `{address}` is not a wallet address on your mint chain.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'That is not a wallet address on evm:196', code: BAD_ADDRESS }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/tokens/{tokenId}:
+    get:
+      tags: [Tokens]
+      operationId: getToken
+      summary: Get a token
+      description: |-
+        Any token of your program, live or burned: who holds it (as our chain watcher last saw it), the item behind it with its current `market_value`, and for a live, confirmed token today's sell-back with its schedule. A burned token has `end`.
+      parameters:
+        - $ref: '#/components/parameters/TokenId'
+      responses:
+        '200':
+          description: The token.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token]
+                properties:
+                  token: { $ref: '#/components/schemas/TokenDetail' }
+              example:
+                token:
+                  chain: 'evm:196'
+                  contract: 0x7b1e...c0de
+                  token_id: '81264573985362058461377125337283195667'
+                  status: confirmed
+                  holder: 0x8f3c...e21a
+                  order_id: okx-ord-7f3a9c21
+                  minted_at: '2026-11-16T18:04:45.110Z'
+                  confirmed_at: '2026-11-16T18:04:52.000Z'
+                  end: null
+                  item:
+                    id: a1c4e2f8-7b3d-4c5e-9f1a-2b3c4d5e6f70
+                    category: pokemon
+                    name: Charizard ex
+                    set: Obsidian Flames
+                    number: 199/165
+                    grading_company: PSA
+                    grading_rank: 10
+                    cert_number: '81234567'
+                    front_image: https://...
+                    back_image: https://...
+                    render_image: https://...
+                    market_value: 415
+                  sellback:
+                    amount: 330
+                    rate: 0.8
+                    fresh: false
+                    value_locked: true
+                    fresh_until: '2026-11-16T18:09:52.000Z'
+                    locked_until: '2026-11-23T18:04:41.317Z'
+                    schedule:
+                      - { from: '2026-11-17T09:00:00.000Z', until: '2026-11-23T18:04:41.317Z', rate: 0.8, amount: 330, fixed: true }
+                      - { from: '2026-11-23T18:04:41.317Z', until: null, rate: 0.8, amount: 332, fixed: false }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: '`UNKNOWN_TOKEN`: no such token on your program''s contract.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Unknown token, code: UNKNOWN_TOKEN }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/tokens/{tokenId}/quote:
+    post:
+      tags: [Sell-back]
+      operationId: createSellbackQuote
+      summary: Create a sell-back quote
+      description: |-
+        A quote fixes the amount, the payer and the payout destination, and expires 10 minutes after it is issued, or when the 5-minute fresh window ends if the quote is at the fresh rate (whichever is sooner). Every call issues a new quote; an unused quote just expires. Takes no `Idempotency-Key`.
+
+        - **EVM** (`family: "evm"`): the holder's wallet calls `burnWithQuote(quote, signature)` on `contract`, passing `quote` exactly as returned. `tokenId`, `amount` (USDC, 6 decimals) and `expiresAt` (unix seconds) are decimal strings.
+        - **Solana** (`family: "solana"`): `transaction` moves the asset to `vault` with the quote id as a memo; the holder signs and sends it unchanged before `last_valid_block_height` and `expires_at`.
+
+        Follow the payout with Get a sell-back quote or the `sellback.updated` webhook. [Sell-back](/partner-api/v2/sell-back).
+      parameters:
+        - $ref: '#/components/parameters/TokenId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SellbackQuoteRequest' }
+            example: { kind: sellback, holder: 0x8f3c...e21a, payout_chain: 'evm:8453', payout_address: 0x8f3c...e21a }
+      responses:
+        '201':
+          description: The quote to burn with.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SellbackQuote' }
+              examples:
+                evm:
+                  summary: EVM program
+                  value:
+                    quote_id: 0x5e0c...91ab
+                    chain: 'evm:196'
+                    amount_usd: 330
+                    expires_at: '2026-11-16T18:30:00.000Z'
+                    payout: { chain: 'evm:8453', address: 0x8f3c...e21a }
+                    family: evm
+                    contract: 0x7b1e...c0de
+                    quote:
+                      tokenId: '81264573985362058461377125337283195667'
+                      kind: 1
+                      quoteId: 0x5e0c...91ab
+                      holder: 0x8f3c...e21a
+                      payoutHash: 0x2c71...
+                      amount: '330000000'
+                      expiresAt: '1795372200'
+                    signature: 0x4a1f...1b
+                solana:
+                  summary: Solana program
+                  value:
+                    quote_id: 0x5e0c...91ab
+                    chain: 'solana:mainnet'
+                    amount_usd: 330
+                    expires_at: '2026-11-16T18:30:00.000Z'
+                    payout: { chain: 'evm:8453', address: 0x8f3c...e21a }
+                    family: solana
+                    collection: CoLL...
+                    asset: AsSt...
+                    vault: VauL...
+                    transaction: <base64 unsigned transaction>
+                    last_valid_block_height: 312345678
+        '400':
+          description: |-
+            - `BAD_JSON`: the body isn't JSON.
+            - `BAD_HOLDER`: `holder` is not a wallet address on your mint chain.
+            - `PAYOUT_CHAIN_NOT_SUPPORTED`: `payout_chain` is not `evm:8453` or `solana:mainnet`.
+            - `PAYOUT_CHAIN_NOT_ENABLED`: payouts on that chain aren't switched on yet (today: `solana:mainnet`); send `payout_chain: "evm:8453"` with a Base `payout_address`.
+            - `BAD_PAYOUT_ADDRESS`: no usable `payout_address` for the payout chain (required when it isn't your mint chain's family).
+            - `USE_SHIPMENT_ENDPOINT`: `kind: "shipment"`; shipments start at Create a shipment.
+            - No code: `kind` other than `sellback`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'Payouts on solana:mainnet are not switched on yet.', code: PAYOUT_CHAIN_NOT_ENABLED }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: |-
+            - `NOT_HOLDER`: that wallet does not hold the token on chain right now.
+            - `WALLET_REFUSED`: the holder or the payout address failed sanctions screening.
+            - Any of the key and program refusals every endpoint can return.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: That wallet does not hold this token., code: NOT_HOLDER }
+        '404':
+          description: '`UNKNOWN_TOKEN`: no such token on your program''s contract.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Unknown token, code: UNKNOWN_TOKEN }
+        '409':
+          description: |-
+            - `TOKEN_NOT_MINTED`: the token's mint hasn't confirmed yet.
+            - `TOKEN_BURNED`: the token was already sold back or shipped.
+            - `NO_OFFER`: the item has no sell-back offer right now.
+            - No code: your program has no contract yet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: This token has already been redeemed., code: TOKEN_BURNED }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503':
+          description: |-
+            - `CHAIN_UNAVAILABLE`: we couldn't read the token's owner from the chain; retry shortly.
+            - `SCREENING_UNAVAILABLE`: wallet screening is briefly unavailable; retry shortly.
+            - `AUTH_UNAVAILABLE`, or no code: we couldn't check your key or load your program; retry after `Retry-After`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Could not read the token owner; try again shortly., code: CHAIN_UNAVAILABLE }
+  /api/partner/v2/quotes:
+    get:
+      tags: [Sell-back]
+      operationId: listSellbackQuotes
+      summary: List sell-back quotes
+      description: Your sell-back quotes, newest first, each in the Get a sell-back quote shape.
+      parameters:
+        - name: wallet
+          in: query
+          description: The `holder` the quote was issued to, on your mint chain.
+          schema: { type: string }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of quotes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [quotes, next_cursor]
+                properties:
+                  quotes:
+                    type: array
+                    items: { $ref: '#/components/schemas/SellbackQuoteStatus' }
+                  next_cursor: { $ref: '#/components/schemas/NextCursor' }
+              example:
+                quotes:
+                  - quote_id: 0x5e0c...91ab
+                    status: redeemed
+                    amount_usd: 330
+                    holder: 0x8f3c...e21a
+                    payout: { chain: 'evm:8453', address: 0x8f3c...e21a, status: sent, tx_hash: 0x77d0..., held: false }
+                    expires_at: '2026-11-16T18:30:00.000Z'
+                    redeemed_at: '2026-11-16T18:21:13.000Z'
+                    burn_tx: 0x3be1...
+                next_cursor: null
+        '400':
+          description: |-
+            - `BAD_CURSOR`: `cursor` isn't a `next_cursor` from a previous page.
+            - `BAD_LIMIT`: `limit` isn't 1-100.
+            - `BAD_ADDRESS`: `wallet` is not an address on your mint chain.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: cursor must be a next_cursor from a previous page, code: BAD_CURSOR }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/quotes/{quoteId}:
+    get:
+      tags: [Sell-back]
+      operationId: getSellbackQuote
+      summary: Get a sell-back quote
+      description: |-
+        One sell-back quote and its payout. We count a burn after a few block confirmations (EVM) or finalization (Solana), then pay within minutes; the amount paid is always exactly `amount_usd`. Every payout status change is also sent as a `sellback.updated` webhook.
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          description: The `quote_id` from Create a sell-back quote.
+          schema: { type: string, pattern: '^0x[0-9a-f]{64}$' }
+          example: '0x5e0c7a3b1d2f4e6a8c0b9d7f5e3a1c2b4d6f8e0a9c7b5d3f1e2a4c6b8d0f91ab'
+      responses:
+        '200':
+          description: The quote.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [quote]
+                properties:
+                  quote: { $ref: '#/components/schemas/SellbackQuoteStatus' }
+              example:
+                quote:
+                  quote_id: 0x5e0c...91ab
+                  status: redeemed
+                  amount_usd: 330
+                  holder: 0x8f3c...e21a
+                  payout: { chain: 'evm:8453', address: 0x8f3c...e21a, status: sent, tx_hash: 0x77d0..., held: false }
+                  expires_at: '2026-11-16T18:30:00.000Z'
+                  redeemed_at: '2026-11-16T18:21:13.000Z'
+                  burn_tx: 0x3be1...
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: '`UNKNOWN_QUOTE`: no such sell-back quote in your program.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Unknown quote, code: UNKNOWN_QUOTE }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/shipments/estimate:
+    post:
+      tags: [Shipments]
+      operationId: estimateShipment
+      summary: Estimate a shipment
+      description: |-
+        **Rate limit:** 30 a minute, shared with Estimate a one-token shipment.
+
+        Carrier rates to ship 1-25 tokens held by one wallet in one box. Charges nothing and stores nothing. `amount` is the carrier rate; `total` is what the holder pays (the rate plus any cover premium): pass it as `max_cost` when you create the shipment. A refusal about particular tokens lists them in `token_ids`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShipmentEstimateRequest' }
+            example:
+              token_ids: ['81264573985362058461377125337283195667', '90311820476190023716442901288201455']
+              holder: 0x8f3c...e21a
+              address: { name: Alice Tester, address1: 1 Market St, address2: null, city: San Francisco, state: CA, zip: '94105', country: US, phone: '4155550100' }
+              cover_amount: null
+      responses:
+        '200':
+          description: The rates.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShippingRates' }
+              example:
+                rates:
+                  - { carrier: USPS, service: Priority Mail, token: usps_priority, amount: 9.85, estimated_days: 3, total: 9.85 }
+        '400': { $ref: '#/components/responses/ShipmentEstimateBadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/NotHolderForbidden' }
+        '404': { $ref: '#/components/responses/UnknownTokens' }
+        '409': { $ref: '#/components/responses/TokensNotLive' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ChainUnavailable' }
+  /api/partner/v2/shipments:
+    post:
+      tags: [Shipments]
+      operationId: createShipment
+      summary: Create a shipment
+      description: |-
+        Creates and opens one payment for a shipment of 1-25 tokens held by one wallet, in one box. We re-quote the chosen rate for all the tokens together. Pay it exactly like an order. Once paid, Get a shipment returns a `burn` per token; the box ships once every token is burned, within 24 hours of payment (renew a lapsed window).
+
+        `shipment_id` names the whole box; each token has its own `quote_id`, which it burns with. An unpaid shipment never expires. A replay with the same `Idempotency-Key` returns `payment` again while the shipment is unpaid (`null` once paid). [Shipping](/partner-api/v2/shipping).
+      parameters:
+        - $ref: '#/components/parameters/ShipmentIdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateShipmentRequest' }
+            example:
+              token_ids: ['81264573985362058461377125337283195667', '90311820476190023716442901288201455']
+              holder: 0x8f3c...e21a
+              address: { name: Alice Tester, address1: 1 Market St, city: San Francisco, state: CA, zip: '94105', country: US, phone: '4155550100' }
+              rate: { carrier: USPS, token: usps_priority }
+              max_cost: 9.85
+              cover_amount: null
+      responses:
+        '201':
+          description: The shipment and how to pay for it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateShipmentResponse' }
+              example:
+                shipment:
+                  shipment_id: 7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73
+                  status: awaiting_payment
+                  shipping_cost: 9.85
+                  holder: 0x8f3c...e21a
+                  expires_at: '2026-11-17T18:40:00.000Z'
+                  paid_at: null
+                  tokens:
+                    - { token_id: '90311820476190023716442901288201455', quote_id: 0x1b7c...e4a0, status: awaiting_payment, burned_at: null, burn_tx: null, burn: null }
+                    - { token_id: '81264573985362058461377125337283195667', quote_id: 0xa93f...0c2d, status: awaiting_payment, burned_at: null, burn_tx: null, burn: null }
+                  fulfilment: null
+                payment:
+                  intent_id: pi_01JE...
+                  client_secret: pi_01JE..._secret_...
+                  publishable_key: pk_live_...
+                  amount: 9.85
+                  deposit_addresses:
+                    - { chain: 'evm:8453', address: 0x5a4d...0002 }
+                    - { chain: 'solana:mainnet', address: 7kPq...Rt4w }
+        '200':
+          description: A replay of an earlier request with the same `Idempotency-Key` (`idempotent_replay` is true).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateShipmentResponse' }
+        '400': { $ref: '#/components/responses/ShipmentCreateBadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ShipmentCreateForbidden' }
+        '404': { $ref: '#/components/responses/UnknownTokens' }
+        '409': { $ref: '#/components/responses/ShipmentCreateConflict' }
+        '422': { $ref: '#/components/responses/ShipmentKeyReused' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ChainOrScreeningUnavailable' }
+    get:
+      tags: [Shipments]
+      operationId: listShipments
+      summary: List shipments
+      description: Your shipments, newest first, one-token and multi-token together, each in its Get a shipment shape.
+      parameters:
+        - name: wallet
+          in: query
+          description: The `holder`, on your mint chain.
+          schema: { type: string }
+        - name: status
+          in: query
+          description: Only shipments in this status.
+          schema:
+            type: string
+            enum: [awaiting_payment, ready, redeemed, expired, partially_redeemed]
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of shipments.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [shipments, next_cursor]
+                properties:
+                  shipments:
+                    type: array
+                    items: { $ref: '#/components/schemas/AnyShipment' }
+                  next_cursor: { $ref: '#/components/schemas/NextCursor' }
+              example:
+                shipments:
+                  - quote_id: 0xc41d...77e2
+                    status: ready
+                    shipping_cost: 9.85
+                    holder: 0x8f3c...e21a
+                    expires_at: '2026-11-17T18:41:02.000Z'
+                    paid_at: '2026-11-16T18:41:02.000Z'
+                    burn:
+                      quote: { tokenId: '81264573985362058461377125337283195667', kind: 2, quoteId: 0xc41d...77e2, holder: 0x8f3c...e21a, payoutHash: 0x9e04..., amount: '0', expiresAt: '1795458062' }
+                      signature: 0x77ab...1c
+                    fulfilment: null
+                next_cursor: null
+        '400':
+          description: |-
+            - `BAD_CURSOR`: `cursor` isn't a `next_cursor` from a previous page.
+            - `BAD_LIMIT`: `limit` isn't 1-100.
+            - `BAD_STATUS`: `status` isn't one the list filters on.
+            - `BAD_ADDRESS`: `wallet` is not an address on your mint chain.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'status must be one of awaiting_payment, ready, redeemed, expired, partially_redeemed', code: BAD_STATUS }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/tokens/{tokenId}/shipment/estimate:
+    post:
+      tags: [Shipments]
+      operationId: estimateTokenShipment
+      summary: Estimate a one-token shipment
+      description: |-
+        **Rate limit:** 30 a minute, shared with Estimate a shipment.
+
+        Carrier rates to ship one token's item to its holder. Charges nothing and stores nothing. Same as Estimate a shipment, with the token in the path.
+      parameters:
+        - $ref: '#/components/parameters/TokenId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TokenShipmentEstimateRequest' }
+            example:
+              holder: 0x8f3c...e21a
+              address: { name: Alice Tester, address1: 1 Market St, city: San Francisco, state: CA, zip: '94105', country: US, phone: '4155550100' }
+      responses:
+        '200':
+          description: The rates.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShippingRates' }
+              example:
+                rates:
+                  - { carrier: USPS, service: Priority Mail, token: usps_priority, amount: 9.85, estimated_days: 3, total: 9.85 }
+        '400': { $ref: '#/components/responses/ShipmentEstimateBadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/NotHolderForbidden' }
+        '404': { $ref: '#/components/responses/UnknownTokens' }
+        '409': { $ref: '#/components/responses/TokensNotLive' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ChainUnavailable' }
+  /api/partner/v2/tokens/{tokenId}/shipment:
+    post:
+      tags: [Shipments]
+      operationId: createTokenShipment
+      summary: Create a one-token shipment
+      description: |-
+        Creates and opens a payment for shipping one token, with the token in the path. Answers with the shipment as `quote` (no `shipment_id`, no `tokens`: the token's own `quote_id` names the shipment). It shares its `Idempotency-Key` space with Create a shipment. A token that already has a paid shipment waiting for its burn is refused with `TOKEN_IN_SHIPMENT` and that shipment's `quote_id`.
+      parameters:
+        - $ref: '#/components/parameters/TokenId'
+        - $ref: '#/components/parameters/ShipmentIdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTokenShipmentRequest' }
+            example:
+              holder: 0x8f3c...e21a
+              address: { name: Alice Tester, address1: 1 Market St, city: San Francisco, state: CA, zip: '94105', country: US, phone: '4155550100' }
+              rate: { carrier: USPS, token: usps_priority }
+              max_cost: 9.85
+      responses:
+        '201':
+          description: The shipment and how to pay for it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateTokenShipmentResponse' }
+              example:
+                quote:
+                  quote_id: 0xa93f...0c2d
+                  status: awaiting_payment
+                  shipping_cost: 9.85
+                  holder: 0x8f3c...e21a
+                  expires_at: '2026-11-17T18:40:00.000Z'
+                  paid_at: null
+                  burn: null
+                payment:
+                  intent_id: pi_01JE...
+                  client_secret: pi_01JE..._secret_...
+                  publishable_key: pk_live_...
+                  amount: 9.85
+                  deposit_addresses:
+                    - { chain: 'evm:8453', address: 0x5a4d...0002 }
+                    - { chain: 'solana:mainnet', address: 7kPq...Rt4w }
+        '200':
+          description: A replay of an earlier request with the same `Idempotency-Key` (`idempotent_replay` is true).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateTokenShipmentResponse' }
+        '400': { $ref: '#/components/responses/ShipmentCreateBadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ShipmentCreateForbidden' }
+        '404': { $ref: '#/components/responses/UnknownTokens' }
+        '409': { $ref: '#/components/responses/ShipmentCreateConflict' }
+        '422': { $ref: '#/components/responses/ShipmentKeyReused' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ChainOrScreeningUnavailable' }
+  /api/partner/v2/shipments/{id}:
+    get:
+      tags: [Shipments]
+      operationId: getShipment
+      summary: Get a shipment
+      description: |-
+        One shipment: its burn details once paid, then the box's tracking. `{id}` is a `shipment_id`, or any `quote_id` (a token in a multi-token shipment returns its whole shipment).
+
+        Once the shipping payment settles, `status` becomes `ready` and each token's `burn` holds what the holder burns it with: on EVM the signed quote for `burnWithQuote` (`kind` 2, `amount` "0"), on Solana a fresh transaction built on every GET (fetch it right before signing). The burn window is 24 hours from payment (`expires_at`), shared by every token in the shipment. We never return the delivery address or the shipping label, and never the `payment`: replay the create POST to get it.
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+      responses:
+        '200':
+          description: The shipment.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [shipment]
+                properties:
+                  shipment: { $ref: '#/components/schemas/AnyShipment' }
+              example:
+                shipment:
+                  shipment_id: 7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73
+                  status: redeemed
+                  shipping_cost: 9.85
+                  holder: 0x8f3c...e21a
+                  expires_at: '2026-11-17T18:41:02.000Z'
+                  paid_at: '2026-11-16T18:41:02.000Z'
+                  tokens:
+                    - { token_id: '90311820476190023716442901288201455', quote_id: 0x1b7c...e4a0, status: redeemed, burned_at: '2026-11-16T19:02:10.000Z', burn_tx: 0x51c0..., burn: null }
+                    - { token_id: '81264573985362058461377125337283195667', quote_id: 0xa93f...0c2d, status: redeemed, burned_at: '2026-11-16T19:04:55.000Z', burn_tx: 0x3be1..., burn: null }
+                  fulfilment:
+                    status: shipped
+                    carrier: USPS
+                    service: Priority Mail
+                    tracking_number: '9400111899223456789012'
+                    tracking_url: https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223456789012
+                    shipped_at: '2026-11-17T16:02:11.000Z'
+                    expected_delivery: '2026-11-20'
+                    delivered_at: null
+                    created_at: '2026-11-16T19:05:30.000Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/UnknownShipment' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/shipments/{id}/renew:
+    post:
+      tags: [Shipments]
+      operationId: renewShipment
+      summary: Renew a shipment's burn window
+      description: |-
+        Gives the unburned tokens of a paid shipment a new 24-hour burn window under the same `quote_id`s; the shipping already paid still counts. `{id}` is a `shipment_id` or any `quote_id`. No body. A window that is still open is returned unchanged with `renewed: false`.
+
+        If a multi-token shipment's window lapses and it isn't renewed, it closes 24 hours after `expires_at`: the tokens already burned ship, and the rest are `dropped` (still live in the holder's wallet). A one-token shipment never closes by itself, and answers in its own shape.
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+      responses:
+        '200':
+          description: The shipment, renewed or as it was.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [shipment, renewed]
+                properties:
+                  shipment: { $ref: '#/components/schemas/AnyShipment' }
+                  renewed: { type: boolean, description: 'False when the window was still open and nothing changed.' }
+              example:
+                shipment:
+                  shipment_id: 7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73
+                  status: ready
+                  shipping_cost: 9.85
+                  holder: 0x8f3c...e21a
+                  expires_at: '2026-11-19T09:12:40.000Z'
+                  paid_at: '2026-11-16T18:41:02.000Z'
+                  tokens:
+                    - { token_id: '90311820476190023716442901288201455', quote_id: 0x1b7c...e4a0, status: redeemed, burned_at: '2026-11-16T19:02:10.000Z', burn_tx: 0x51c0..., burn: null }
+                    - token_id: '81264573985362058461377125337283195667'
+                      quote_id: 0xa93f...0c2d
+                      status: ready
+                      burned_at: null
+                      burn_tx: null
+                      burn:
+                        quote: { tokenId: '81264573985362058461377125337283195667', kind: 2, quoteId: 0xa93f...0c2d, holder: 0x8f3c...e21a, payoutHash: 0x6d2e..., amount: '0', expiresAt: '1795598000' }
+                        signature: 0x2f9c...4b
+                  fulfilment: null
+                renewed: true
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/UnknownShipment' }
+        '409':
+          description: |-
+            - `NOT_PAID`: the shipping isn't paid yet.
+            - `ALREADY_REDEEMED`: the token (every token, on a multi-token shipment) was already burned and the box is shipping.
+            - `TOKEN_NOT_LIVE`: a token in the shipment was burned some other way (`token_ids` lists it).
+            - `HOLDER_CHANGED`: a token still to be burned changed hands after the shipping was paid (`token_ids` lists them on a multi-token shipment). The shipment can't be renewed: contact CatchBack support with the `shipment_id` or `quote_id`. Tokens already burned still ship once the grace period ends.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Pay for the shipping first; the burns are released once it is paid., code: NOT_PAID }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ChainUnavailable' }
+  /api/partner/v2/webhooks:
+    post:
+      tags: [Webhooks]
+      operationId: registerWebhook
+      summary: Register a webhook
+      description: |-
+        One webhook per key. The first call registers it and answers `201` with the signing secret: **the secret is shown once; store it.** Calling again changes the URL and answers `200` with `secret: null` (the secret stays the same). To get a new secret, delete the webhook and register again.
+
+        The URL must be a public `https://` URL on port 443, with a hostname (not an IP address) and no login in it, up to 2048 characters. In the sandbox `http://localhost`, `http://127.0.0.1` and `http://[::1]` on any port are also accepted. Events: `nft_order.updated`, `sellback.updated`, `nft_shipment.updated`, and `ping` from Test a webhook.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, format: uri, maxLength: 2048, description: 'A public `https://` URL.' }
+            example: { url: https://partner.example.com/catchback/webhooks }
+      responses:
+        '201':
+          description: Registered. `secret` is shown this once.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterWebhookResponse' }
+              example:
+                webhook:
+                  id: c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17
+                  url: https://partner.example.com/catchback/webhooks
+                  enabled: true
+                  created_at: '2026-11-17T10:00:00.000Z'
+                  updated_at: '2026-11-17T10:00:00.000Z'
+                secret: whsec_3f9a...
+        '200':
+          description: The URL changed. `secret` is null; the secret is unchanged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterWebhookResponse' }
+              example:
+                webhook:
+                  id: c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17
+                  url: https://partner.example.com/catchback/v2-webhooks
+                  enabled: true
+                  created_at: '2026-11-17T10:00:00.000Z'
+                  updated_at: '2026-11-18T08:30:00.000Z'
+                secret: null
+        '400':
+          description: |-
+            - `BAD_JSON`: the body isn't JSON.
+            - `INVALID_WEBHOOK_URL`: the URL isn't a public `https://` URL; the message says why.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: The webhook URL must use https., code: INVALID_WEBHOOK_URL }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: |-
+            - `KEY_ROTATED`: this key has been rotated; register the webhook with the new key.
+            - `WEBHOOK_ACCOUNT_CHANGED`: this key's webhook was registered under an earlier setup of your program; delete it and register again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: This key has been rotated; register the webhook with the new key., code: KEY_ROTATED }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/WebhooksUnavailable' }
+    get:
+      tags: [Webhooks]
+      operationId: listWebhooks
+      summary: List webhooks
+      description: This key's webhook, as a list of at most one (empty when none is set). The secret is never returned again.
+      responses:
+        '200':
+          description: The webhook, if any.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [webhooks]
+                properties:
+                  webhooks:
+                    type: array
+                    maxItems: 1
+                    items: { $ref: '#/components/schemas/Webhook' }
+              example:
+                webhooks:
+                  - id: c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17
+                    url: https://partner.example.com/catchback/webhooks
+                    enabled: true
+                    created_at: '2026-11-17T10:00:00.000Z'
+                    updated_at: '2026-11-17T10:00:00.000Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/WebhooksUnavailable' }
+  /api/partner/v2/webhooks/{id}:
+    delete:
+      tags: [Webhooks]
+      operationId: deleteWebhook
+      summary: Delete a webhook
+      description: Removes the webhook and its secret, and stops every event not yet delivered.
+      parameters:
+        - $ref: '#/components/parameters/WebhookId'
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: boolean, const: true }
+              example: { deleted: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/UnknownWebhook' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/WebhooksUnavailable' }
+  /api/partner/v2/webhooks/{id}/test:
+    post:
+      tags: [Webhooks]
+      operationId: testWebhook
+      summary: Test a webhook
+      description: |-
+        Sends one signed `ping` event to your URL right now, with no retry, and answers how your receiver responded. On a failure `delivered` is false, `response_status` is your status code (or null) and `error` a short reason. No body.
+      parameters:
+        - $ref: '#/components/parameters/WebhookId'
+      responses:
+        '200':
+          description: How your receiver responded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookTestResult' }
+              examples:
+                delivered:
+                  summary: Delivered
+                  value: { event_id: evt_9c1d4e7a2b5f8c0d3e6a9b1c4d7e0f23, delivered: true, response_status: 200, error: null }
+                failed:
+                  summary: Your receiver answered 500
+                  value: { event_id: evt_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d, delivered: false, response_status: 500, error: http_500 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/UnknownWebhook' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/WebhooksUnavailable' }
+  /api/partner/v2/revenue:
+    get:
+      tags: [Revenue]
+      operationId: getRevenue
+      summary: Get your revenue statement
+      description: |-
+        Your revenue share, month by month: one month with `period`, or the last 12 months (newest first) without it. A sale counts in the month it was paid; a refund in the month it was refunded. Amounts in USD.
+      parameters:
+        - name: period
+          in: query
+          description: One month, `YYYY-MM`.
+          schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }
+          example: 2026-11
+      responses:
+        '200':
+          description: The statement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RevenueStatement' }
+              example:
+                program: okx
+                currency: USD
+                months:
+                  - period: 2026-11
+                    orders: 412
+                    gmv: 18250
+                    share_pct: 5
+                    share_amount: 912.5
+                    refunds: { count: 3, gmv: 125, share_amount: 6.25 }
+                    net_gmv: 18125
+                    net_share: 906.25
+                    payout: { status: open, amount: null, reference: null, paid_at: null }
+        '400':
+          description: '`BAD_PERIOD`: `period` isn''t `YYYY-MM`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: period must be YYYY-MM, code: BAD_PERIOD }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/keys:
+    get:
+      tags: [Keys]
+      operationId: getKey
+      summary: Get your key
+      description: |-
+        The key you call with. Never a secret. `expires_at` is set once the key has been rotated (when it stops working); `successor` is then the key that replaced it; `rotated_from` is the key this one replaced.
+      responses:
+        '200':
+          description: The key.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [key]
+                properties:
+                  key: { $ref: '#/components/schemas/Key' }
+              example:
+                key:
+                  id: c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17
+                  name: okx-prod
+                  scopes: ['nft:orders']
+                  created_at: '2026-11-16T12:00:00.000Z'
+                  last_used_at: '2026-11-17T09:58:12.000Z'
+                  expires_at: null
+                  rotated_from: null
+                  successor: null
+                  program: okx
+        '401': { $ref: '#/components/responses/InvalidKey' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/keys/rotate:
+    post:
+      tags: [Keys]
+      operationId: rotateKey
+      summary: Rotate your key
+      description: |-
+        Issues a new key for the same program, with the same scopes. No body. **Store `key.secret` straight away.**
+
+        - The old key keeps working for 24 hours (`previous_key.expires_at`), then answers `401`.
+        - If the response is lost, call again with the same old key and the same `Idempotency-Key` within 10 minutes, before you use the new key: you get the same new key and secret back (`200`, `idempotent_replay: true`). After that the replay is `409` `ALREADY_ROTATED`.
+        - A key is rotated once; rotate the new key next time.
+        - Your webhook moves to the new key (same URL, same secret), and the old key's stops.
+      parameters:
+        - $ref: '#/components/parameters/RotateIdempotencyKey'
+      responses:
+        '201':
+          description: The new key, with its secret.
+          headers:
+            Cache-Control:
+              description: '`no-store`.'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RotateKeyResponse' }
+              example:
+                key: { id: 9a41d7e2-3b5c-4d6e-8f0a-1b2c3d4e5f60, name: okx-prod-r2, secret: cb_live_7c1e..., created_at: '2026-11-17T10:00:00.000Z' }
+                previous_key: { id: c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17, expires_at: '2026-11-18T10:00:00.000Z' }
+        '200':
+          description: A replay within 10 minutes, before the new key was used (`idempotent_replay` is true). Same key, same secret.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RotateKeyResponse' }
+        '400':
+          description: '`BAD_IDEMPOTENCY_KEY`: `Idempotency-Key` missing, or not 8-128 characters of `A-Za-z0-9_-`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'Idempotency-Key must be 8-128 characters of A-Z, a-z, 0-9, _ or -.', code: BAD_IDEMPOTENCY_KEY }
+        '401': { $ref: '#/components/responses/InvalidKey' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: '`ALREADY_ROTATED`: this key was already rotated with a different `Idempotency-Key`, or the replay window has passed. The body has `successor` (`id`, `name`) and `expires_at`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: This key was already rotated. Use its successor, or retry with the original Idempotency-Key.
+                code: ALREADY_ROTATED
+                successor: { id: 9a41d7e2-3b5c-4d6e-8f0a-1b2c3d4e5f60, name: okx-prod-r2 }
+                expires_at: '2026-11-18T10:00:00.000Z'
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/keys/revoke-previous:
+    post:
+      tags: [Keys]
+      operationId: revokePreviousKey
+      summary: Revoke the previous key
+      description: |-
+        Call it with the **new** key once every server uses it. The key it replaced stops working immediately instead of at the end of the 24 hours, and its webhook stops with it. Do this whenever you rotate because a key may have leaked. No body.
+      responses:
+        '200':
+          description: The previous key is revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revoked]
+                properties:
+                  revoked:
+                    type: object
+                    required: [id, at]
+                    properties:
+                      id: { type: string, format: uuid, description: 'The key this one replaced.' }
+                      at: { type: string, format: date-time }
+              example: { revoked: { id: c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17, at: '2026-11-17T10:05:00.000Z' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: '`NO_PREVIOUS_KEY`: this key didn''t replace another key.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: This key did not replace another key., code: NO_PREVIOUS_KEY }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/sandbox/payments/{intentId}:
+    post:
+      tags: [Sandbox]
+      operationId: sandboxPay
+      summary: Simulate a payment
+      description: |-
+        **Sandbox only: `404` in production.**
+
+        Pays an order's, a multi-pack order's, a shipment's or a multi-token shipment's sandbox Payment Intent, exactly as a settled payment would, then delivers any webhooks it produced. Paying twice changes nothing.
+      parameters:
+        - name: intentId
+          in: path
+          required: true
+          description: The `payment.intent_id` from the create response. Sandbox intent ids start `sbx_pi_`.
+          schema: { type: string }
+          example: sbx_pi_01JD4X7Q2M9N
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount: { type: number, exclusiveMinimum: 0, description: 'Dollars paid. Default: the full amount. Send less to test the 1% tolerance and an `underpaid` refund.' }
+            example: { amount: 25 }
+      responses:
+        '200':
+          description: Paid.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SandboxPaymentResult' }
+              examples:
+                order:
+                  summary: An order
+                  value: { paid: true, kind: order, status: paid, order_status: paid, webhooks: { delivered: 1, retrying: 0 } }
+                shipment:
+                  summary: A shipment
+                  value: { paid: true, kind: shipment, status: ready, shipment_status: ready, webhooks: { delivered: 1, retrying: 0 } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: |-
+            - `UNKNOWN_PAYMENT`: no such payment in your program.
+            - No code (`Not found`): not the sandbox.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Unknown payment, code: UNKNOWN_PAYMENT }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/sandbox/tick:
+    post:
+      tags: [Sandbox]
+      operationId: sandboxTick
+      summary: Run the background work
+      description: |-
+        **Sandbox only: `404` in production.**
+
+        Runs one pass of what production does every two minutes (open paid packs, mint, confirm mints, watch the chain for transfers and burns, pay out, create shipments, close lapsed multi-token shipments, expire unpaid orders), then delivers the webhooks those steps produced. No body. Call it between the steps of a flow instead of waiting.
+      responses:
+        '200':
+          description: The pass ran.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SandboxTickResult' }
+              example: { ran: true, errors: 0, webhooks: { delivered: 2, retrying: 0 } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotSandbox' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502':
+          description: The pass didn't run (`ran` is false). Retry.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SandboxTickResult' }
+              example: { ran: false, errors: 0, webhooks: { delivered: 0, retrying: 0 } }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner/v2/sandbox/shipments/{id}:
+    post:
+      tags: [Sandbox]
+      operationId: sandboxShip
+      summary: Mark a shipment shipped or delivered
+      description: |-
+        **Sandbox only: `404` in production.**
+
+        Plays our shipping team, so you can build and test your tracking screens. `shipped` marks a burned shipment shipped, with a test USPS tracking number, a tracking link, `shipped_at` and an `expected_delivery` three days out; `delivered` then sets `delivered_at`. Read the result with Get a shipment. It also delivers any webhooks the change produced.
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [shipped, delivered] }
+            example: { status: shipped }
+      responses:
+        '200':
+          description: Done.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, status, webhooks]
+                properties:
+                  ok: { type: boolean, const: true }
+                  status: { type: string, enum: [shipped, delivered], description: 'The status you set.' }
+                  webhooks: { $ref: '#/components/schemas/SandboxWebhookDeliveries' }
+              example: { ok: true, status: shipped, webhooks: { delivered: 1, retrying: 0 } }
+        '400':
+          description: '`status` isn''t `shipped` or `delivered` (no `code`).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: "status must be 'shipped' or 'delivered'" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: |-
+            - `UNKNOWN_SHIPMENT`: no such shipment in your program.
+            - No code (`Not found`): not the sandbox.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Unknown shipment, code: UNKNOWN_SHIPMENT }
+        '409':
+          description: '`NOT_BURNED`: the shipment has no shipping order yet: burn every token, then tick.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'No shipping order for this shipment yet: burn it and tick first', code: NOT_BURNED }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+  /api/partner-nfts/metadata/{chainId}/{tokenId}:
+    get:
+      tags: [Metadata]
+      operationId: getEvmTokenMetadata
+      summary: Token metadata (EVM)
+      description: |-
+        **No key.** A token's standard NFT metadata: the token's `tokenURI`. Wallets and marketplaces read it from anywhere. It never includes a price or value of any kind. Cached for a few minutes (`Cache-Control: public, s-maxage=300`). A token whose mint hasn't been sent yet answers `404`. A trailing `.json` on the last segment is accepted.
+      security:
+        - {}
+      parameters:
+        - name: chainId
+          in: path
+          required: true
+          description: The numeric chain id of your mint chain.
+          schema: { type: string, pattern: '^[0-9]{1,12}$' }
+          example: '196'
+        - name: tokenId
+          in: path
+          required: true
+          description: The decimal `token_id`.
+          schema: { type: string, pattern: '^[0-9]{1,78}(\.json)?$' }
+          example: '81264573985362058461377125337283195667'
+      responses:
+        '200': { $ref: '#/components/responses/TokenMetadata' }
+        '404': { $ref: '#/components/responses/UnknownMetadataToken' }
+        '503': { $ref: '#/components/responses/MetadataUnavailable' }
+  /api/partner-nfts/metadata/{id}:
+    get:
+      tags: [Metadata]
+      operationId: getSolanaTokenMetadata
+      summary: Token metadata (Solana)
+      description: |-
+        **No key.** A Solana asset's standard NFT metadata: the asset's `uri`. Same body and rules as the EVM form. `{id}` is our id for the asset (a UUID), as the asset's `uri` names it.
+      security:
+        - {}
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Our id for the asset.
+          schema: { type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\.json)?$' }
+          example: 4b8e0f2a-91c3-4d5e-87f6-a0b1c2d3e4f5
+      responses:
+        '200': { $ref: '#/components/responses/TokenMetadata' }
+        '404': { $ref: '#/components/responses/UnknownMetadataToken' }
+        '503': { $ref: '#/components/responses/MetadataUnavailable' }
+webhooks:
+  nft_order.updated:
+    post:
+      tags: [Webhook events]
+      operationId: nftOrderUpdatedEvent
+      summary: Order updated
+      description: |-
+        **We send this to your webhook URL.** An order changed status after you created it: `paid`, `rolled`, `minted`, `mint_failed`, `expired`, `refund_due`, `refunded`. `data.order` is the order as Get an order returns it. For a multi-pack order it fires for each unit, carrying the order's `order_id`, its `batch_id` and the `unit` number.
+
+        The payload is the current state, not a diff: several quick changes can arrive as one event with the latest status, and an intermediate status may never be sent on its own. Setup, signatures and retries: [Webhooks](/partner-api/v2/webhooks).
+      security:
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/WebhookSignature'
+        - $ref: '#/components/parameters/WebhookEvent'
+        - $ref: '#/components/parameters/WebhookEventId'
+        - $ref: '#/components/parameters/WebhookAttempt'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/WebhookEnvelope'
+                - type: object
+                  properties:
+                    type: { const: nft_order.updated }
+                    data:
+                      type: object
+                      required: [order]
+                      properties:
+                        order: { $ref: '#/components/schemas/OrderOrUnit' }
+            example:
+              id: evt_4b8e0f2a91c3d5e7f6a0b1c2d3e4f5a6
+              type: nft_order.updated
+              created_at: '2026-11-16T18:04:52.118Z'
+              data:
+                order:
+                  order_id: okx-ord-7f3a9c21
+                  id: 3d2b8f0e-6c1a-4f7e-9a51-2b0d8c4e7f13
+                  status: minted
+                  pack_type: bronze
+                  category: pokemon
+                  odds: standard
+                  price: 25
+                  recipient: 0x8f3c...e21a
+                  mint_chain: 'evm:196'
+                  paid_at: '2026-11-16T18:04:40.002Z'
+                  pull: { card_id: a1c4e2f8-7b3d-4c5e-9f1a-2b3c4d5e6f70, category: pokemon, name: Charizard ex 199/165 PSA 10, value: 412.5, pulled_at: '2026-11-16T18:04:41.317Z' }
+                  token: { chain: 'evm:196', contract: 0x7b1e...c0de, token_id: '81264573985362058461377125337283195667', status: confirmed, tx: 0x9f2a... }
+                  failure_reason: null
+                  created_at: '2026-11-16T18:02:11.420Z'
+      responses:
+        '200': { $ref: '#/components/responses/WebhookAck' }
+  sellback.updated:
+    post:
+      tags: [Webhook events]
+      operationId: sellbackUpdatedEvent
+      summary: Sell-back updated
+      description: |-
+        **We send this to your webhook URL.** A sell-back payout changed status: `pending` (the burn was seen), `sending`, `sent`, `held`, `failed`. `data.quote` is the quote as Get a sell-back quote returns it. Setup, signatures and retries: [Webhooks](/partner-api/v2/webhooks).
+      security:
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/WebhookSignature'
+        - $ref: '#/components/parameters/WebhookEvent'
+        - $ref: '#/components/parameters/WebhookEventId'
+        - $ref: '#/components/parameters/WebhookAttempt'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/WebhookEnvelope'
+                - type: object
+                  properties:
+                    type: { const: sellback.updated }
+                    data:
+                      type: object
+                      required: [quote]
+                      properties:
+                        quote: { $ref: '#/components/schemas/SellbackQuoteStatus' }
+            example:
+              id: evt_7d1c3a5e9b2f4c6e8a0d1b3c5e7f9a12
+              type: sellback.updated
+              created_at: '2026-11-16T18:23:40.551Z'
+              data:
+                quote:
+                  quote_id: 0x5e0c...91ab
+                  status: redeemed
+                  amount_usd: 330
+                  holder: 0x8f3c...e21a
+                  payout: { chain: 'evm:8453', address: 0x8f3c...e21a, status: sent, tx_hash: 0x77d0..., held: false }
+                  expires_at: '2026-11-16T18:30:00.000Z'
+                  redeemed_at: '2026-11-16T18:21:13.000Z'
+                  burn_tx: 0x3be1...
+      responses:
+        '200': { $ref: '#/components/responses/WebhookAck' }
+  nft_shipment.updated:
+    post:
+      tags: [Webhook events]
+      operationId: nftShipmentUpdatedEvent
+      summary: Shipment updated
+      description: |-
+        **We send this to your webhook URL.** A shipment was paid (`ready`), a token was burned (`redeemed`), or the box moved: `fulfilment.status` `pending`, `processing`, `shipped`, `delivered`, `cancelled`, `needs_review`.
+
+        `data.shipment` has the fields of the one-token shape: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `burn` and `fulfilment`. In a multi-token shipment each event is about one token (its `quote_id`); Get a shipment with that `quote_id` returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction. A burn window lapsing sends no event. Setup, signatures and retries: [Webhooks](/partner-api/v2/webhooks).
+      security:
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/WebhookSignature'
+        - $ref: '#/components/parameters/WebhookEvent'
+        - $ref: '#/components/parameters/WebhookEventId'
+        - $ref: '#/components/parameters/WebhookAttempt'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/WebhookEnvelope'
+                - type: object
+                  properties:
+                    type: { const: nft_shipment.updated }
+                    data:
+                      type: object
+                      required: [shipment]
+                      properties:
+                        shipment: { $ref: '#/components/schemas/TokenShipment' }
+            example:
+              id: evt_2e4a6c8e0b1d3f5a7c9e1b3d5f7a9c0e
+              type: nft_shipment.updated
+              created_at: '2026-11-17T16:04:02.010Z'
+              data:
+                shipment:
+                  quote_id: 0xa93f...0c2d
+                  status: redeemed
+                  shipping_cost: 9.85
+                  holder: 0x8f3c...e21a
+                  expires_at: '2026-11-17T18:41:02.000Z'
+                  paid_at: '2026-11-16T18:41:02.000Z'
+                  burn: null
+                  fulfilment:
+                    status: shipped
+                    carrier: USPS
+                    service: Priority Mail
+                    tracking_number: '9400111899223456789012'
+                    tracking_url: https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223456789012
+                    shipped_at: '2026-11-17T16:02:11.000Z'
+                    expected_delivery: '2026-11-20'
+                    delivered_at: null
+                    created_at: '2026-11-16T19:05:30.000Z'
+      responses:
+        '200': { $ref: '#/components/responses/WebhookAck' }
+  ping:
+    post:
+      tags: [Webhook events]
+      operationId: pingEvent
+      summary: Ping
+      description: |-
+        **We send this to your webhook URL** when you call Test a webhook: once, with no retry. Use it to check your receiver and your signature check.
+      security:
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/WebhookSignature'
+        - $ref: '#/components/parameters/WebhookEvent'
+        - $ref: '#/components/parameters/WebhookEventId'
+        - $ref: '#/components/parameters/WebhookAttempt'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/WebhookEnvelope'
+                - type: object
+                  properties:
+                    type: { const: ping }
+                    data:
+                      type: object
+                      required: [webhook_id]
+                      properties:
+                        webhook_id: { type: string, format: uuid, description: 'The webhook''s `id`.' }
+            example:
+              id: evt_9c1d4e7a2b5f8c0d3e6a9b1c4d7e0f23
+              type: ping
+              created_at: '2026-11-17T10:01:00.000Z'
+              data: { webhook_id: c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17 }
+      responses:
+        '200': { $ref: '#/components/responses/WebhookAck' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: cb_live_<48 hex>
+      description: 'Your API key (`cb_live_…`), sent as a bearer token, with the scope `nft:orders`. Keep it on your servers: never in a browser, app or wallet. Use a separate key per environment. A request from a country on our sanctions list gets a `403` with `Access denied`, whether or not it has a valid key. See [Authentication and keys](/partner-api/v2/authentication).'
+  parameters:
+    OrderIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Your own order id, 8-128 characters of `A-Za-z0-9_-`, one per order. It becomes the order's `order_id`. Retry a timed-out or `500` call with the same key. The same key with a different request (`pack_type`, `category`, resolved `odds`, `quantity`, `recipient`, `refund_address`) is `422`.
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
+      example: okx-ord-7f3a9c21
+    ShipmentIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Your own shipment id, 8-128 characters of `A-Za-z0-9_-`. Both shipment endpoints share one key space. The same key with a different request (tokens in any order, `holder`, `address`, `rate`, `cover_amount`) is `422`.
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
+      example: okx-ship-1c9e04
+    RotateIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 8-128 characters of `A-Za-z0-9_-`. Reuse it within 10 minutes to get a lost new key back.
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
+      example: okx-rotate-2026-11
+    PackCategory:
+      name: category
+      in: query
+      description: The catalog.
+      schema: { $ref: '#/components/schemas/PackCategory' }
+    WalletFilter:
+      name: wallet
+      in: query
+      description: A `recipient` address on your mint chain.
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      description: Page size, 1-100.
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    Cursor:
+      name: cursor
+      in: query
+      description: The `next_cursor` of the previous page, unchanged. Omit for the first page.
+      schema: { type: string, maxLength: 400 }
+    OrderId:
+      name: id
+      in: path
+      required: true
+      description: Our order `id` (a UUID), or the `Idempotency-Key` you sent. A unit's `id` returns that unit.
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
+      example: okx-ord-7f3a9c21
+    TokenId:
+      name: tokenId
+      in: path
+      required: true
+      description: The token's decimal `token_id`, on either chain family. Keep it as a string or bigint, never a JS number.
+      schema: { type: string, pattern: '^[0-9]{1,78}$' }
+      example: '81264573985362058461377125337283195667'
+    ShipmentId:
+      name: id
+      in: path
+      required: true
+      description: A `shipment_id` (a UUID), or any token's `quote_id` (`0x` + 64 hex).
+      schema: { type: string, pattern: '^(0x[0-9a-f]{64}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$' }
+      example: 7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73
+    WebhookId:
+      name: id
+      in: path
+      required: true
+      description: The webhook's `id`. Any other id is `404` `UNKNOWN_WEBHOOK`.
+      schema: { type: string, format: uuid }
+      example: c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17
+    WebhookSignature:
+      name: X-CatchBack-Signature
+      in: header
+      required: true
+      description: '`t=<unix seconds>,v1=<hex>`. `v1` is the HMAC-SHA256 of `<t>.<raw request body>`, keyed with your whole secret, `whsec_` included. Compute it over the raw bytes before any JSON parsing, compare in constant time, and refuse a `t` more than 300 seconds from your clock. Each retry is signed afresh.'
+      schema: { type: string }
+      example: t=1795370692,v1=d93da821be64a143bbacb3c0e47e37a90f72c6747b8b9bc3571abf03fcabf66c
+    WebhookEvent:
+      name: X-CatchBack-Event
+      in: header
+      required: true
+      description: The event's `type`.
+      schema: { type: string }
+    WebhookEventId:
+      name: X-CatchBack-Event-Id
+      in: header
+      required: true
+      description: The event's `id`, which stays the same on every retry. Dedupe on it.
+      schema: { type: string }
+    WebhookAttempt:
+      name: X-CatchBack-Attempt
+      in: header
+      required: true
+      description: Which try this is, from 1 to 8.
+      schema: { type: integer, minimum: 1, maximum: 8 }
+  headers:
+    RetryAfter:
+      description: Seconds to wait before retrying.
+      schema: { type: integer, minimum: 1 }
+  responses:
+    Unauthorized:
+      description: |-
+        - `Missing or malformed API key`: no `Bearer cb_live_…` header.
+        - `Invalid API key`: unknown or disabled, or a rotated key past its 24 hours.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Missing or malformed API key }
+    InvalidKey:
+      description: |-
+        - `Missing or malformed API key`, or `Invalid API key`, as on every endpoint.
+        - `INVALID_KEY`: the key is disabled, or a rotated key past its 24 hours.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Invalid API key, code: INVALID_KEY }
+    Forbidden:
+      description: |-
+        - `API key lacks required scope: nft:orders`.
+        - `NO_PROGRAM`: the key isn't linked to a partner program.
+        - `PROGRAM_INACTIVE`: your program is not live.
+        - `NOT_AVAILABLE`: wallet orders aren't switched on for your program yet.
+        - `Access denied`: a request from a country on our sanctions list.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: This partner program is not live, code: PROGRAM_INACTIVE }
+    RateLimited:
+      description: '`RATE_LIMITED`: too many requests from this key. Wait `retry_after_seconds`. Limits per key: `POST /orders` 30 a minute; the two shipment estimates 30 a minute together; every other endpoint 120 a minute together.'
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Too many requests. Slow down., code: RATE_LIMITED, retry_after_seconds: 23 }
+    AuthUnavailable:
+      description: '`AUTH_UNAVAILABLE`, or no code: we couldn''t check your key or load your program right now. This never means the key is bad; retry after `Retry-After`.'
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Could not load the partner program; try again. }
+    ServerError:
+      description: Our fault. Retry with backoff, with the same `Idempotency-Key` where the endpoint takes one.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Something went wrong; retry with the same Idempotency-Key. }
+    NotSandbox:
+      description: Not the sandbox. Every sandbox endpoint answers this in production.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Not found }
+    UnknownTokens:
+      description: '`UNKNOWN_TOKEN`: no such token on your program''s contract. On Create a shipment and Estimate a shipment, `token_ids` lists the unknown ones.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Unknown token, code: UNKNOWN_TOKEN, token_ids: ['90311820476190023716442901288201455'] }
+    TokensNotLive:
+      description: '`TOKEN_NOT_LIVE`: the token isn''t minted yet, or was already burned. On the multi-token endpoints `token_ids` lists them.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: These tokens are not live., code: TOKEN_NOT_LIVE, token_ids: ['90311820476190023716442901288201455'] }
+    NotHolderForbidden:
+      description: |-
+        - `NOT_HOLDER`: that wallet does not hold the token on chain right now. On the multi-token endpoints `token_ids` lists the tokens it doesn't hold.
+        - Any of the key and program refusals every endpoint can return.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: 'That wallet does not hold every token: one shipment is for one holder.', code: NOT_HOLDER, token_ids: ['90311820476190023716442901288201455'] }
+    ChainUnavailable:
+      description: |-
+        - `CHAIN_UNAVAILABLE`: we couldn't read a token's owner from the chain; retry shortly.
+        - `AUTH_UNAVAILABLE`, or no code: we couldn't check your key or load your program; retry after `Retry-After`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Could not read the token owner; try again shortly., code: CHAIN_UNAVAILABLE }
+    ChainOrScreeningUnavailable:
+      description: |-
+        - `CHAIN_UNAVAILABLE`: we couldn't read a token's owner from the chain; retry shortly with the same `Idempotency-Key`.
+        - `SCREENING_UNAVAILABLE`: wallet screening is briefly unavailable; retry shortly with the same `Idempotency-Key`.
+        - `AUTH_UNAVAILABLE`, or no code: we couldn't check your key or load your program; retry after `Retry-After`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: This wallet cannot redeem right now., code: SCREENING_UNAVAILABLE }
+    ShipmentEstimateBadRequest:
+      description: |-
+        - `BAD_JSON`: the body isn't JSON.
+        - `BAD_TOKEN_IDS`: `token_ids` isn't a list of 1-25 distinct decimal token id strings (Estimate a shipment only).
+        - `BAD_HOLDER`: `holder` is not a wallet address on your mint chain.
+        - `BAD_ADDRESS`: the shipping address is invalid; `fields` maps each bad field to a message.
+        - `BAD_COVER`: `cover_amount` isn't a positive dollar amount with at most two decimals.
+        - `COVER_NOT_ALLOWED`: `cover_amount` is outside what the items can be insured for; the body has `order_value`, `min_cover` and `max_cover` (`max_cover` is null when they can't be insured).
+        - `NOT_SHIPPABLE`: an item can't ship.
+        - `PARTNER_GOODS`: the item is held by its brand partner and can't ship through CatchBack; it can still be sold back.
+        - `COUNTRY_NOT_SUPPORTED`: we don't ship to that country.
+        - `OVER_CUSTOMS_CAP`: the items are worth more than we can ship internationally.
+
+        A refusal about particular tokens lists them in `token_ids`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Some address fields are invalid., code: BAD_ADDRESS, fields: { phone: phone is required outside the US } }
+    ShipmentCreateBadRequest:
+      description: |-
+        - `BAD_IDEMPOTENCY_KEY`: `Idempotency-Key` missing, or not 8-128 characters of `A-Za-z0-9_-`.
+        - `BAD_JSON`: the body isn't JSON.
+        - `BAD_TOKEN_IDS`: `token_ids` isn't a list of 1-25 distinct decimal token id strings (Create a shipment only).
+        - `BAD_HOLDER`: `holder` is not a wallet address on your mint chain.
+        - `BAD_ADDRESS`: the shipping address is invalid; `fields` maps each bad field to a message.
+        - `BAD_COVER`: `cover_amount` isn't a positive dollar amount with at most two decimals.
+        - `COVER_NOT_ALLOWED`: `cover_amount` is outside what the items can be insured for; the body has `order_value`, `min_cover` and `max_cover`.
+        - `BAD_MAX_COST`: `max_cost` missing or not positive.
+        - `NOT_SHIPPABLE`, `PARTNER_GOODS`, `COUNTRY_NOT_SUPPORTED`, `OVER_CUSTOMS_CAP`: as on the estimate.
+
+        A refusal about particular tokens lists them in `token_ids`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: 'max_cost (the most the holder will pay for shipping, in dollars) is required', code: BAD_MAX_COST }
+    ShipmentCreateForbidden:
+      description: |-
+        - `NOT_HOLDER`: that wallet does not hold the token(s) on chain right now (`token_ids` on Create a shipment).
+        - `WALLET_REFUSED`: the holder failed sanctions screening.
+        - Any of the key and program refusals every endpoint can return.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: This wallet cannot redeem right now., code: WALLET_REFUSED }
+    ShipmentCreateConflict:
+      description: |-
+        - `TOKEN_NOT_LIVE`: a token isn't minted yet, or was already burned (`token_ids` lists them on Create a shipment).
+        - `TOKEN_IN_SHIPMENT`: a token already has a paid shipment waiting for its burn; `token_ids` lists them (and `quote_id` on the one-token endpoint). Burn or renew that shipment instead.
+        - `RATE_UNAVAILABLE`: the carrier no longer offers that rate; estimate again.
+        - `COVER_UNAVAILABLE`: the chosen service has no cover option; choose another rate or leave `cover_amount` out.
+        - `PRICE_CHANGED`: the shipping cost is now above `max_cost`; the body has the current `amount`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: The shipping cost is now above max_cost., code: PRICE_CHANGED, amount: 10.4 }
+    ShipmentKeyReused:
+      description: '`IDEMPOTENCY_KEY_REUSED`: the key was already used for a different shipment.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: This Idempotency-Key was already used for a different shipment., code: IDEMPOTENCY_KEY_REUSED }
+    UnknownShipment:
+      description: '`UNKNOWN_SHIPMENT`: no such shipment in your program.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Unknown shipment, code: UNKNOWN_SHIPMENT }
+    UnknownWebhook:
+      description: '`UNKNOWN_WEBHOOK`: no such webhook on this key.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Unknown webhook, code: UNKNOWN_WEBHOOK }
+    WebhooksUnavailable:
+      description: |-
+        - `WEBHOOKS_UNAVAILABLE`: webhooks aren't available on this server yet.
+        - `AUTH_UNAVAILABLE`, or no code: we couldn't check your key or load your program; retry after `Retry-After`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Webhooks are not available on this server yet., code: WEBHOOKS_UNAVAILABLE }
+    TokenMetadata:
+      description: The token's metadata.
+      headers:
+        Cache-Control:
+          description: '`public, s-maxage=300, stale-while-revalidate=3600`.'
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TokenMetadata' }
+          example:
+            name: Charizard ex 199/165 (PSA 10)
+            description: A physical collectible held in the CatchBack vault. Burn this token to sell it back or have it shipped.
+            image: https://...
+            external_url: https://catchbackcards.com
+            attributes:
+              - { trait_type: Category, value: pokemon }
+              - { trait_type: Grade, value: PSA 10 }
+              - { trait_type: Status, value: Vaulted }
+    UnknownMetadataToken:
+      description: No such token, or its mint hasn't been sent yet.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Unknown token }
+    MetadataUnavailable:
+      description: Briefly unavailable; retry shortly.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Unavailable }
+    WebhookAck:
+      description: Answer any `2xx` within 5 seconds, and do slow work after you've answered. Anything else counts as a failure, including a redirect (we never follow one). We retry after 1 minute, 5 minutes, 30 minutes, 2, 6, 12 and 24 hours, then drop the event after 8 attempts; poll to catch up. Delivery is at-least-once and unordered, so dedupe on `id`.
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      description: Every error body. `code` is stable where you might branch on it; some errors add the fields below.
+      properties:
+        error: { type: string, description: 'For people. The text can change, so branch on the status and the `code`.' }
+        code:
+          description: Machine-readable, where you might branch on it. New codes can be added, so treat an unknown one like a missing one.
+          anyOf:
+            - $ref: '#/components/schemas/ErrorCode'
+            - type: string
+        retry_after_seconds: { type: integer, description: 'On `RATE_LIMITED`.' }
+        odds:
+          description: 'On `BAD_ODDS` when the pack sells other odds: the choices it sells. On `ODDS_UNAVAILABLE` from Create an order: the choice asked for.'
+          oneOf:
+            - type: array
+              items: { $ref: '#/components/schemas/Odds' }
+            - $ref: '#/components/schemas/Odds'
+        reason: { type: [string, 'null'], description: 'On `PACK_UNAVAILABLE`, why the pack can''t open.' }
+        status: { type: string, description: 'On `NOT_PULLED`, the order''s status.' }
+        token_ids:
+          type: array
+          items: { type: string }
+          description: On a refusal about particular tokens, the token ids it is about.
+        quote_id: { type: string, description: 'On `TOKEN_IN_SHIPMENT` from the one-token endpoint, the shipment waiting for the burn.' }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+          description: On `BAD_ADDRESS` from a shipment or estimate, each bad address field and what is wrong with it.
+        order_value: { type: number, description: 'On `COVER_NOT_ALLOWED`.' }
+        min_cover: { type: number, description: 'On `COVER_NOT_ALLOWED`.' }
+        max_cover: { type: [number, 'null'], description: 'On `COVER_NOT_ALLOWED`; null when the items can''t be insured.' }
+        amount: { type: number, description: 'On `PRICE_CHANGED`, the current shipping cost.' }
+        successor:
+          type: object
+          description: On `ALREADY_ROTATED`, the key that replaced this one.
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        expires_at: { type: [string, 'null'], format: date-time, description: 'On `ALREADY_ROTATED`, when this key stops working.' }
+    NextCursor:
+      type: [string, 'null']
+      description: Pass it back unchanged as `cursor` for the next page. Opaque. Null on the last page.
+    ErrorCode:
+      type: string
+      description: Every `code` v2 returns. Branch on these, never on the message text.
+      enum:
+        - RATE_LIMITED
+        - AUTH_UNAVAILABLE
+        - NO_PROGRAM
+        - PROGRAM_INACTIVE
+        - NOT_AVAILABLE
+        - BAD_JSON
+        - BAD_IDEMPOTENCY_KEY
+        - IDEMPOTENCY_KEY_REUSED
+        - BAD_RECIPIENT
+        - BAD_PACK
+        - BAD_CATEGORY
+        - BAD_ODDS
+        - BAD_QUANTITY
+        - ODDS_UNAVAILABLE
+        - BAD_REFUND_ADDRESS
+        - PACK_NOT_OFFERED
+        - PACK_UNAVAILABLE
+        - WALLET_REFUSED
+        - WALLET_BLOCKED
+        - SCREENING_UNAVAILABLE
+        - UNKNOWN_ORDER
+        - NOT_PULLED
+        - VERIFY_UNAVAILABLE
+        - BAD_CURSOR
+        - BAD_LIMIT
+        - BAD_STATUS
+        - BAD_ADDRESS
+        - BAD_PARTNER_USER_REF
+        - TOO_MANY_WALLETS
+        - UNKNOWN_TOKEN
+        - BAD_HOLDER
+        - NOT_HOLDER
+        - CHAIN_UNAVAILABLE
+        - TOKEN_NOT_MINTED
+        - TOKEN_BURNED
+        - TOKEN_NOT_LIVE
+        - NO_OFFER
+        - PAYOUT_CHAIN_NOT_SUPPORTED
+        - PAYOUT_CHAIN_NOT_ENABLED
+        - BAD_PAYOUT_ADDRESS
+        - USE_SHIPMENT_ENDPOINT
+        - BAD_TOKEN_IDS
+        - TOKEN_IN_SHIPMENT
+        - BAD_COVER
+        - COVER_NOT_ALLOWED
+        - COVER_UNAVAILABLE
+        - BAD_MAX_COST
+        - NOT_SHIPPABLE
+        - PARTNER_GOODS
+        - COUNTRY_NOT_SUPPORTED
+        - OVER_CUSTOMS_CAP
+        - RATE_UNAVAILABLE
+        - PRICE_CHANGED
+        - UNKNOWN_SHIPMENT
+        - NOT_PAID
+        - ALREADY_REDEEMED
+        - HOLDER_CHANGED
+        - UNKNOWN_QUOTE
+        - INVALID_WEBHOOK_URL
+        - WEBHOOK_ACCOUNT_CHANGED
+        - WEBHOOKS_UNAVAILABLE
+        - UNKNOWN_WEBHOOK
+        - KEY_ROTATED
+        - BAD_PERIOD
+        - INVALID_KEY
+        - NO_PREVIOUS_KEY
+        - ALREADY_ROTATED
+        - UNKNOWN_PAYMENT
+        - NOT_BURNED
+    ChainKey:
+      type: string
+      description: 'A chain as `<family>:<id>`: `evm:8453` is Base, `evm:<chainId>` any other EVM chain (e.g. `evm:196`, X Layer), `solana:mainnet` Solana. The sandbox uses a public testnet.'
+      pattern: '^(evm:[0-9]+|solana:(mainnet|devnet))$'
+      examples: ['evm:196']
+    PackCategory:
+      type: string
+      enum: [pokemon, onepiece, sports, riftbound, watches, goods]
+      default: pokemon
+      description: '`goods` packs hold streetwear and jewelry. Raw singles have no category of their own: they come out of other categories'' packs.'
+    Odds:
+      type: string
+      enum: [standard, hot, chill, classic]
+      description: |-
+        The odds a pack is opened at, as in our app's picker. Standard, Hot and Chill share one value-band ladder and differ only in the chance of each band; Classic is the pack's own bands and chances. A pack that sells only its own odds sells just `classic`. [Odds](/partner-api/v2/odds).
+    Item:
+      type: object
+      description: An item's catalog fields. Which fields an item has depends on its category; every one can be absent or null.
+      required: [id, category]
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        category: { $ref: '#/components/schemas/PackCategory' }
+        name: { type: [string, 'null'] }
+        set: { type: [string, 'null'] }
+        year: { type: [string, integer, 'null'] }
+        number: { type: [string, 'null'] }
+        variant: { type: [string, 'null'] }
+        rarity: { type: [string, 'null'], description: 'Print rarity, e.g. "Rare Holo".' }
+        card_type: { type: [string, 'null'] }
+        language: { type: [string, 'null'] }
+        slab_label: { type: [string, 'null'] }
+        grading_company: { type: [string, 'null'] }
+        grading_rank: { type: [number, string, 'null'] }
+        card_condition: { type: [string, 'null'] }
+        cert_number: { type: [string, 'null'] }
+        brand: { type: [string, 'null'] }
+        reference_number: { type: [string, 'null'] }
+        condition: { type: [string, 'null'] }
+        size: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        video_url: { type: [string, 'null'] }
+        sport: { type: [string, 'null'] }
+        player_name: { type: [string, 'null'] }
+        team: { type: [string, 'null'] }
+        manufacturer: { type: [string, 'null'] }
+        parallel: { type: [string, 'null'] }
+        is_rookie: { type: [boolean, 'null'] }
+        is_autograph: { type: [boolean, 'null'] }
+        is_memorabilia: { type: [boolean, 'null'] }
+        serial_numbered: { type: [string, integer, boolean, 'null'] }
+        front_image: { type: [string, 'null'] }
+        back_image: { type: [string, 'null'] }
+        render_image: { type: [string, 'null'] }
+        image_url: { type: [string, 'null'] }
+        market_value: { type: [number, 'null'], description: 'The item''s current market value in dollars.' }
+    Chase:
+      type: object
+      description: The hand-picked chase item (bounty) a pack is offering right now.
+      required: [label, odds, ends_at, item]
+      properties:
+        label: { type: [string, 'null'] }
+        odds: { type: string, description: 'Its chance per pack, formatted as a percentage, e.g. `0.05%`.' }
+        ends_at: { type: [string, 'null'], format: date-time, description: 'Null when open-ended.' }
+        item: { $ref: '#/components/schemas/Item' }
+    PackCatalogItem:
+      type: object
+      required: [pack_type, name, price, available, odds, default_odds, image_url, banner_url, description, chase]
+      properties:
+        pack_type: { type: string, description: 'The id to buy it by.' }
+        name: { type: string }
+        price: { type: number, description: 'What the customer pays, in dollars.' }
+        available: { type: boolean, description: 'Mirrors the pack''s shelf in our app.' }
+        reason:
+          type: string
+          description: Only when `available` is false.
+          enum: [Out of stock, Odds maintenance in progress, Restocking, Not available right now]
+        odds:
+          type: array
+          description: The odds choices the pack sells, in the order our app's picker shows them.
+          items: { $ref: '#/components/schemas/Odds' }
+        default_odds: { $ref: '#/components/schemas/Odds' }
+        image_url: { type: [string, 'null'], description: 'Pack art, absolute and resized for display.' }
+        banner_url: { type: [string, 'null'], description: 'The pack''s wide banner.' }
+        description: { type: [string, 'null'] }
+        chase:
+          oneOf:
+            - $ref: '#/components/schemas/Chase'
+            - type: 'null'
+    OddsChoice:
+      type: object
+      required: [odds, label, available]
+      properties:
+        odds: { $ref: '#/components/schemas/Odds' }
+        label: { type: string }
+        available: { type: boolean, description: 'Whether these odds are selling right now.' }
+    PackPool:
+      description: '`ModePackPool` for a pack that sells the odds choice, `ClassicPackPool` (`odds: "classic"`, with `bucket_id` bands) for a pack that sells only its own odds.'
+      anyOf:
+        - $ref: '#/components/schemas/ModePackPool'
+        - $ref: '#/components/schemas/ClassicPackPool'
+    ModePackPool:
+      type: object
+      required: [pack_type, name, category, price, odds, label, tagline, available, fresh_buyback_rate, consolation_probability, bands, odds_choices, total_cards, cards]
+      properties:
+        pack_type: { type: string }
+        name: { type: string }
+        category: { $ref: '#/components/schemas/PackCategory' }
+        price: { type: number }
+        odds: { $ref: '#/components/schemas/Odds' }
+        label: { type: string }
+        tagline: { type: string }
+        available: { type: boolean, description: 'Whether these odds are selling right now.' }
+        fresh_buyback_rate: { type: number, description: 'The sell-back rate in the fresh window, as a fraction (`1` = 100%).' }
+        consolation_probability: { type: [number, 'null'], description: 'The chance of the pack''s consolation prize, where it has one.' }
+        bands:
+          type: array
+          items: { $ref: '#/components/schemas/PoolBand' }
+        odds_choices:
+          type: array
+          items: { $ref: '#/components/schemas/OddsChoice' }
+        total_cards: { type: integer }
+        cards:
+          type: array
+          description: Every item a pull can produce at these odds, highest value first.
+          items:
+            allOf:
+              - $ref: '#/components/schemas/Item'
+              - type: object
+                required: [band]
+                properties:
+                  band: { type: string, description: 'The `band` it sits in.' }
+    PoolBand:
+      type: object
+      required: [band, min_value, max_value, odds, cards]
+      properties:
+        band: { type: string, description: '`<min_value>-<max_value>`.' }
+        min_value: { type: number }
+        max_value: { type: number }
+        odds: { type: number, minimum: 0, maximum: 1, description: 'The chance of a pull landing in this band at these odds. A band at 0 can''t pull.' }
+        cards: { type: integer, description: 'How many items sit in it.' }
+    ClassicPackPool:
+      type: object
+      required: [pack_type, name, category, price, odds, label, tagline, available, bands, chase, odds_choices, total_cards, cards]
+      properties:
+        pack_type: { type: string }
+        name: { type: string }
+        category: { $ref: '#/components/schemas/PackCategory' }
+        price: { type: number }
+        odds: { type: string, const: classic }
+        label: { type: string, const: Classic }
+        tagline: { type: string }
+        available: { type: boolean }
+        reason: { type: string, description: 'Only on a pack that isn''t on sale and has no pool right now.' }
+        kind: { type: string, const: slab }
+        bands:
+          type: array
+          items: { $ref: '#/components/schemas/ClassicPoolBand' }
+        chase:
+          oneOf:
+            - type: object
+              required: [card, probability, odds_label, label, ends_at]
+              properties:
+                card:
+                  oneOf:
+                    - $ref: '#/components/schemas/Item'
+                    - type: 'null'
+                probability: { type: number }
+                odds_label: { type: [string, 'null'] }
+                label: { type: [string, 'null'] }
+                ends_at: { type: [string, 'null'], format: date-time }
+            - type: 'null'
+        odds_choices:
+          type: array
+          items: { $ref: '#/components/schemas/OddsChoice' }
+        total_cards: { type: integer }
+        cards:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/Item'
+              - type: object
+                required: [bucket_id]
+                properties:
+                  bucket_id: { type: string }
+    ClassicPoolBand:
+      type: object
+      required: [bucket_id, label, min_value, max_value, odds, is_consolation, hittable_cards]
+      properties:
+        bucket_id: { type: string }
+        label: { type: [string, 'null'] }
+        min_value: { type: number }
+        max_value: { type: number }
+        odds: { type: number, minimum: 0, maximum: 1 }
+        is_consolation: { type: boolean }
+        hittable_cards: { type: integer }
+    CreateOrderRequest:
+      type: object
+      required: [pack_type, recipient]
+      properties:
+        pack_type: { type: string, description: 'A `pack_type` from List packs.' }
+        category: { $ref: '#/components/schemas/PackCategory' }
+        odds:
+          allOf:
+            - $ref: '#/components/schemas/Odds'
+          description: 'One the pack sells. Default: the pack''s `default_odds`.'
+        quantity: { type: integer, minimum: 1, maximum: 10, default: 1, description: '2 or more makes a multi-pack order.' }
+        recipient: { type: string, description: 'The customer''s self-custody wallet on your mint chain. Never an exchange deposit address: the NFTs are minted to it.' }
+        refund_address: { type: string, description: 'An EVM wallet that can receive USDC on Base, for refunds. Required on a Solana program; defaults to `recipient` on an EVM program.' }
+        partner_user_ref: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$', description: 'Your opaque user id. Never put personal data here. Not compared on an idempotent replay.' }
+    Payment:
+      type: object
+      description: 'A Unifold Payment Intent for exactly the amount due. Open it in your app with `client_secret` and `publishable_key` (Unifold''s web or React Native SDK), or show `deposit_addresses` and `amount`. Paid once at least 99% has arrived. [Payments](/partner-api/v2/payments).'
+      required: [intent_id, client_secret, publishable_key, amount, deposit_addresses]
+      properties:
+        intent_id: { type: [string, 'null'], description: 'The Payment Intent''s id (`sbx_pi_…` in the sandbox).' }
+        client_secret: { type: [string, 'null'], description: 'Opens Unifold''s checkout. Null once there is nothing left to pay.' }
+        publishable_key: { type: [string, 'null'], description: 'The public Unifold key to initialise the SDK with.' }
+        amount: { type: number, description: 'The amount due in USD (a multi-pack order''s total).' }
+        deposit_addresses:
+          type: array
+          description: Addresses the customer can send to directly, on Base and Solana. Empty once there is nothing left to pay. Never reuse one for another order.
+          items:
+            type: object
+            required: [chain, address]
+            properties:
+              chain: { $ref: '#/components/schemas/ChainKey' }
+              address: { type: string }
+    OrderStatus:
+      type: string
+      enum: [awaiting_payment, paid, rolled, minted, mint_failed, expired, refund_due, refunded]
+      description: |-
+        - `awaiting_payment`: waiting for the payment, for up to 24 hours.
+        - `expired`: not paid within 24 hours. A payment that still arrives is refunded in full.
+        - `paid`: settled; the pack opens next.
+        - `rolled`: the pack opened (`pull` is set); the NFT is being minted.
+        - `minted` (final): the NFT is in `recipient`'s wallet.
+        - `mint_failed`: the mint hasn't landed yet; it is retried and never re-opens the pack.
+        - `refund_due`: being refunded in USDC on Base to `refund_address`; `failure_reason` says why (e.g. `paid_after_expiry`, `underpaid`).
+        - `refunded` (final): the refund was sent.
+    Pull:
+      type: object
+      required: [card_id, category, name, value, pulled_at]
+      properties:
+        card_id: { type: string }
+        category: { $ref: '#/components/schemas/PackCategory' }
+        name: { type: [string, 'null'] }
+        value: { type: number, description: 'The item''s value when it was pulled; it anchors the sell-back offer.' }
+        pulled_at: { type: string, format: date-time }
+    OrderToken:
+      type: object
+      description: The NFT. On an EVM program it has `contract`; on a Solana program `collection` and `asset` instead.
+      required: [chain, token_id, status, tx]
+      properties:
+        chain: { $ref: '#/components/schemas/ChainKey' }
+        contract: { type: [string, 'null'], description: 'EVM only.' }
+        collection: { type: [string, 'null'], description: 'Solana only.' }
+        asset: { type: [string, 'null'], description: 'Solana only.' }
+        token_id: { type: [string, 'null'], description: 'Decimal. Keep it as a string or bigint.' }
+        status:
+          type: string
+          enum: [pending, submitted, confirmed, failed, burned]
+          description: '`pending` (reserved, not sent), `submitted`, `confirmed`, `failed` (being retried), or `burned` once sold back or shipped.'
+        tx: { type: [string, 'null'], description: 'The mint transaction.' }
+    Order:
+      type: object
+      description: One single-pack order.
+      required: [order_id, id, status, pack_type, category, odds, price, recipient, mint_chain, paid_at, pull, token, failure_reason, created_at]
+      properties:
+        order_id: { type: string, description: 'Your `Idempotency-Key`.' }
+        id: { type: string, format: uuid, description: 'Our id.' }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        pack_type: { type: string }
+        category: { $ref: '#/components/schemas/PackCategory' }
+        odds: { $ref: '#/components/schemas/Odds' }
+        price: { type: number }
+        recipient: { type: string }
+        mint_chain: { $ref: '#/components/schemas/ChainKey' }
+        paid_at: { type: [string, 'null'], format: date-time }
+        pull:
+          oneOf:
+            - $ref: '#/components/schemas/Pull'
+            - type: 'null'
+        token:
+          oneOf:
+            - $ref: '#/components/schemas/OrderToken'
+            - type: 'null'
+        failure_reason: { type: [string, 'null'], description: 'On `mint_failed`, `expired`, `refund_due` and `refunded`: why.' }
+        created_at: { type: string, format: date-time }
+    OrderUnit:
+      description: One pack of a multi-pack order, in the single-order shape under the order's `order_id`.
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - type: object
+          required: [batch_id, unit]
+          properties:
+            batch_id: { type: string, format: uuid, description: 'The multi-pack order''s `id`.' }
+            unit: { type: [integer, 'null'], minimum: 1, maximum: 10, description: '1 to `quantity`.' }
+    OrderBatch:
+      type: object
+      description: A multi-pack order (`quantity` 2-10), paid with one payment.
+      required: [order_id, id, status, quantity, pack_type, category, odds, unit_price, price, recipient, mint_chain, paid_at, units, created_at]
+      properties:
+        order_id: { type: string }
+        id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [awaiting_payment, paid, rolled, minted, mint_failed, expired, refund_due, refunded, processing, completed]
+          description: '`awaiting_payment` until paid; once paid, the units'' status when they all agree; otherwise `processing` while any unit is still moving, and `completed` once every unit is final.'
+        quantity: { type: integer, minimum: 2, maximum: 10 }
+        pack_type: { type: string }
+        category: { $ref: '#/components/schemas/PackCategory' }
+        odds: { $ref: '#/components/schemas/Odds' }
+        unit_price: { type: number, description: 'The price of one pack.' }
+        price: { type: number, description: 'The total due.' }
+        recipient: { type: string }
+        mint_chain: { $ref: '#/components/schemas/ChainKey' }
+        paid_at: { type: [string, 'null'], format: date-time }
+        units:
+          type: array
+          items: { $ref: '#/components/schemas/OrderUnit' }
+        created_at: { type: string, format: date-time }
+    OrderOrUnit:
+      anyOf:
+        - $ref: '#/components/schemas/OrderUnit'
+        - $ref: '#/components/schemas/Order'
+    AnyOrder:
+      description: A single order, a multi-pack order (with `units`), or one unit of one.
+      anyOf:
+        - $ref: '#/components/schemas/OrderBatch'
+        - $ref: '#/components/schemas/OrderUnit'
+        - $ref: '#/components/schemas/Order'
+    CreateOrderResponse:
+      type: object
+      required: [order, payment]
+      properties:
+        order:
+          anyOf:
+            - $ref: '#/components/schemas/OrderBatch'
+            - $ref: '#/components/schemas/Order'
+        payment: { $ref: '#/components/schemas/Payment' }
+        idempotent_replay: { type: boolean, const: true, description: 'Present on a replay.' }
+    Verification:
+      type: object
+      required: [order_id, id, pull_id, card_id, category, verified, verification_type, verify_url, proof]
+      properties:
+        order_id: { type: string }
+        id: { type: string, format: uuid }
+        unit: { type: integer, description: 'In a multi-pack order''s proof.' }
+        pull_id: { type: string }
+        card_id: { type: string }
+        category: { $ref: '#/components/schemas/PackCategory' }
+        verified: { type: boolean }
+        verification_type: { type: [string, 'null'], examples: [provably_fair] }
+        verify_url: { type: string, format: uri, description: 'Public; your customer can open it to re-run the check with no key.' }
+        proof: { type: object, additionalProperties: true, description: 'Exactly what `verify_url` returns, the verifier''s step-by-step replay.' }
+    PendingVerification:
+      type: object
+      description: A unit of a multi-pack order that hasn't opened yet.
+      required: [order_id, id, status, verified, pending, unit]
+      properties:
+        order_id: { type: string }
+        id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        verified: { type: 'null' }
+        pending: { type: boolean, const: true }
+        unit: { type: integer }
+    BatchVerification:
+      type: object
+      required: [order_id, batch_id, verified, units]
+      properties:
+        order_id: { type: string }
+        batch_id: { type: string, format: uuid }
+        verified: { type: boolean, description: 'True only when every unit''s proof verifies.' }
+        units:
+          type: array
+          items:
+            anyOf:
+              - $ref: '#/components/schemas/Verification'
+              - $ref: '#/components/schemas/PendingVerification'
+    TokenIdentity:
+      type: object
+      description: 'A token''s identity: `chain`, `contract` and `token_id` on EVM (a standard ERC-721); `chain`, `collection`, `asset` and `token_id` on Solana (a Metaplex Core asset).'
+      required: [chain, token_id]
+      properties:
+        chain: { $ref: '#/components/schemas/ChainKey' }
+        contract: { type: string, description: 'EVM only.' }
+        collection: { type: string, description: 'Solana only.' }
+        asset: { type: [string, 'null'], description: 'Solana only, the asset''s on-chain address.' }
+        token_id: { type: string, description: 'Decimal, up to 2^128 on EVM. Keep it as a string or bigint.' }
+    MintStatus:
+      type: string
+      enum: [pending, submitted, confirmed, failed]
+      description: The mint status. Only a `confirmed` token can be quoted.
+    WalletToken:
+      allOf:
+        - $ref: '#/components/schemas/TokenIdentity'
+        - type: object
+          required: [status, card, minted_at, sellback]
+          properties:
+            status: { $ref: '#/components/schemas/MintStatus' }
+            card:
+              type: object
+              required: [id, category, name]
+              properties:
+                id: { type: string }
+                category: { $ref: '#/components/schemas/PackCategory' }
+                name: { type: [string, 'null'] }
+            minted_at: { type: string, format: date-time }
+            sellback:
+              type: object
+              description: What a sell-back would pay right now. Indicative; only a quote fixes the amount.
+              required: [amount, rate, fresh, locked_until]
+              properties:
+                amount: { type: number }
+                rate: { type: number, description: 'As a fraction of the basis.' }
+                fresh: { type: boolean, description: 'True inside the 5-minute fresh window.' }
+                locked_until: { type: [string, 'null'], format: date-time, description: 'When the 7-day value lock ends.' }
+    SellbackPhase:
+      type: object
+      required: [from, until, rate, amount, fixed]
+      properties:
+        from: { type: string, format: date-time }
+        until: { type: [string, 'null'], format: date-time, description: 'Null for the last, open-ended phase.' }
+        rate: { type: number }
+        amount: { type: number }
+        fixed: { type: boolean, description: 'True when the amount is locked; false when it follows the market and is today''s estimate.' }
+    SellbackOffer:
+      type: object
+      description: |-
+        Today's sell-back for a live, confirmed token. The offer is anchored to the token, not its holder, so a trade changes nothing: the fresh rate for the first 5 minutes after the token is confirmed, then 80% of the value at pull until 7 days after the pull, then 80% of the current market value. Goods never pay more than their value at pull. [Sell-back](/partner-api/v2/sell-back).
+      required: [amount, rate, fresh, value_locked, fresh_until, locked_until, schedule]
+      properties:
+        amount: { type: number }
+        rate: { type: number }
+        fresh: { type: boolean }
+        value_locked: { type: boolean, description: 'True while the 7-day value lock holds the amount.' }
+        fresh_until: { type: [string, 'null'], format: date-time, description: 'When the 5-minute fresh window ends (or ended).' }
+        locked_until: { type: [string, 'null'], format: date-time, description: 'When the value lock lifts.' }
+        schedule:
+          type: array
+          description: What a sell-back pays from now on, one phase per row.
+          items: { $ref: '#/components/schemas/SellbackPhase' }
+    TokenDetail:
+      allOf:
+        - $ref: '#/components/schemas/TokenIdentity'
+        - type: object
+          required: [status, holder, order_id, minted_at, confirmed_at, end, item, sellback]
+          properties:
+            status:
+              type: string
+              enum: [pending, submitted, confirmed, failed, burned]
+            holder: { type: [string, 'null'], description: 'The owner as our chain watcher last saw it. A quote re-reads the chain.' }
+            order_id: { type: [string, 'null'], description: 'The `Idempotency-Key` of the order that minted it.' }
+            minted_at: { type: string, format: date-time }
+            confirmed_at: { type: [string, 'null'], format: date-time }
+            end:
+              description: Set once the token is burned.
+              oneOf:
+                - type: object
+                  required: [at, reason, tx]
+                  properties:
+                    at: { type: string, format: date-time }
+                    reason:
+                      type: [string, 'null']
+                      enum: [sellback, shipment, admin, null]
+                      description: '`admin` means CatchBack burned it; contact us about it.'
+                    tx: { type: [string, 'null'] }
+                - type: 'null'
+            item: { $ref: '#/components/schemas/Item' }
+            sellback:
+              description: Null for a burned token or one not yet confirmed.
+              oneOf:
+                - $ref: '#/components/schemas/SellbackOffer'
+                - type: 'null'
+    SellbackQuoteRequest:
+      type: object
+      required: [holder]
+      properties:
+        kind: { type: string, enum: [sellback], default: sellback }
+        holder: { type: string, description: 'The wallet that holds the token now. Checked on chain.' }
+        payout_chain:
+          type: string
+          enum: ['evm:8453', 'solana:mainnet']
+          description: 'Default: the token''s family (Base for an EVM program, Solana for a Solana program). Solana payouts answer `PAYOUT_CHAIN_NOT_ENABLED` until they are switched on.'
+        payout_address: { type: string, description: 'Where the USDC goes. Required when the payout chain isn''t your mint chain''s family; otherwise defaults to `holder`.' }
+    PayoutDestination:
+      type: object
+      required: [chain, address]
+      properties:
+        chain: { $ref: '#/components/schemas/ChainKey' }
+        address: { type: string }
+    EvmBurnQuote:
+      type: object
+      description: 'The EIP-712 `Quote` struct to pass to `burnWithQuote` exactly as returned. Domain: name `CatchBackCards`, version `1`, your mint chain id, your contract. `kind` 1 is a sell-back, 2 a shipment. `tokenId`, `amount` (USDC, 6 decimals; "0" for a shipment) and `expiresAt` (unix seconds) are decimal strings: convert them to bigints.'
+      required: [tokenId, kind, quoteId, holder, payoutHash, amount, expiresAt]
+      properties:
+        tokenId: { type: string }
+        kind: { type: integer, enum: [1, 2] }
+        quoteId: { type: string, description: 'bytes32.' }
+        holder: { type: string }
+        payoutHash: { type: string, description: 'bytes32. Sell-back: keccak256(abi.encode(string payout.chain, string payout.address)). Shipment: keccak256(abi.encode(string "shipment", string quote_id)).' }
+        amount: { type: string }
+        expiresAt: { type: string }
+    SellbackQuoteBase:
+      type: object
+      required: [quote_id, chain, amount_usd, expires_at, payout, family]
+      properties:
+        quote_id: { type: string, description: '`0x` + 64 hex.' }
+        chain: { $ref: '#/components/schemas/ChainKey' }
+        amount_usd: { type: number, description: 'Exactly what the payout sends.' }
+        expires_at: { type: string, format: date-time, description: '10 minutes after issue, or the end of the fresh window if sooner.' }
+        payout: { $ref: '#/components/schemas/PayoutDestination' }
+        family: { type: string, enum: [evm, solana] }
+    EvmSellbackQuote:
+      allOf:
+        - $ref: '#/components/schemas/SellbackQuoteBase'
+        - type: object
+          required: [family, contract, quote, signature]
+          properties:
+            family: { type: string, const: evm }
+            contract: { type: string, description: 'The contract the holder calls `burnWithQuote` on.' }
+            quote: { $ref: '#/components/schemas/EvmBurnQuote' }
+            signature: { type: string }
+    SolanaSellbackQuote:
+      allOf:
+        - $ref: '#/components/schemas/SellbackQuoteBase'
+        - type: object
+          required: [family, collection, asset, vault, transaction, last_valid_block_height]
+          properties:
+            family: { type: string, const: solana }
+            collection: { type: string }
+            asset: { type: string }
+            vault: { type: string, description: 'Where the transaction moves the asset.' }
+            transaction: { type: string, description: 'Base64 unsigned transaction. The holder is its fee payer and only signer; sign and send it unchanged.' }
+            last_valid_block_height: { type: integer, description: 'It must land before this (about a minute) and before `expires_at`.' }
+    SellbackQuote:
+      oneOf:
+        - $ref: '#/components/schemas/EvmSellbackQuote'
+        - $ref: '#/components/schemas/SolanaSellbackQuote'
+      discriminator:
+        propertyName: family
+        mapping:
+          evm: '#/components/schemas/EvmSellbackQuote'
+          solana: '#/components/schemas/SolanaSellbackQuote'
+    SellbackQuoteStatus:
+      type: object
+      required: [quote_id, status, amount_usd, holder, payout, expires_at, redeemed_at, burn_tx]
+      properties:
+        quote_id: { type: string }
+        status:
+          type: string
+          enum: [ready, expired, redeemed]
+          description: '`ready`: issued, not yet burned with. `expired`: not burned before `expires_at`. `redeemed`: we saw the burn; the payout is queued.'
+        amount_usd: { type: number }
+        holder: { type: string }
+        payout:
+          type: object
+          required: [chain, address, status, tx_hash, held]
+          properties:
+            chain: { $ref: '#/components/schemas/ChainKey' }
+            address: { type: string }
+            status:
+              type: [string, 'null']
+              enum: [pending, sending, sent, held, failed, null]
+              description: '`null`: no burn seen yet. `pending`: queued. `sending`: sent to the network. `sent`: paid, `tx_hash` is the USDC transfer. `held`: under review by our team, then released. `failed`: retried automatically.'
+            tx_hash: { type: [string, 'null'] }
+            held: { type: boolean }
+        expires_at: { type: string, format: date-time }
+        redeemed_at: { type: [string, 'null'], format: date-time }
+        burn_tx: { type: [string, 'null'] }
+    ShipmentAddress:
+      type: object
+      required: [name, address1, city, country]
+      properties:
+        name: { type: string, maxLength: 100 }
+        address1: { type: string, maxLength: 100 }
+        address2: { type: [string, 'null'], maxLength: 100 }
+        city: { type: string, maxLength: 100 }
+        state: { type: [string, 'null'], maxLength: 100, description: 'Where the country uses it.' }
+        zip: { type: [string, 'null'], maxLength: 20, description: 'Where the country uses it.' }
+        country: { type: string, minLength: 2, maxLength: 2, description: 'ISO 3166 alpha-2.' }
+        phone: { type: [string, 'null'], maxLength: 20, description: 'Required outside the US.' }
+    TokenIdList:
+      type: array
+      minItems: 1
+      maxItems: 25
+      uniqueItems: true
+      description: 1-25 distinct decimal token ids of your program, all held by `holder`. Send them as strings.
+      items: { type: string, pattern: '^[0-9]{1,78}$' }
+    CoverAmount:
+      type: [number, 'null']
+      exclusiveMinimum: 0
+      description: Shipping insurance cover in dollars, with at most two decimals, within the range the items allow (a `400` `COVER_NOT_ALLOWED` gives the range). Leave it out or null for none.
+    TokenShipmentEstimateRequest:
+      type: object
+      required: [holder, address]
+      properties:
+        holder: { type: string }
+        address: { $ref: '#/components/schemas/ShipmentAddress' }
+        cover_amount: { $ref: '#/components/schemas/CoverAmount' }
+    ShipmentEstimateRequest:
+      allOf:
+        - type: object
+          required: [token_ids]
+          properties:
+            token_ids: { $ref: '#/components/schemas/TokenIdList' }
+        - $ref: '#/components/schemas/TokenShipmentEstimateRequest'
+    ShippingRate:
+      type: object
+      required: [carrier, service, token, amount, estimated_days, total]
+      properties:
+        carrier: { type: string }
+        service: { type: string }
+        token: { type: string, description: 'Pass it back as `rate.token`.' }
+        amount: { type: number, description: 'The carrier rate.' }
+        estimated_days: { type: [integer, 'null'] }
+        total: { type: number, description: 'What the holder pays (the rate plus any cover premium). Pass it as `max_cost`.' }
+    ShippingRates:
+      type: object
+      required: [rates]
+      properties:
+        rates:
+          type: array
+          items: { $ref: '#/components/schemas/ShippingRate' }
+    TokenShipmentCreateFields:
+      type: object
+      required: [holder, address, rate, max_cost]
+      properties:
+        holder: { type: string }
+        address: { $ref: '#/components/schemas/ShipmentAddress' }
+        rate:
+          type: object
+          required: [carrier, token]
+          description: A rate from the estimate. We re-quote it.
+          properties:
+            carrier: { type: string }
+            token: { type: string }
+        max_cost: { type: number, exclusiveMinimum: 0, description: 'The most the holder will pay for shipping, in dollars (the estimate''s `total`).' }
+        cover_amount: { $ref: '#/components/schemas/CoverAmount' }
+    CreateTokenShipmentRequest:
+      $ref: '#/components/schemas/TokenShipmentCreateFields'
+    CreateShipmentRequest:
+      allOf:
+        - type: object
+          required: [token_ids]
+          properties:
+            token_ids: { $ref: '#/components/schemas/TokenIdList' }
+        - $ref: '#/components/schemas/TokenShipmentCreateFields'
+    EvmShipmentBurn:
+      type: object
+      required: [quote, signature]
+      properties:
+        quote: { $ref: '#/components/schemas/EvmBurnQuote' }
+        signature: { type: string }
+    SolanaShipmentBurn:
+      type: object
+      required: [transaction, vault, last_valid_block_height]
+      properties:
+        transaction: { type: string, description: 'Base64 unsigned transaction, built fresh on every GET.' }
+        vault: { type: string }
+        last_valid_block_height: { type: integer }
+    ShipmentBurn:
+      description: What the holder burns the token with, once the shipping is paid and while the window is open; else null.
+      oneOf:
+        - $ref: '#/components/schemas/EvmShipmentBurn'
+        - $ref: '#/components/schemas/SolanaShipmentBurn'
+        - type: 'null'
+    Fulfilment:
+      type: object
+      description: Where the box is, once every burn is seen. Never the address or the label.
+      required: [status, carrier, service, tracking_number, tracking_url, shipped_at, expected_delivery, delivered_at, created_at]
+      properties:
+        status:
+          type: string
+          enum: [pending, processing, shipped, delivered, cancelled, needs_review]
+          description: '`pending`: burns seen, the shipping order is being created. `processing`: being packed. `shipped`: on its way, with tracking. `delivered`. `cancelled`: by our team (rare); contact us. `needs_review`: we couldn''t create the shipment; our team resolves it.'
+        carrier: { type: [string, 'null'] }
+        service: { type: [string, 'null'] }
+        tracking_number: { type: [string, 'null'] }
+        tracking_url: { type: [string, 'null'], description: 'The carrier''s own tracking page.' }
+        shipped_at: { type: [string, 'null'], format: date-time }
+        expected_delivery: { type: [string, 'null'], format: date, description: 'A date, not a moment.' }
+        delivered_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+    TokenShipment:
+      type: object
+      description: A one-token shipment, named by the token's `quote_id`. `fulfilment` is present on reads and webhook events, not on the create response.
+      required: [quote_id, status, shipping_cost, holder, expires_at, paid_at, burn]
+      properties:
+        quote_id: { type: string }
+        status:
+          type: string
+          enum: [awaiting_payment, ready, expired, redeemed]
+          description: '`awaiting_payment`, `ready` (paid; burn it), `expired` (the paid burn window lapsed: renew it), `redeemed` (the burn was seen).'
+        shipping_cost: { type: [number, 'null'] }
+        holder: { type: string }
+        expires_at: { type: string, format: date-time, description: 'The end of the burn window once paid. An unpaid shipment never expires.' }
+        paid_at: { type: [string, 'null'], format: date-time }
+        burn: { $ref: '#/components/schemas/ShipmentBurn' }
+        fulfilment:
+          oneOf:
+            - $ref: '#/components/schemas/Fulfilment'
+            - type: 'null'
+    ShipmentToken:
+      type: object
+      required: [token_id, quote_id, status, burned_at, burn_tx, burn]
+      properties:
+        token_id: { type: [string, 'null'] }
+        quote_id: { type: string, description: 'What this token burns with.' }
+        status:
+          type: string
+          enum: [awaiting_payment, ready, expired, redeemed, dropped]
+          description: '`dropped`: not burned before the shipment closed; still live in the holder''s wallet.'
+        burned_at: { type: [string, 'null'], format: date-time }
+        burn_tx: { type: [string, 'null'] }
+        burn: { $ref: '#/components/schemas/ShipmentBurn' }
+    ShipmentGroup:
+      type: object
+      description: A shipment of 1-25 tokens in one box, named by `shipment_id`. Tokens are listed by token id.
+      required: [shipment_id, status, shipping_cost, holder, expires_at, paid_at, tokens, fulfilment]
+      properties:
+        shipment_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [awaiting_payment, ready, expired, redeemed, partially_redeemed]
+          description: '`partially_redeemed`: the window and its 24-hour grace passed; the burned tokens ship, the rest are `dropped`.'
+        shipping_cost: { type: number }
+        holder: { type: string }
+        expires_at: { type: string, format: date-time }
+        paid_at: { type: [string, 'null'], format: date-time }
+        tokens:
+          type: array
+          items: { $ref: '#/components/schemas/ShipmentToken' }
+        fulfilment:
+          oneOf:
+            - $ref: '#/components/schemas/Fulfilment'
+            - type: 'null'
+    AnyShipment:
+      description: A multi-token shipment (`shipment_id`, `tokens`) or a one-token shipment (`quote_id`, `burn`).
+      anyOf:
+        - $ref: '#/components/schemas/ShipmentGroup'
+        - $ref: '#/components/schemas/TokenShipment'
+    CreateShipmentResponse:
+      type: object
+      required: [shipment, payment]
+      properties:
+        shipment: { $ref: '#/components/schemas/ShipmentGroup' }
+        payment:
+          description: Null on a replay once the shipping is paid.
+          oneOf:
+            - $ref: '#/components/schemas/Payment'
+            - type: 'null'
+        idempotent_replay: { type: boolean, const: true }
+    CreateTokenShipmentResponse:
+      type: object
+      required: [quote, payment]
+      properties:
+        quote: { $ref: '#/components/schemas/TokenShipment' }
+        payment:
+          oneOf:
+            - $ref: '#/components/schemas/Payment'
+            - type: 'null'
+        idempotent_replay: { type: boolean, const: true }
+    Webhook:
+      type: object
+      required: [id, url, enabled, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        url: { type: string, format: uri }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    RegisterWebhookResponse:
+      type: object
+      required: [webhook, secret]
+      properties:
+        webhook: { $ref: '#/components/schemas/Webhook' }
+        secret: { type: [string, 'null'], description: 'The signing secret (`whsec_…`), only on the first registration. Used whole as the HMAC key.' }
+    WebhookTestResult:
+      type: object
+      required: [event_id, delivered, response_status, error]
+      properties:
+        event_id: { type: string }
+        delivered: { type: boolean }
+        response_status: { type: [integer, 'null'] }
+        error:
+          type: [string, 'null']
+          description: '`http_<status>`, `redirect_refused`, `timeout`, `dns_failed`, `connect_failed`, `blocked_address` or `invalid_url`.'
+    WebhookEnvelope:
+      type: object
+      required: [id, type, created_at, data]
+      properties:
+        id: { type: string, description: 'Dedupe on it: a retry carries the same `id` and the same body.' }
+        type: { type: string, enum: [nft_order.updated, sellback.updated, nft_shipment.updated, ping] }
+        created_at: { type: string, format: date-time, description: 'When the change happened.' }
+        data: { type: object, description: 'The current state, not a diff.' }
+    Key:
+      type: object
+      required: [id, name, scopes, created_at, last_used_at, expires_at, rotated_from, successor, program]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        scopes:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: [string, 'null'], format: date-time }
+        expires_at: { type: [string, 'null'], format: date-time, description: 'Set once the key has been rotated.' }
+        rotated_from: { type: [string, 'null'], format: uuid }
+        successor:
+          oneOf:
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: string, format: uuid }
+                name: { type: string }
+            - type: 'null'
+        program: { type: string, description: 'Your program''s slug.' }
+    RotateKeyResponse:
+      type: object
+      required: [key, previous_key]
+      properties:
+        key:
+          type: object
+          required: [id, name, secret, created_at]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            secret: { type: string, description: 'The new `cb_live_…` key. Shown here only.' }
+            created_at: { type: string, format: date-time }
+        previous_key:
+          type: object
+          required: [id, expires_at]
+          properties:
+            id: { type: string, format: uuid }
+            expires_at: { type: [string, 'null'], format: date-time, description: 'When the calling key stops working.' }
+        idempotent_replay: { type: boolean, const: true }
+    RevenueMonth:
+      type: object
+      required: [period, orders, gmv, share_pct, share_amount, refunds, net_gmv, net_share, payout]
+      properties:
+        period: { type: string, description: '`YYYY-MM`.' }
+        orders: { type: integer, description: 'Packs paid that month.' }
+        gmv: { type: number, description: 'Their price.' }
+        share_pct: { type: number, description: 'Your share rate, in percent.' }
+        share_amount: { type: number, description: 'What it earned on `gmv`.' }
+        refunds:
+          type: object
+          required: [count, gmv, share_amount]
+          properties:
+            count: { type: integer }
+            gmv: { type: number }
+            share_amount: { type: number, description: 'The share the refunds take back.' }
+        net_gmv: { type: number }
+        net_share: { type: number, description: 'What you are owed for the month.' }
+        payout:
+          type: object
+          required: [status, amount, reference, paid_at]
+          properties:
+            status:
+              type: string
+              enum: [open, due, paid, none]
+              description: '`open`: the month is still running. `due`: closed, owed and not paid yet. `paid`. `none`: nothing owed.'
+            amount: { type: [number, 'null'] }
+            reference: { type: [string, 'null'] }
+            paid_at: { type: [string, 'null'], format: date-time }
+    RevenueStatement:
+      type: object
+      required: [program, currency, months]
+      properties:
+        program: { type: string }
+        currency: { type: string, const: USD }
+        months:
+          type: array
+          description: Newest first.
+          items: { $ref: '#/components/schemas/RevenueMonth' }
+    SandboxWebhookDeliveries:
+      type: object
+      description: The webhook deliveries this call made.
+      required: [delivered, retrying]
+      properties:
+        delivered: { type: integer }
+        retrying: { type: integer }
+    SandboxPaymentResult:
+      type: object
+      required: [paid, kind, status, webhooks]
+      properties:
+        paid: { type: boolean, const: true }
+        kind: { type: string, enum: [order, shipment] }
+        status: { type: string, description: 'The order''s status (the multi-pack order''s, for one), or the shipment''s, after the payment.' }
+        order_status: { type: string, description: 'Same as `status`, on an order.' }
+        shipment_status: { type: string, description: 'Same as `status`, on a shipment.' }
+        webhooks: { $ref: '#/components/schemas/SandboxWebhookDeliveries' }
+    SandboxTickResult:
+      type: object
+      required: [ran, errors, webhooks]
+      properties:
+        ran: { type: boolean }
+        errors: { type: integer, description: 'How many steps of the pass reported an error.' }
+        webhooks: { $ref: '#/components/schemas/SandboxWebhookDeliveries' }
+    TokenMetadata:
+      type: object
+      required: [name, description, image, external_url, attributes]
+      properties:
+        name: { type: string, description: 'The item''s name, with its grade where it has one.' }
+        description: { type: string }
+        image: { type: [string, 'null'] }
+        external_url: { type: string }
+        attributes:
+          type: array
+          description: '`Category`, `Set`, `Year`, `Number`, `Grade`, `Cert`, `Language`, `Brand`, `Size` and `Condition` where the item has them, and `Status` (`Vaulted`, or `Redeemed` once burned). Never a price.'
+          items:
+            type: object
+            required: [trait_type, value]
+            properties:
+              trait_type: { type: string }
+              value: { type: string }
