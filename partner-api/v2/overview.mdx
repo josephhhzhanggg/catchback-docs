@@ -4,15 +4,15 @@ sidebarTitle: "Overview"
 description: "Sell CatchBack packs to your users' own web3 wallets: each pulled item arrives as an NFT they can hold, trade, sell back for USDC or have shipped."
 ---
 
-Partner API v2 is for exchanges and wallet platforms whose users buy CatchBack packs from their own web3 wallets.
+For exchanges and wallet platforms whose users buy CatchBack packs from their own web3 wallets.
 
 <Note>
-  **v2 replaces v1.** The [v1 Partner API](/partner-api/introduction) (a prefunded balance, balance-paid purchases, withdrawals) is retired for every partner. In v2 there is no partner balance and no prefunding: each customer pays for their own pack, and each pulled item is delivered as an NFT to the customer's wallet.
+  **v2 replaces v1.** The v1 Partner API is retired. v2 has no partner balance or prefunding: each customer pays for their own pack and gets each item as an NFT in their wallet.
 </Note>
 
 ## How it works
 
-Every pack a customer buys holds one real item (a graded card, a raw single, or a piece of streetwear or jewelry) that we keep in our vault. The customer receives an NFT for that item in their own wallet. The NFT is the claim on the item: whoever holds it can trade it, sell it back to us for USDC, or have the physical item shipped. Selling back and shipping both burn the NFT.
+Each pack holds one real item (a graded card, a raw single, streetwear or jewelry) kept in our vault. The customer gets an NFT for it in their wallet. Whoever holds the NFT can trade it, sell it back for USDC, or have the item shipped. Selling back and shipping burn the NFT.
 
 ```text
  1. POST /orders  (quantity 1-10) ──▶ order awaiting_payment + payment details (one payment)
@@ -32,51 +32,73 @@ Every pack a customer buys holds one real item (a graded card, a raw single, or 
                                                     GET  /shipments/{id}  → tracking
 ```
 
-- **One item, one live NFT.** An item is never represented by two live tokens.
-- **We pay mint gas.** The holder pays gas for their own transfers and burns.
-- **The sell-back offer travels with the token:** a trade never changes what a burn pays. See [Sell-back](/partner-api/v2/sell-back).
+- **One item, one live NFT.**
+- **We pay mint gas.** The holder pays gas for transfers and burns.
+- **The sell-back offer travels with the token.** A trade doesn't change what a burn pays. See [Sell-back](/partner-api/v2/sell-back).
+
+### Who delivers the NFT?
+
+We mint it straight to the customer's wallet. Your platform never holds the token or the customer's funds.
+
+```text
+ your platform:  POST /orders  { "recipient": "0x8f3c…" }   ◀── you only pass the address
+ CatchBack:      mints the NFT ─────────────────────────────▶ customer's wallet
+```
+
+1. Collect the customer's wallet address.
+2. Send it as `recipient` when you [create the order](/partner-api/v2/endpoints/create-order).
+3. Show the result when the order reaches `minted`: listen for [`nft_order.updated`](/partner-api/v2/webhooks) or call `GET /orders/{id}`.
+
+Money goes direct too:
+
+- **Sell-back payouts:** USDC to the holder's wallet, or to the quote's `payout_address`. See [Sell-back](/partner-api/v2/sell-back).
+- **Refunds:** USDC on Base to the order's `refund_address`, which defaults to `recipient` on EVM programs. See [Payments](/partner-api/v2/payments).
+
+<Warning>
+  `recipient` must be a self-custody wallet the customer controls, **never an exchange deposit address**. An NFT minted to a deposit address lands in the exchange's wallet, and the customer may never be able to reach it.
+</Warning>
 
 ## What you build
 
 <CardGroup cols={2}>
   <Card title="A pack shop" icon="box-open" href="/partner-api/v2/endpoints/list-packs">
-    List the packs you can sell, show their odds, and let the customer pick the odds they buy at.
+    List packs, show odds, let the customer pick an odds mode.
   </Card>
   <Card title="A checkout" icon="credit-card" href="/partner-api/v2/payments">
-    Create an order for the customer's wallet and let them pay in USDC on Base or Solana.
+    Create an order; the customer pays in USDC on Base or Solana.
   </Card>
   <Card title="Order tracking" icon="list-check" href="/partner-api/v2/orders">
-    Follow each order from payment to the NFT landing in the wallet, and show the provably-fair proof.
+    Follow each order from payment to mint, with the provably-fair proof.
   </Card>
   <Card title="Holdings" icon="wallet" href="/partner-api/v2/endpoints/list-wallet-tokens">
-    Show a wallet's CatchBack NFTs with what each would sell back for today.
+    A wallet's CatchBack NFTs and today's sell-back value.
   </Card>
   <Card title="Sell-back" icon="arrow-rotate-left" href="/partner-api/v2/sell-back">
-    Get a quote, have the holder burn the token, and follow the USDC payout.
+    Quote, burn, get paid in USDC.
   </Card>
   <Card title="Shipping" icon="truck" href="/partner-api/v2/shipping">
-    Ship one item or a box of up to 25, paid once, and show carrier tracking.
+    Ship 1-25 items in one box, with tracking.
   </Card>
   <Card title="Webhooks" icon="bell" href="/partner-api/v2/webhooks">
-    A signed `POST` when an order, a sell-back payout or a shipment changes.
+    Signed events for orders, sell-backs and shipments.
   </Card>
   <Card title="Sandbox" icon="flask" href="/partner-api/v2/quickstart">
-    Run the whole flow on a public testnet with simulated payments.
+    The full flow on testnet with simulated payments.
   </Card>
 </CardGroup>
 
 ## Basics
 
-- **Base URL:** `https://catchbackcards.com`. Every v2 path is relative to `/api/partner/v2`. The [public token metadata](/partner-api/v2/endpoints/get-token-metadata) lives under `/api/partner-nfts/metadata` and needs no key.
-- **Auth:** every request sends your key as a bearer token, and every v2 endpoint needs the scope `nft:orders`. See [Authentication and keys](/partner-api/v2/authentication).
-- **Your program:** your key is linked to your partner program, which fixes the chain your NFTs mint on (`mint_chain`) and your collection contract. Every endpoint acts within your program: an order, token, quote or shipment from another program answers `404`.
-- **Formats:** JSON requests and responses, UTF-8. Money is USD as a number in dollars (`25`, `9.85`). Responses may gain new fields at any time; ignore fields you don't know.
-- **Server-side only.** Call the API from your servers. The key must never reach a browser or app.
-- **Where you call from:** your servers can call from anywhere except a country on our sanctions list, which gets a `403` `Access denied` on every endpoint.
+- **Base URL:** `https://catchbackcards.com/api/partner/v2`. [Token metadata](/partner-api/v2/endpoints/get-token-metadata) is public, under `/api/partner-nfts/metadata`.
+- **Auth:** your key as a bearer token, with the `nft:orders` scope. See [Authentication and keys](/partner-api/v2/authentication).
+- **Your program:** your key sets your mint chain (`mint_chain`) and collection contract. Anything from another program returns `404`.
+- **Formats:** JSON, UTF-8. Money is USD in dollars (`25`, `9.85`). Ignore fields you don't recognize; new ones can appear anytime.
+- **Server-side only.** Never expose the key in a browser or app.
+- **Sanctions:** requests from sanctioned countries get `403 Access denied`.
 
 ## Endpoints
 
-All paths are relative to `/api/partner/v2`.
+Paths are relative to `/api/partner/v2`.
 
 | Method and path | What it does |
 |---|---|
@@ -110,7 +132,7 @@ All paths are relative to `/api/partner/v2`.
 | [`POST /keys/rotate`](/partner-api/v2/endpoints/rotate-key) | Issue a replacement key (`Idempotency-Key`) |
 | [`POST /keys/revoke-previous`](/partner-api/v2/endpoints/revoke-previous-key) | End the key this one replaced, now |
 
-And one public endpoint with no key:
+Public, no key:
 
 | Method and path | What it does |
 |---|---|
@@ -118,12 +140,12 @@ And one public endpoint with no key:
 
 ## OpenAPI spec
 
-The OpenAPI 3.1 spec is the official contract for Partner API v2: every endpoint, request, response, error code and webhook event. Generate your client from it.
+The OpenAPI 3.1 spec is the official contract: every endpoint, error code and webhook event. Generate your client from it.
 
 ```text
 https://catchbackcards.mintlify.app/partner-api/v2/openapi.yaml
 ```
 
 <Note>
-  Interested in becoming a partner, or want to talk about your program? Contact us at [support@catchbackcards.com](mailto:support@catchbackcards.com).
+  Want to become a partner? Email [support@catchbackcards.com](mailto:support@catchbackcards.com).
 </Note>
