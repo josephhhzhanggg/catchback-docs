@@ -70,7 +70,7 @@ This marks the payment as settled, exactly as a real customer payment would.
 
 ## 5. Open the pack and receive the item
 
-In production our background work runs every two minutes. In the sandbox it runs when you call **tick**, so you don't have to wait:
+Our background work runs every two minutes. In the sandbox you can also run it straight away by calling **tick**, so you don't have to wait:
 
 ```bash
 curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/tick" \
@@ -121,12 +121,12 @@ That's the whole flow. To try shipping instead, see [Shipping](/partner-api/v2/s
 |---|---|
 | Unifold Payment Intent, paid by the customer | Intent ids start `sbx_pi_`; mark one paid with [`POST /sandbox/payments/{intentId}`](/partner-api/v2/endpoints/sandbox-pay) |
 | `publishable_key`, deposit addresses | Placeholders (`pk_sandbox`, fixed addresses) |
-| Background work and webhooks every two minutes | Run when you call [`POST /sandbox/tick`](/partner-api/v2/endpoints/sandbox-tick) |
+| Background work and webhooks every two minutes | Also every two minutes, or right away when you call [`POST /sandbox/tick`](/partner-api/v2/endpoints/sandbox-tick) |
 | USDC payouts and refunds | Complete instantly (transfer ids start `sbx_tr_`); Solana payouts are allowed |
 | Carrier rates | One fixed rate: USPS Priority Mail (sandbox), $9.85 |
 | Your mint chain | A public testnet, real contract |
 | Sanctions screening | The real OFAC list |
-| Webhook URLs | Public `https://` URLs, and also `http://localhost`, `http://127.0.0.1` or `http://[::1]` on any port when the sandbox runs next to your receiver |
+| Webhook URLs | Public `https://` URLs, as in production. To receive on your own machine, use a tunnel such as ngrok |
 
 All three sandbox endpoints return **404** outside the sandbox.
 
