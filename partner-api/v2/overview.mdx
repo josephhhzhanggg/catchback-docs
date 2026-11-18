@@ -80,54 +80,36 @@ At purchase, each pack algorithmically selects one real item from our vault. The
 
 ### Who delivers the digital representation?
 
-We mint it straight to the customer's wallet. Your platform never holds the token or the customer's funds.
+We do, straight to the customer's wallet. Your platform passes us the wallet address and shows the result. It never holds the token, and it never touches the customer's money.
 
 ```text
  your platform:  POST /orders  { "recipient": "0x8f3c…" }   ◀── you only pass the address
  CatchBack:      mints the digital representation ──────────▶ customer's wallet
 ```
 
-1. Collect the customer's wallet address.
-2. Send it as `recipient` when you [create the order](/partner-api/v2/endpoints/create-order).
-3. Show the result when the order reaches `minted`: listen for [`nft_order.updated`](/partner-api/v2/webhooks) or call `GET /orders/{id}`.
+#### Step by step
 
-Money goes direct too:
+1. **Collect the customer's wallet address** on your program's chain (`mint_chain` in the [catalog](/partner-api/v2/endpoints/list-packs)). On EVM, one address is the same on every EVM chain, so a customer who pays from Base receives the token at that same address on your chain.
+2. **Create the order** with that address as `recipient` ([Create an order](/partner-api/v2/endpoints/create-order)). The response includes the payment details. Hand them to the customer, who pays within 24 hours in USDC on Base or Solana ([Payments](/partner-api/v2/payments)).
+3. **We open the pack and mint the token.** Once the payment settles, the order moves `paid` → `rolled` (the item is chosen and `order.pull` is set) → `minted` (the token is confirmed on chain and `order.token` is set). We pay the minting fee. If a mint doesn't land, we retry it (`mint_failed`); the pack is never opened twice.
+4. **Show the result.** Listen for the [`nft_order.updated`](/partner-api/v2/webhooks) webhook, or poll `GET /orders/{id}`. At `minted`, show the customer the item from `order.pull`.
 
-- **Sell-back payouts:** USDC to the holder's wallet, or to the quote's `payout_address`. See [Sell-back](/partner-api/v2/sell-back).
-- **Refunds:** USDC on Base to the order's `refund_address`, which defaults to `recipient` on EVM programs. See [Payments](/partner-api/v2/payments).
+A multi-pack order (`quantity` 2-10) is paid once, then each pack opens and mints on its own, so each unit moves through these statuses separately. Every status is listed in [Orders](/partner-api/v2/orders).
+
+#### Where the money goes
+
+Every payment and payout moves between the customer and CatchBack directly.
+
+| Money | Goes to | Details |
+|---|---|---|
+| **The customer's payment** | CatchBack, through our payment provider Unifold | You never collect or forward it |
+| **Sell-back payout** | USDC to the holder's wallet, or to the quote's `payout_address` | Paid on Base for EVM programs and on Solana for Solana programs. Solana payouts aren't on yet, so Solana programs send a Base `payout_address` for now. See [Sell-back](/partner-api/v2/sell-back) |
+| **Refund** | USDC on Base to the order's `refund_address` | Sent when the pack can't open after payment, the payment is more than 1% short, or it arrives after the 24-hour window. Defaults to `recipient` on EVM programs; required on Solana programs. See [Payments](/partner-api/v2/payments) |
+| **Your revenue share** | You | Reported month by month on your [revenue statement](/partner-api/v2/endpoints/get-revenue) |
 
 <Warning>
   `recipient` must be a self-custody wallet the customer controls, **never an exchange deposit address**. A digital representation minted to a deposit address lands in the exchange's wallet, and the customer may never be able to reach it.
 </Warning>
-
-## What you build
-
-<CardGroup cols={2}>
-  <Card title="A pack shop" icon="box-open" href="/partner-api/v2/endpoints/list-packs">
-    List packs, show odds, let the customer pick an odds mode.
-  </Card>
-  <Card title="A checkout" icon="credit-card" href="/partner-api/v2/payments">
-    Create an order; the customer pays in USDC on Base or Solana.
-  </Card>
-  <Card title="Order tracking" icon="list-check" href="/partner-api/v2/orders">
-    Follow each order from payment to mint, with the provably-fair proof.
-  </Card>
-  <Card title="Holdings" icon="wallet" href="/partner-api/v2/endpoints/list-wallet-tokens">
-    A wallet's CatchBack digital representations and today's sell-back value.
-  </Card>
-  <Card title="Sell-back" icon="arrow-rotate-left" href="/partner-api/v2/sell-back">
-    Quote, burn, get paid in USDC.
-  </Card>
-  <Card title="Shipping" icon="truck" href="/partner-api/v2/shipping">
-    Ship 1-25 items in one box, with tracking.
-  </Card>
-  <Card title="Webhooks" icon="bell" href="/partner-api/v2/webhooks">
-    Signed events for orders, sell-backs and shipments.
-  </Card>
-  <Card title="Sandbox" icon="flask" href="/partner-api/v2/quickstart">
-    The full flow on testnet with simulated payments.
-  </Card>
-</CardGroup>
 
 ## Basics
 
