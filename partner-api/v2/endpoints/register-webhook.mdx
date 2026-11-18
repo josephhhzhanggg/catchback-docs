@@ -1,0 +1,72 @@
+---
+title: "Register a webhook"
+api: "POST /api/partner/v2/webhooks"
+description: "Register your key's webhook URL, or change it. The signing secret is shown once."
+---
+
+Scope: `nft:orders`
+
+Registers this key's webhook (**201**, with the signing secret, shown once), or changes its URL (**200**, `"secret": null`: the secret stays the same). Events, signatures and retries: [Webhooks](/partner-api/v2/webhooks).
+
+- **One webhook per key.** To get a new secret, [delete](/partner-api/v2/endpoints/delete-webhook) the webhook and register again.
+- A key that has been rotated can't register or re-enable a webhook (`409 KEY_ROTATED`). A rotation moves the webhook to the new key by itself.
+
+<ParamField body="url" type="string" required>
+  A public `https://` URL on port 443, with a hostname (not an IP address) and no login in it, up to 2048 characters. In the sandbox, `http://localhost`, `http://127.0.0.1` and `http://[::1]` on any port also work.
+</ParamField>
+
+## Response
+
+<ResponseField name="webhook" type="object">
+  `id`, `url`, `enabled`, `created_at` and `updated_at`. Use `id` with [Test a webhook](/partner-api/v2/endpoints/test-webhook) and [Delete a webhook](/partner-api/v2/endpoints/delete-webhook).
+</ResponseField>
+<ResponseField name="secret" type="string | null">
+  The signing secret, `whsec_...`, on the first registration only. **Store it**: it is never returned again. `null` when you changed the URL of an existing webhook.
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_JSON` | The body isn't JSON |
+| `400` | `INVALID_WEBHOOK_URL` | The URL isn't a public `https://` URL; the message says why |
+| `409` | `KEY_ROTATED` | This key has been rotated; register the webhook with the new key |
+| `409` | `WEBHOOK_ACCOUNT_CHANGED` | This key's webhook was registered under an earlier setup of your program; `DELETE` it and register again |
+| `503` | `WEBHOOKS_UNAVAILABLE` | Webhooks aren't available on this server yet |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/webhooks \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "https://partner.example.com/catchback/webhooks" }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201
+{
+  "webhook": {
+    "id": "c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17",
+    "url": "https://partner.example.com/catchback/webhooks",
+    "enabled": true,
+    "created_at": "2026-11-17T10:00:00.000Z",
+    "updated_at": "2026-11-17T10:00:00.000Z"
+  },
+  "secret": "whsec_3f9a..."
+}
+```
+
+```json 200
+{
+  "webhook": {
+    "id": "c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17",
+    "url": "https://partner.example.com/catchback/webhooks-v2",
+    "enabled": true,
+    "created_at": "2026-11-17T10:00:00.000Z",
+    "updated_at": "2026-11-17T11:30:00.000Z"
+  },
+  "secret": null
+}
+```
+</ResponseExample>

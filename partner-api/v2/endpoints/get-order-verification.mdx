@@ -1,0 +1,70 @@
+---
+title: "Verify an order's pull"
+api: "GET /api/partner/v2/orders/{id}/verification"
+description: "The order's provably-fair proof, and a public URL your customer can open to re-run the check."
+---
+
+Scope: `nft:orders`
+
+Every pack is opened provably fairly. This returns the proof for an order's pull, and a public `verify_url` your customer can open to re-run the check without a key.
+
+<ParamField path="id" type="string" required>
+  A single order's `id` or `Idempotency-Key`, or one unit's `id` from a multi-pack order. A multi-pack order's own `id` or `Idempotency-Key` returns one proof per unit.
+</ParamField>
+
+## Response
+
+<ResponseField name="verification" type="object">
+  <Expandable title="verification">
+    <ResponseField name="order_id" type="string">Your `Idempotency-Key`.</ResponseField>
+    <ResponseField name="id" type="string">The order's id.</ResponseField>
+    <ResponseField name="pull_id" type="string" />
+    <ResponseField name="card_id" type="string" />
+    <ResponseField name="category" type="string" />
+    <ResponseField name="verified" type="boolean" />
+    <ResponseField name="verification_type" type="string">e.g. `provably_fair`.</ResponseField>
+    <ResponseField name="verify_url" type="string">A public URL that re-runs the check, with no key.</ResponseField>
+    <ResponseField name="proof" type="object">Exactly what `verify_url` returns: the verifier's step-by-step replay.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Multi-pack orders
+
+A multi-pack order's own `id` or `Idempotency-Key` returns `{ order_id, batch_id, verified, units: [...] }`: one proof per unit, each with its `unit` number. A unit not yet opened has `"verified": null, "pending": true`, and the order's `verified` is true only when every unit's is.
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `404` | `UNKNOWN_ORDER` | No such order in your program |
+| `409` | `NOT_PULLED` | The order's pack hasn't been opened yet; the body has the order's `status` |
+| `503` | `VERIFY_UNAVAILABLE` | The proof couldn't be loaded right now; retry shortly |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v2/orders/okx-ord-7f3a9c21/verification \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "verification": {
+    "order_id": "okx-ord-7f3a9c21",
+    "id": "3d2b8f0e-6c1a-4f7e-9a51-2b0d8c4e7f13",
+    "pull_id": "6a0f...",
+    "card_id": "a1c4...",
+    "category": "pokemon",
+    "verified": true,
+    "verification_type": "provably_fair",
+    "verify_url": "https://catchbackcards.com/api/verify-pull?transaction_id=6a0f...&card_source=pokemon",
+    "proof": { "verified": true, "verification_type": "provably_fair", "...": "the verifier's step-by-step replay" }
+  }
+}
+```
+
+```json 409
+{ "error": "This order has not been opened yet", "code": "NOT_PULLED", "status": "awaiting_payment" }
+```
+</ResponseExample>

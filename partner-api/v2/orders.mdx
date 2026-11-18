@@ -1,0 +1,50 @@
+---
+title: "Orders and statuses"
+description: "The lifecycle of a wallet order, multi-pack orders and their units, and what each status means."
+---
+
+One order buys 1-10 packs of one kind for one wallet, paid with one payment. Create it with [`POST /orders`](/partner-api/v2/endpoints/create-order), follow it with [`GET /orders/{id}`](/partner-api/v2/endpoints/get-order) or the [`nft_order.updated`](/partner-api/v2/webhooks#events) webhook, and prove the pull with [`GET /orders/{id}/verification`](/partner-api/v2/endpoints/get-order-verification).
+
+## Order statuses
+
+```text
+awaiting_payment ──payment settles──▶ paid ──pack opened──▶ rolled ──mint confirmed──▶ minted
+   │                                    │                     │
+   │                                    │                     └─▶ mint_failed ──retried──▶ minted
+   │                                    └─pack refused after payment─▶ refund_due ──▶ refunded
+   └─not paid in 24 h─▶ expired ──paid anyway─▶ refund_due ──▶ refunded
+```
+
+| Status | Meaning | Final? |
+|---|---|---|
+| `awaiting_payment` | Waiting for the customer's payment, for up to 24 hours | no |
+| `expired` | Not paid within 24 hours. A payment that still arrives is refunded in full | yes, unless paid late |
+| `paid` | Payment settled; the pack opens next | no |
+| `rolled` | The pack opened: `pull` is set; the NFT is being minted | no |
+| `minted` | The NFT is in `recipient`'s wallet: `token.status` is `confirmed` | **yes** |
+| `mint_failed` | The mint hasn't landed yet. It is retried and never re-opens the pack; if it can't complete, our team resolves it. `failure_reason` says why | no |
+| `refund_due` | The customer is being refunded in USDC on Base to `refund_address`. `failure_reason` says why: the pack couldn't open after payment (for example it sold out in between), `paid_after_expiry`, or `underpaid` (more than 1% short) | no |
+| `refunded` | The refund was sent | **yes** |
+
+## The pull and the token
+
+Once paid and opened, the order carries:
+
+- `pull`: the item pulled (`card_id`, `category`, `name`, `value`, `pulled_at`). `pull.value` is the item's value when it was pulled; it anchors the [sell-back offer](/partner-api/v2/sell-back).
+- `token`: the NFT. On EVM it has `chain`, `contract`, `token_id`, `status` and `tx`; on a Solana program it has `collection` and `asset` instead of `contract`.
+
+`token.status`: `pending` (reserved, not sent), `submitted`, `confirmed`, `failed` (being retried), or `burned` once the token has been sold back or shipped.
+
+## Multi-pack orders
+
+A multi-pack order (`quantity` 2-10) is one payment for `quantity` × the pack price. Each pack inside it is a **unit**: once the payment settles, every unit opens, mints and (if it has to) refunds on its own, exactly like a single order.
+
+- `price` is the total due; `unit_price` the price of one pack. Each unit is in the single-order shape plus `batch_id` and `unit` (1 to `quantity`), and carries its own `pull` and `token`.
+- [`GET /orders/{id}`](/partner-api/v2/endpoints/get-order) with your `Idempotency-Key` or the order's `id` returns the whole order; with one unit's `id` it returns that unit.
+- **The order's `status`:** `awaiting_payment` until paid; once paid, the units' status when they all agree (`paid`, `rolled`, `minted`, `refund_due`, `refunded`, `expired`, ...); otherwise `processing` while any unit is still moving, and `completed` once every unit is final (for example some `minted` and one `refunded`).
+- **Refunds are per unit.** A unit that can't open after payment goes to `refund_due` on its own and refunds its share of the payment. A payment that arrives after the 24-hour window refunds every unit its share (`paid_after_expiry`).
+- In [`GET /orders`](/partner-api/v2/endpoints/list-orders) and in webhooks the units appear one by one, each with the order's `order_id`, its `batch_id` and its `unit` number.
+
+## Provably fair
+
+Every pack is opened provably fairly. [`GET /orders/{id}/verification`](/partner-api/v2/endpoints/get-order-verification) returns the proof for an order's pull, and a public `verify_url` your customer can open to re-run the check without a key.

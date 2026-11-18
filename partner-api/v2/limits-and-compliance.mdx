@@ -1,0 +1,51 @@
+---
+title: "Limits and compliance"
+description: "Request rates per key, sell-back payout limits, underpayment, sanctions screening, KYC and held payouts."
+---
+
+## Request rate
+
+Per key:
+
+| Endpoint | Limit |
+|---|---|
+| `POST /orders` | 30 a minute |
+| `POST /shipments/estimate` and `POST /tokens/{tokenId}/shipment/estimate`, together | 30 a minute |
+| Every other endpoint, together | 120 a minute |
+
+Over a limit is a `429 RATE_LIMITED` with `retry_after_seconds` and a `Retry-After` header. Treat these numbers as ceilings and stay well under them.
+
+```json
+{ "error": "Too many requests. Slow down.", "code": "RATE_LIMITED", "retry_after_seconds": 12 }
+```
+
+## Money limits
+
+| Limit | Value | What happens |
+|---|---|---|
+| Sell-back payouts per address | **$5,000 per UTC day**, per payout address | A payout that would take the USDC sent to that address that day over the limit is `held` for review by our team, then released |
+| Sell-back payouts per program | A daily cap across all your customers (set with you at onboarding) | Beyond it, payouts that day are `held` for review, then released. A safety net against pricing errors or a compromised integration; normal volume never reaches it |
+| Underpayment | 1% tolerance | A payment more than 1% short opens nothing: the order goes to `refund_due` with `failure_reason: "underpaid"` and everything that arrived is refunded |
+
+There is no limit on how much a wallet buys.
+
+## Sanctions screening
+
+Every wallet is checked against the US Treasury (OFAC) sanctions list of digital-currency addresses:
+
+- the `recipient` and `refund_address` of an order;
+- the `holder` and `payout_address` of a sell-back quote;
+- the `holder` of a shipment;
+- every payout destination, again right before we send.
+
+A match is a `403 WALLET_REFUSED` (or a payout `held`). If screening is briefly unavailable we fail closed: `503 SCREENING_UNAVAILABLE` on a request, or a payout `held` until it can be checked.
+
+Your servers can call from anywhere except a country on our sanctions list, which gets a `403` `Access denied` on every endpoint.
+
+## KYC
+
+KYC of your users is yours, per our agreement. Never send personal data in `partner_user_ref`.
+
+## Held payouts
+
+A payout is `held` when it is over the daily payout limit, when its destination fails or can't complete screening, or when payouts are paused. Held payouts are reviewed and released by our team; the quote stays `redeemed` and the amount owed doesn't change. Show a held payout to your customer as "under review", not failed.

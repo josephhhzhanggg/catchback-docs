@@ -1,0 +1,51 @@
+---
+title: "Payments"
+description: "How a customer pays for an order or a shipment: the Unifold Payment Intent, chains, tolerance, the 24-hour window and refunds."
+---
+
+Each order (and each [shipment](/partner-api/v2/shipping)) has its own **Unifold Payment Intent** for exactly its amount. Unifold accepts the payment, converts and bridges it, and tells us when it has settled.
+
+## The `payment` object
+
+[`POST /orders`](/partner-api/v2/endpoints/create-order), [`POST /shipments`](/partner-api/v2/endpoints/create-shipment) and [`POST /tokens/{tokenId}/shipment`](/partner-api/v2/endpoints/create-token-shipment) return it:
+
+```json
+{
+  "intent_id": "pi_01JD...",
+  "client_secret": "pi_01JD..._secret_...",
+  "publishable_key": "pk_live_...",
+  "amount": 25,
+  "deposit_addresses": [
+    { "chain": "evm:8453", "address": "0x5a4d...0001" },
+    { "chain": "solana:mainnet", "address": "9xQe...Vf2p" }
+  ]
+}
+```
+
+| Field | Use |
+|---|---|
+| `intent_id` | The Payment Intent's id |
+| `client_secret` | Opens Unifold's checkout for this intent in your app, with Unifold's web or React Native SDK |
+| `publishable_key` | The Unifold publishable key to initialise that SDK with. It is public and safe in an app |
+| `amount` | The amount due, in USD (a multi-pack order's total) |
+| `deposit_addresses` | Addresses the customer can send to directly: `evm:8453` (Base) and `solana:mainnet` |
+
+Your checkout either opens Unifold's checkout with `client_secret` and `publishable_key`, or shows the customer `deposit_addresses` and `amount`.
+
+<Note>
+  `GET /orders/{id}` and `GET /shipments/{id}` don't include `payment`. Replaying the create POST with the same `Idempotency-Key` returns it while the order or shipment is unpaid. Once an order is past `awaiting_payment`, a replay's `payment` has no `client_secret` and no deposit addresses: there is nothing left to pay.
+</Note>
+
+## Rules
+
+- **Chains:** pay on **Base** or **Solana**. USDC is the simplest; Unifold converts other tokens it accepts, and conversion costs come off what arrives.
+- **Tolerance:** an intent counts as paid once at least **99%** of the amount has arrived (swap slippage and wallet fees are absorbed). Payments toward one intent add up, so an underpaid customer can send the rest to the same address.
+- **Underpayment:** a payment more than 1% short opens nothing: the order goes to `refund_due` with `failure_reason: "underpaid"` and everything that arrived is refunded.
+- **Overpayment** is not returned automatically. Send exactly `amount`.
+- **Payment window:** an order must be paid within **24 hours** of its creation, after which it becomes `expired`. A payment that lands after that is refunded in full (`paid_after_expiry`). An unpaid shipment never expires.
+- **Refunds** go out as USDC on Base to the order's `refund_address`, for the amount received (a multi-pack unit gets its share). A refund that fails to send is retried automatically.
+- **One payment per intent.** Never reuse a deposit address for another order.
+
+<Warning>
+  Payment Intents are live-mode only: in production every payment is real money. Use the [sandbox](/partner-api/v2/quickstart) to test.
+</Warning>

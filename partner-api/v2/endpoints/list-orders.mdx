@@ -1,0 +1,59 @@
+---
+title: "List orders"
+api: "GET /api/partner/v2/orders"
+description: "Your program's orders, newest first, paged."
+---
+
+Scope: `nft:orders`
+
+Newest first, each order in the [Get an order](/partner-api/v2/endpoints/get-order) shape. The units of a multi-pack order are listed one by one, each with the order's `order_id`, its `batch_id` and its `unit` number, as `GET /orders/{id}` shows a unit.
+
+<ParamField query="wallet" type="string">
+  A `recipient` address on your mint chain. Default: all.
+</ParamField>
+<ParamField query="partner_user_ref" type="string">
+  A `partner_user_ref` you sent with an order. It matches the wallets you first sent with that ref. Default: all.
+</ParamField>
+<ParamField query="status" type="string">
+  `awaiting_payment`, `paid`, `rolled`, `minted`, `mint_failed`, `expired`, `refund_due` or `refunded`. Default: all.
+</ParamField>
+<ParamField query="limit" type="integer" default="25">
+  1-100.
+</ParamField>
+<ParamField query="cursor" type="string">
+  The `next_cursor` of the previous page. Opaque: pass it back unchanged.
+</ParamField>
+
+## Response
+
+<ResponseField name="orders" type="object[]">Each in the [Get an order](/partner-api/v2/endpoints/get-order) shape.</ResponseField>
+<ResponseField name="next_cursor" type="string | null">Null on the last page.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_CURSOR` | `cursor` isn't a `next_cursor` from a previous page |
+| `400` | `BAD_LIMIT` | `limit` isn't 1-100 |
+| `400` | `BAD_STATUS` | `status` isn't one the list filters on; the message lists them |
+| `400` | `BAD_ADDRESS` | `wallet` is not an address on your mint chain |
+| `400` | `BAD_PARTNER_USER_REF` | `partner_user_ref` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `400` | `TOO_MANY_WALLETS` | That `partner_user_ref` covers more than 200 wallets; filter by `wallet` instead |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v2/orders?wallet=0x8f3c...e21a&status=minted&limit=25" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "orders": [
+    { "order_id": "okx-ord-7f3a9c21", "id": "3d2b8f0e-...", "status": "minted", "...": "..." }
+  ],
+  "next_cursor": "WyIyMDI2LTExLTE2VDE4OjAyOjExLjQyMDEyMyswMDowMCIsIjNkMmI4ZjBlLS4uLiJd"
+}
+```
+</ResponseExample>

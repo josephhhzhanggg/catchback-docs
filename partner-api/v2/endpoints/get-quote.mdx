@@ -1,0 +1,60 @@
+---
+title: "Get a quote"
+api: "GET /api/partner/v2/quotes/{quoteId}"
+description: "One sell-back quote and the progress of its USDC payout."
+---
+
+Scope: `nft:orders`
+
+A sell-back quote and its payout. We count a burn after a few block confirmations (EVM) or finalization (Solana), then pay within minutes. The amount paid is always exactly `amount_usd`. Every payout status change is also sent as a `sellback.updated` [webhook](/partner-api/v2/webhooks).
+
+<ParamField path="quoteId" type="string" required>
+  The `quote_id` from [Quote a sell-back](/partner-api/v2/endpoints/create-sellback-quote).
+</ParamField>
+
+## Response
+
+<ResponseField name="quote" type="object">
+  <Expandable title="quote">
+    <ResponseField name="quote_id" type="string" />
+    <ResponseField name="status" type="string">`ready` (issued and not yet burned with), `expired` (not burned before `expires_at`; can no longer be used) or `redeemed` (we saw the burn; the payout is queued).</ResponseField>
+    <ResponseField name="amount_usd" type="number" />
+    <ResponseField name="holder" type="string" />
+    <ResponseField name="payout" type="object">
+      `chain`, `address`, `status`, `tx_hash` and `held`. `status`: `null` (no burn seen yet), `pending` (queued to send), `sending` (sent to the network, waiting to settle), `sent` (paid: `tx_hash` is the USDC transfer on `payout.chain`), `held` (under review by our team, `held: true`; see [Held payouts](/partner-api/v2/limits-and-compliance#held-payouts)) or `failed` (a send failed; it is retried automatically).
+    </ResponseField>
+    <ResponseField name="expires_at" type="string" />
+    <ResponseField name="redeemed_at" type="string | null" />
+    <ResponseField name="burn_tx" type="string | null" />
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `404` | `UNKNOWN_QUOTE` | No such sell-back quote in your program |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v2/quotes/0x5e0c...91ab \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "quote": {
+    "quote_id": "0x5e0c...91ab",
+    "status": "redeemed",
+    "amount_usd": 330,
+    "holder": "0x8f3c...e21a",
+    "payout": { "chain": "evm:8453", "address": "0x8f3c...e21a", "status": "sent", "tx_hash": "0x77d0...", "held": false },
+    "expires_at": "2026-11-16T18:30:00.000Z",
+    "redeemed_at": "2026-11-16T18:21:13.000Z",
+    "burn_tx": "0x3be1..."
+  }
+}
+```
+</ResponseExample>

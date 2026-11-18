@@ -1,0 +1,48 @@
+---
+title: "Odds"
+description: "Standard, Hot, Chill and Classic: the odds choices a customer buys at, and how to show them."
+---
+
+Customers choose the odds they buy at, exactly as in our app. The odds shown are the odds the pack is opened with.
+
+| `odds` | Label | What it is |
+|---|---|---|
+| `standard` | Standard | The shared value-band ladder at its regular chances |
+| `hot` | Hot | The same bands: fewer hits, bigger chase |
+| `chill` | Chill | The same bands: more hits, smaller swings |
+| `classic` | Classic | The pack's own bands and chances |
+
+- Standard, Hot and Chill share one band ladder and differ only in the chance of each band.
+- A pack that sells only its own odds lists just `classic`.
+- On packs that offer the choice, every one of them sells back at 100% for the first 5 minutes after the NFT is confirmed ([Sell-back](/partner-api/v2/sell-back)); the pool's `fresh_buyback_rate` gives the exact rate for each.
+
+## Which odds a pack sells
+
+[`GET /catalog/packs`](/partner-api/v2/endpoints/list-packs) lists, for each pack:
+
+- `odds`: the odds choices the pack sells, in the order our app's picker shows them;
+- `default_odds`: the one an order gets when it names none (Standard wherever it is sold).
+
+Whether a particular odds choice is selling right now is on the pool endpoint.
+
+## Show the odds before the customer buys
+
+[`GET /catalog/packs/pool`](/partner-api/v2/endpoints/get-pack-pool) returns what one pack can pull at one odds choice: the value bands with their chances, whether those odds are selling right now, and every item a pull can produce. This is the same information as the odds panel in our app, so show it to your customers before they buy.
+
+```bash
+curl "https://catchbackcards.com/api/partner/v2/catalog/packs/pool?pack_type=bronze&category=pokemon&odds=hot" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+
+- `bands[].odds` is the chance (0 to 1) of a pull landing in that band at these odds, and `cards` how many items sit in it. A band at 0 can't pull at these odds.
+- `available` says whether these odds are selling right now; `odds_choices` gives the same for every choice the pack sells.
+- `consolation_probability` is the chance of the pack's consolation prize, where it has one, else null.
+- `fresh_buyback_rate` is the sell-back rate in the fresh window, as a fraction (`1` = 100%).
+
+## Ordering at an odds choice
+
+Pass `odds` to [`POST /orders`](/partner-api/v2/endpoints/create-order). The order's `odds` is the odds the pack is opened at.
+
+- An `odds` value the pack doesn't sell is `400 BAD_ODDS`, with `odds` listing the choices it sells.
+- Odds that aren't selling right now are `409 ODDS_UNAVAILABLE`, and nothing is created: try another choice or later.
+- If those odds stop selling before the payment settles, the pack isn't opened at other odds: the order goes to `refund_due` and the customer is refunded.

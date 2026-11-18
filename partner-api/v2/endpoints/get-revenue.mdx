@@ -1,0 +1,68 @@
+---
+title: "Get your revenue statement"
+api: "GET /api/partner/v2/revenue"
+description: "Your revenue share, month by month: one month, or the last 12."
+---
+
+Scope: `nft:orders`
+
+Your revenue share, month by month: one month with `period`, or the last 12 months (newest first) without it. A sale counts in the month it was paid; a refund in the month it was refunded. Amounts in USD.
+
+<ParamField query="period" type="string">
+  A month, `YYYY-MM`. Without it, the last 12 months.
+</ParamField>
+
+## Response
+
+<ResponseField name="program" type="string">Your program.</ResponseField>
+<ResponseField name="currency" type="string">`USD`.</ResponseField>
+<ResponseField name="months" type="object[]">
+  <Expandable title="month">
+    <ResponseField name="period" type="string">`YYYY-MM`.</ResponseField>
+    <ResponseField name="orders" type="integer">Packs paid that month.</ResponseField>
+    <ResponseField name="gmv" type="number">Their price.</ResponseField>
+    <ResponseField name="share_pct" type="number">Your share rate.</ResponseField>
+    <ResponseField name="share_amount" type="number">What it earned on `gmv`.</ResponseField>
+    <ResponseField name="refunds" type="object">Refunds that month: `count`, their price (`gmv`), and the share they take back (`share_amount`).</ResponseField>
+    <ResponseField name="net_gmv" type="number">After refunds.</ResponseField>
+    <ResponseField name="net_share" type="number">After refunds: what you are owed for the month.</ResponseField>
+    <ResponseField name="payout" type="object">
+      `status`: `open` (the month is still running), `due` (closed, owed and not paid yet), `paid` (with `amount`, `reference` and `paid_at`) or `none` (nothing owed).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_PERIOD` | `period` isn't `YYYY-MM` |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v2/revenue?period=2026-11" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "program": "okx",
+  "currency": "USD",
+  "months": [
+    {
+      "period": "2026-11",
+      "orders": 412,
+      "gmv": 18250,
+      "share_pct": 5,
+      "share_amount": 912.5,
+      "refunds": { "count": 3, "gmv": 125, "share_amount": 6.25 },
+      "net_gmv": 18125,
+      "net_share": 906.25,
+      "payout": { "status": "open", "amount": null, "reference": null, "paid_at": null }
+    }
+  ]
+}
+```
+</ResponseExample>

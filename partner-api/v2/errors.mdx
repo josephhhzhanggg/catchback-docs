@@ -1,0 +1,106 @@
+---
+title: "Errors"
+description: "Status codes and every error code in Partner API v2."
+---
+
+Error bodies are `{ "error": "<message>" }`. Errors your integration should act on also carry a stable `code`, and some carry extra fields. **Branch on `code`, never on the message text.**
+
+```json
+{ "error": "Too many requests. Slow down.", "code": "RATE_LIMITED", "retry_after_seconds": 12 }
+```
+
+## Status codes
+
+| Status | Meaning |
+|---|---|
+| `400` | Bad parameter or body |
+| `401` | Missing, malformed, disabled, expired or unknown API key |
+| `403` | Scope, program, or a wallet we can't serve |
+| `404` | No such order, token, quote, shipment, payment, webhook or pack in your program |
+| `409` | The token, shipment, key, rate or price is not in the state the request needs |
+| `422` | An `Idempotency-Key` reused for a different request |
+| `429` | A request-rate limit (`RATE_LIMITED`) |
+| `500` | Our fault: retry with backoff, with the same `Idempotency-Key` where the endpoint takes one |
+| `503` | A dependency (wallet screening, the chain, the proof, webhooks) is briefly unavailable; retry shortly |
+
+The errors every endpoint can return before it does anything else (`401`, `403`, `429`, `503`) are listed on [Authentication and keys](/partner-api/v2/authentication#errors-every-endpoint-can-return-first).
+
+## Every code
+
+| `code` | Status | Endpoint | When |
+|---|---|---|---|
+| `RATE_LIMITED` | `429` | all | Too many requests; wait `retry_after_seconds` |
+| `NO_PROGRAM` | `403` | all | The key isn't linked to a partner program |
+| `PROGRAM_INACTIVE` | `403` | all | Your program is not live |
+| `NOT_AVAILABLE` | `403` | all | Wallet orders aren't switched on for your program yet |
+| `AUTH_UNAVAILABLE` | `503` | all | We couldn't check your key right now (never means the key is bad); retry after `Retry-After` |
+| `BAD_IDEMPOTENCY_KEY` | `400` | orders, shipments, keys rotate | `Idempotency-Key` missing, or not 8-128 characters of `A-Z a-z 0-9 _ -` |
+| `IDEMPOTENCY_KEY_REUSED` | `422` | orders, shipments | The key was already used for a different order or shipment ([Idempotency](/partner-api/v2/idempotency)) |
+| `BAD_RECIPIENT` | `400` | orders | `recipient` is not a wallet address on your mint chain |
+| `BAD_PACK` | `400` | orders, pool | `pack_type` missing |
+| `BAD_CATEGORY` | `400` | orders, pool | Unknown `category` |
+| `BAD_ODDS` | `400` | orders, pool | `odds` not `standard`, `hot`, `chill` or `classic`, or not one the pack sells; in the second case the body's `odds` lists the choices it sells |
+| `BAD_QUANTITY` | `400` | orders | `quantity` isn't a whole number from 1 to 10 |
+| `ODDS_UNAVAILABLE` | `409` | orders, pool | Those odds aren't selling right now; try another choice or later. Nothing is created |
+| `BAD_REFUND_ADDRESS` | `400` | orders | No usable EVM `refund_address` (required when you mint on Solana) |
+| `PACK_NOT_OFFERED` | `404` | orders, pool | That pack isn't sold through your program |
+| `PACK_UNAVAILABLE` | `409` | orders | A pack that sells only its own odds can't open right now; `reason` says why. Nothing is created |
+| `WALLET_REFUSED` | `403` | orders, quote, shipments | A wallet in the request failed sanctions screening |
+| `WALLET_BLOCKED` | `403` | orders | This wallet may not buy from CatchBack |
+| `SCREENING_UNAVAILABLE` | `503` | orders, quote, shipments | Wallet screening is briefly unavailable; retry shortly |
+| `UNKNOWN_ORDER` | `404` | order GET, verification | No such order in your program (by id or `Idempotency-Key`) |
+| `NOT_PULLED` | `409` | verification | The order's pack hasn't been opened yet; the body has its `status` |
+| `VERIFY_UNAVAILABLE` | `503` | verification | The proof couldn't be loaded right now; retry shortly |
+| `BAD_CURSOR` | `400` | lists | `cursor` isn't a `next_cursor` from a previous page |
+| `BAD_LIMIT` | `400` | lists | `limit` isn't 1-100 |
+| `BAD_STATUS` | `400` | order and shipment lists | `status` isn't one the list filters on; the message lists them |
+| `BAD_ADDRESS` | `400` | lists, wallet tokens, shipments, estimates | A wallet (`wallet`, or the path's address) is not an address on your mint chain; on a shipment or estimate, the shipping address is invalid and `fields` maps each bad field to a message |
+| `BAD_PARTNER_USER_REF` | `400` | order list | `partner_user_ref` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `TOO_MANY_WALLETS` | `400` | order list | That `partner_user_ref` covers more than 200 wallets; filter by `wallet` instead |
+| `UNKNOWN_TOKEN` | `404` | token GET, quote, shipments, estimates | No such token on your program's contract; on the multi-token endpoints `token_ids` lists the unknown ones |
+| `BAD_HOLDER` | `400` | quote, shipments, estimates | `holder` is not a wallet address on your mint chain |
+| `NOT_HOLDER` | `403` | quote, shipments, estimates | That wallet does not hold the token on chain right now; on the multi-token endpoints `token_ids` lists the tokens it doesn't hold |
+| `CHAIN_UNAVAILABLE` | `503` | quote, shipments, estimates, renew | We couldn't read the token's owner from the chain; retry shortly |
+| `TOKEN_NOT_MINTED` | `409` | quote | The token's mint hasn't confirmed yet |
+| `TOKEN_BURNED` | `409` | quote | The token was already sold back or shipped |
+| `TOKEN_NOT_LIVE` | `409` | shipments, estimates, renew | The token isn't minted yet, or was already burned; on the multi-token endpoints `token_ids` lists them |
+| `NO_OFFER` | `409` | quote | The item has no sell-back offer right now |
+| `PAYOUT_CHAIN_NOT_SUPPORTED` | `400` | quote | `payout_chain` is not one we pay on (`evm:8453` or `solana:mainnet`) |
+| `PAYOUT_CHAIN_NOT_ENABLED` | `400` | quote | Payouts on that chain aren't switched on yet (today: `solana:mainnet`); send `payout_chain: "evm:8453"` with a Base `payout_address` |
+| `BAD_PAYOUT_ADDRESS` | `400` | quote | No usable `payout_address` for the payout chain (required when it isn't your mint chain's family) |
+| `USE_SHIPMENT_ENDPOINT` | `400` | quote | `kind: "shipment"` sent to the quote endpoint; shipments start at `POST /shipments` |
+| `BAD_TOKEN_IDS` | `400` | shipments, estimate | `token_ids` isn't a list of 1-25 distinct decimal token ids |
+| `TOKEN_IN_SHIPMENT` | `409` | shipments | A token already has a paid shipment waiting for its burn; the body's `token_ids` lists them (and `quote_id` on the one-token endpoint). Burn or renew that shipment instead |
+| `BAD_COVER` | `400` | shipments, estimates | `cover_amount` isn't a positive dollar amount with at most two decimals |
+| `COVER_NOT_ALLOWED` | `400` | shipments, estimates | `cover_amount` is outside what the items can be insured for; the body has `order_value`, `min_cover` and `max_cover` (`max_cover` is null when they can't be insured) |
+| `COVER_UNAVAILABLE` | `409` | shipments | The chosen service has no cover option; choose another rate or leave `cover_amount` out |
+| `BAD_MAX_COST` | `400` | shipments | `max_cost` missing or not positive |
+| `NOT_SHIPPABLE` | `400` | shipments, estimates | This item can't ship (with `token_ids` on the multi-token endpoints) |
+| `PARTNER_GOODS` | `400` | shipments, estimates | The item is held by its brand partner and can't ship through CatchBack; it can still be sold back |
+| `COUNTRY_NOT_SUPPORTED` | `400` | shipments, estimates | We don't ship to that country |
+| `OVER_CUSTOMS_CAP` | `400` | shipments, estimates | The items are worth more than we can ship internationally |
+| `RATE_UNAVAILABLE` | `409` | shipments | The carrier no longer offers that rate; estimate again |
+| `PRICE_CHANGED` | `409` | shipments | The shipping cost is now above `max_cost`; the body has the current `amount` |
+| `UNKNOWN_SHIPMENT` | `404` | shipment GET, renew, sandbox shipments | No such shipment in your program |
+| `NOT_PAID` | `409` | renew | The shipping isn't paid yet |
+| `ALREADY_REDEEMED` | `409` | renew | The token (every token, on a multi-token shipment) was already burned and the box is shipping |
+| `HOLDER_CHANGED` | `409` | renew | A token changed hands after the shipping was paid (`token_ids` lists them on a multi-token shipment); contact CatchBack support with the `quote_id` or `shipment_id` |
+| `UNKNOWN_QUOTE` | `404` | quote GET | No such sell-back quote in your program |
+| `BAD_JSON` | `400` | every POST with a body | The body isn't JSON |
+| `INVALID_WEBHOOK_URL` | `400` | webhooks | The URL isn't a public `https://` URL ([Webhooks](/partner-api/v2/webhooks)); the message says why |
+| `WEBHOOK_ACCOUNT_CHANGED` | `409` | webhooks | This key's webhook was registered under an earlier setup of your program; `DELETE` it and register again |
+| `WEBHOOKS_UNAVAILABLE` | `503` | webhooks | Webhooks aren't available on this server yet |
+| `UNKNOWN_WEBHOOK` | `404` | webhooks | No such webhook on this key |
+| `KEY_ROTATED` | `409` | webhooks | This key has been rotated; register the webhook with the new key |
+| `BAD_PERIOD` | `400` | revenue | `period` isn't `YYYY-MM` |
+| `INVALID_KEY` | `401` | keys | The key is disabled, or a rotated key past its 24 hours |
+| `NO_PREVIOUS_KEY` | `409` | keys revoke-previous | This key didn't replace another key |
+| `ALREADY_ROTATED` | `409` | keys rotate | This key was already rotated with a different `Idempotency-Key`; the body has `successor` (`id`, `name`) and `expires_at` |
+| `UNKNOWN_PAYMENT` | `404` | sandbox payments | No such payment in your program |
+| `NOT_BURNED` | `409` | sandbox shipments | The shipment has no shipping order yet: burn it, then tick |
+
+## Errors without a code
+
+A `400` without a `code` is a malformed request (an unknown `category` on the catalog, a `kind` other than `sellback` on a quote, a `status` other than `shipped` or `delivered` on the sandbox shipment endpoint). Every unknown order, token, quote, shipment, payment or webhook id answers `404` with its `UNKNOWN_*` code.
+
+A `500` body says `Something went wrong; retry with the same Idempotency-Key.` Retry with backoff.

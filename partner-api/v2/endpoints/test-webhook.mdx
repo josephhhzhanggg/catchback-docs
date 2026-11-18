@@ -1,0 +1,46 @@
+---
+title: "Test a webhook"
+api: "POST /api/partner/v2/webhooks/{id}/test"
+description: "Send one signed ping event to your URL now, with no retry, and see how your receiver answered."
+---
+
+Scope: `nft:orders`
+
+Sends one signed `ping` event (`data: { "webhook_id": "<id>" }`) to your URL right now, with no retry, and answers how your receiver responded. Use it to check your signature verification before go-live.
+
+<ParamField path="id" type="string" required>
+  The webhook's `id`.
+</ParamField>
+
+## Response
+
+<ResponseField name="event_id" type="string">The `ping` event's `id`.</ResponseField>
+<ResponseField name="delivered" type="boolean">True when your receiver answered `2xx`.</ResponseField>
+<ResponseField name="response_status" type="integer | null">Your status code, or null when there was none.</ResponseField>
+<ResponseField name="error" type="string | null">
+  On a failure, a short reason: `http_<status>`, `redirect_refused`, `timeout`, `dns_failed`, `connect_failed`, `blocked_address` or `invalid_url`.
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `404` | `UNKNOWN_WEBHOOK` | No such webhook on this key |
+| `503` | `WEBHOOKS_UNAVAILABLE` | Webhooks aren't available on this server yet |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/webhooks/c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17/test \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{ "event_id": "evt_9c1d...", "delivered": true, "response_status": 200, "error": null }
+```
+
+```json 200 failed
+{ "event_id": "evt_9c1d...", "delivered": false, "response_status": 500, "error": "http_500" }
+```
+</ResponseExample>

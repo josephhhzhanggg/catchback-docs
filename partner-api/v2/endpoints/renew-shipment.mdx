@@ -1,0 +1,62 @@
+---
+title: "Renew a shipment"
+api: "POST /api/partner/v2/shipments/{id}/renew"
+description: "A new 24-hour burn window for a paid shipment whose window lapsed, under the same quote ids."
+---
+
+Scope: `nft:orders`
+
+If not every token was burned within the 24 hours, the shipment shows `status: "expired"`, with no `burn` on the tokens still unburned. Renewing gives the unburned tokens a new 24-hour window under the same `quote_id`s; the shipping already paid still counts. No body.
+
+- A window that is still open is returned unchanged with `renewed: false`.
+- **If a multi-token shipment's window lapses and it isn't renewed,** it closes **24 hours after `expires_at`**: the tokens already burned ship, and the rest are `dropped` (still live in the holder's wallet). The shipment's `status` becomes `partially_redeemed`.
+- A one-token shipment renews the same way (`{id}` is its `quote_id`) and answers with that shipment's own shape; it never closes by itself.
+- A burn window lapsing sends no webhook: watch `expires_at`.
+
+<ParamField path="id" type="string" required>
+  A `shipment_id`, or any `quote_id`.
+</ParamField>
+
+## Response
+
+<ResponseField name="shipment" type="object">The shipment, in its [Get a shipment](/partner-api/v2/endpoints/get-shipment) shape, with fresh `burn`s and a new `expires_at`.</ResponseField>
+<ResponseField name="renewed" type="boolean">`false` when the window was still open and nothing changed.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `404` | `UNKNOWN_SHIPMENT` | No such shipment in your program |
+| `409` | `NOT_PAID` | The shipping isn't paid yet |
+| `409` | `ALREADY_REDEEMED` | The token (every token, on a multi-token shipment) was already burned and the box is shipping |
+| `409` | `TOKEN_NOT_LIVE` | A token isn't live |
+| `409` | `HOLDER_CHANGED` | A token still to be burned changed hands after the shipping was paid (`token_ids` lists them on a multi-token shipment). The shipment can't be renewed: contact CatchBack support with the `shipment_id` or `quote_id`. Tokens already burned still ship once the grace period ends |
+| `503` | `CHAIN_UNAVAILABLE` | We couldn't read the token's owner from the chain; retry shortly |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/shipments/7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73/renew \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "shipment": {
+    "shipment_id": "7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73",
+    "status": "ready",
+    "shipping_cost": 9.85,
+    "holder": "0x8f3c...e21a",
+    "expires_at": "2026-11-19T09:12:40.000Z",
+    "paid_at": "2026-11-16T18:41:02.000Z",
+    "tokens": [
+      { "token_id": "90311820476190023716442901288201455", "quote_id": "0x1b7c...e4a0", "status": "redeemed", "burned_at": "2026-11-16T19:02:10.000Z", "burn_tx": "0x51c0...", "burn": null },
+      { "token_id": "81264573985362058461377125337283195667", "quote_id": "0xa93f...0c2d", "status": "ready", "burned_at": null, "burn_tx": null, "burn": { "quote": { "tokenId": "...", "kind": 2, "...": "..." }, "signature": "0x..." } }
+    ],
+    "fulfilment": null
+  },
+  "renewed": true
+}
+```
+</ResponseExample>

@@ -1,0 +1,94 @@
+---
+title: "Shipping"
+description: "Ship the physical item: estimate, pay once for 1-25 tokens in one box, burn each token, renew a lapsed window, and track the delivery."
+---
+
+Shipping is paid first, then the holder burns each token, then we ship. One shipment carries **1 to 25 tokens** held by one wallet, in one box, for one shipping payment.
+
+[`POST /shipments/estimate`](/partner-api/v2/endpoints/estimate-shipment) and [`POST /shipments`](/partner-api/v2/endpoints/create-shipment) take a `token_ids` list and are the endpoints to build on. [`POST /tokens/{tokenId}/shipment/estimate`](/partner-api/v2/endpoints/estimate-token-shipment) and [`POST /tokens/{tokenId}/shipment`](/partner-api/v2/endpoints/create-token-shipment) do the same for one token, with the token in the path.
+
+<Steps>
+  <Step title="Estimate">
+    [`POST /shipments/estimate`](/partner-api/v2/endpoints/estimate-shipment) with `token_ids`, `holder`, `address` and an optional `cover_amount` returns carrier `rates`. It charges nothing and stores nothing. `amount` is the carrier rate; `total` is what the holder pays (the rate plus any cover premium).
+  </Step>
+  <Step title="Create and pay">
+    [`POST /shipments`](/partner-api/v2/endpoints/create-shipment) with the chosen `rate` and `max_cost` (pass the estimate's `total`). We re-quote the rate for all the tokens together and return the `shipment` and its `payment`. Pay it exactly like an order ([Payments](/partner-api/v2/payments)). An unpaid shipment never expires: it stays `awaiting_payment` and can be paid at any time.
+  </Step>
+  <Step title="Burn">
+    Once the shipping payment settles, `status` becomes `ready` and each token's `burn` in [`GET /shipments/{id}`](/partner-api/v2/endpoints/get-shipment) holds what the holder burns it with. The burn window is **24 hours from payment** (`expires_at`), shared by every token in the shipment.
+  </Step>
+  <Step title="Track">
+    **The box ships once every token in it is burned.** Follow `fulfilment` on `GET /shipments/{id}` or the `nft_shipment.updated` webhook for the carrier, tracking link and dates.
+  </Step>
+</Steps>
+
+## The address
+
+- `name`, `address1`, `city` and `country` (ISO 3166 alpha-2) are required; `state` and `zip` where the country uses them; `phone` is required outside the US.
+- `name`, `address1`, `address2`, `city` and `state` take up to 100 characters, `zip` and `phone` up to 20.
+- An invalid address is `400 BAD_ADDRESS`, with `fields` mapping each bad field to a message.
+- We never return the delivery address or the shipping label.
+
+## Insurance
+
+`cover_amount` (optional) is shipping insurance cover in dollars, within the range the items allow. Outside it, `400 COVER_NOT_ALLOWED` gives `order_value`, `min_cover` and `max_cover` (`max_cover` is null when the items can't be insured). A service with no cover option answers `409 COVER_UNAVAILABLE` on create: choose another rate or leave `cover_amount` out.
+
+## Burning
+
+`{id}` in `GET /shipments/{id}` is a `shipment_id`, or any `quote_id` (a token in a multi-token shipment returns its whole shipment).
+
+- **EVM:** `burn` is `{ "quote": { ...same tuple as a sell-back, "kind": 2, "amount": "0" }, "signature": "0x..." }`. Call `burnWithQuote` exactly as for a sell-back (`burnForQuote` on [Sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote), with your contract address).
+- **Solana:** `burn` is `{ "transaction": "<base64>", "vault": "...", "last_valid_block_height": ... }`. Each GET builds a fresh transaction, so fetch it right before signing.
+
+Every burn must come from the wallet named in the shipment (`holder`). Each token's `status` becomes `redeemed` with `burned_at` and `burn_tx` as its burn is seen.
+
+## Renew an expired burn window
+
+If not every token was burned within the 24 hours, the shipment shows `status: "expired"`, with no `burn` on the tokens still unburned. [`POST /shipments/{id}/renew`](/partner-api/v2/endpoints/renew-shipment) gives the unburned tokens a new 24-hour window under the same `quote_id`s; the shipping already paid still counts.
+
+- A window that is still open is returned unchanged with `renewed: false`.
+- **If a multi-token shipment's window lapses and it isn't renewed,** it closes **24 hours after `expires_at`**: the tokens already burned ship, and the rest are `dropped`. A dropped token was never burned, so it stays in the holder's wallet, live; ship it later in a new shipment. The shipment's `status` becomes `partially_redeemed`.
+- A one-token shipment renews the same way (`{id}` is its `quote_id`); it never closes by itself.
+- **A burn window lapsing sends no webhook.** Watch `expires_at` and renew.
+
+## Statuses
+
+| `status` | Meaning |
+|---|---|
+| `awaiting_payment` | Waiting for the shipping payment |
+| `ready` | Paid; each unburned token's `burn` holds its burn details |
+| `expired` | Paid, but not every token was burned within 24 hours: renew it |
+| `redeemed` | We saw every burn; the shipment is being created |
+| `partially_redeemed` | Multi-token only: the window and its 24-hour grace passed; the burned tokens ship, the rest are `dropped` |
+
+| `tokens[].status` | Meaning |
+|---|---|
+| `awaiting_payment` | The shipping isn't paid yet |
+| `ready` | Burn it with `burn` |
+| `expired` | Its burn window lapsed: renew the shipment |
+| `redeemed` | Burned; it ships in the box |
+| `dropped` | Not burned before the shipment closed; still in the holder's wallet |
+
+| `fulfilment.status` | Meaning |
+|---|---|
+| `null` (no `fulfilment`) | Not every burn seen yet |
+| `pending` | Burns seen; the shipping order is being created (retried automatically) |
+| `processing` | With our shipping team, being packed |
+| `shipped` | On its way: `carrier`, `service`, `tracking_number`, `tracking_url`, `shipped_at` and `expected_delivery` are set |
+| `delivered` | Delivered; `delivered_at` is set |
+| `cancelled` | Cancelled by our team (rare); contact us |
+| `needs_review` | We couldn't create the shipment; our team resolves it |
+
+`expected_delivery` is a date (`YYYY-MM-DD`), not a moment. Show your customer `tracking_url` (the carrier's own tracking page).
+
+## What can't ship
+
+| Code | When |
+|---|---|
+| `NOT_SHIPPABLE` | This item can't ship |
+| `PARTNER_GOODS` | The item is held by its brand partner and can't ship through CatchBack; it can still be sold back |
+| `COUNTRY_NOT_SUPPORTED` | We don't ship to that country |
+| `OVER_CUSTOMS_CAP` | The items are worth more than we can ship internationally |
+| `TOKEN_IN_SHIPMENT` | A token already has a paid shipment waiting for its burn: burn or renew that shipment instead |
+
+A refusal about particular tokens lists them in `token_ids`.

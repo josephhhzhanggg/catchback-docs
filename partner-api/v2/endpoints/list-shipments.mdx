@@ -1,0 +1,55 @@
+---
+title: "List shipments"
+api: "GET /api/partner/v2/shipments"
+description: "Your program's shipments, one-token and multi-token together, newest first, paged."
+---
+
+Scope: `nft:orders`
+
+Newest first: one-token and multi-token shipments together, each in its [Get a shipment](/partner-api/v2/endpoints/get-shipment) shape.
+
+<ParamField query="wallet" type="string">
+  The `holder`, on your mint chain. Default: all.
+</ParamField>
+<ParamField query="status" type="string">
+  `awaiting_payment`, `ready`, `redeemed`, `expired` or `partially_redeemed`. Default: all.
+</ParamField>
+<ParamField query="limit" type="integer" default="25">
+  1-100.
+</ParamField>
+<ParamField query="cursor" type="string">
+  The `next_cursor` of the previous page.
+</ParamField>
+
+## Response
+
+<ResponseField name="shipments" type="object[]">Each in its [Get a shipment](/partner-api/v2/endpoints/get-shipment) shape.</ResponseField>
+<ResponseField name="next_cursor" type="string | null">Null on the last page.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_CURSOR` | `cursor` isn't a `next_cursor` from a previous page |
+| `400` | `BAD_LIMIT` | `limit` isn't 1-100 |
+| `400` | `BAD_STATUS` | `status` isn't one the list filters on; the message lists them |
+| `400` | `BAD_ADDRESS` | `wallet` is not an address on your mint chain |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v2/shipments?wallet=0x8f3c...e21a&status=ready&limit=25" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "shipments": [
+    { "shipment_id": "7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73", "status": "ready", "shipping_cost": 9.85, "...": "..." },
+    { "quote_id": "0xa93f...0c2d", "status": "ready", "shipping_cost": 9.85, "...": "..." }
+  ],
+  "next_cursor": null
+}
+```
+</ResponseExample>

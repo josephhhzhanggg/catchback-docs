@@ -1,0 +1,198 @@
+---
+title: "Sell-back"
+description: "What a sell-back pays and when, getting a quote, burning on EVM with burnWithQuote or signing the Solana transaction, and following the USDC payout."
+---
+
+Any holder can sell a token back to us for USDC. The flow:
+
+1. [`POST /tokens/{tokenId}/quote`](/partner-api/v2/endpoints/create-sellback-quote) fixes the amount, the payer and the payout destination for 10 minutes.
+2. The holder burns the token with the quote: on EVM by calling `burnWithQuote`, on Solana by signing the returned transaction.
+3. We see the burn and send the USDC. Follow it with the [`sellback.updated`](/partner-api/v2/webhooks#events) webhook or [`GET /quotes/{quoteId}`](/partner-api/v2/endpoints/get-quote).
+
+## What a sell-back pays
+
+The offer is anchored to the **token**, not to whoever holds it:
+
+| Phase | When | Pays |
+|---|---|---|
+| Fresh | The first 5 minutes after the token is confirmed on chain | The fresh rate of the odds bought (100% on packs that offer the odds choice; the pool's `fresh_buyback_rate` gives it) of the value at pull |
+| Locked | Then until 7 days after the pull (`order.pull.pulled_at`) | 80% of the value at pull, whatever the market does |
+| Market | After that | 80% of the item's current market value |
+
+- **A trade changes nothing.** A buyer on a secondary market gets exactly the offer the minter would have got.
+- **Goods** (streetwear, jewelry) never pay more than their value at pull.
+- [`GET /tokens/{tokenId}`](/partner-api/v2/endpoints/get-token) shows the phases ahead for any token in `sellback.schedule`, and [`GET /wallets/{address}/tokens`](/partner-api/v2/endpoints/list-wallet-tokens) shows today's indicative amount for each token a wallet holds. Only a quote fixes the amount.
+
+## Get a quote
+
+```bash
+curl -X POST "https://catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/quote" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "kind": "sellback", "holder": "0x8f3c...e21a", "payout_chain": "evm:8453", "payout_address": "0x8f3c...e21a" }'
+```
+
+A quote fixes the amount, the payer and the payout destination, and **expires 10 minutes** after it is issued, or when the 5-minute fresh window ends if the quote is at the fresh rate (whichever is sooner). Every call issues a new quote; an unused quote just expires. Fields and errors: [Quote a sell-back](/partner-api/v2/endpoints/create-sellback-quote).
+
+## EVM: burn with the signed quote
+
+On an EVM program the quote response carries `contract`, `quote` and `signature`:
+
+```json
+{
+  "quote_id": "0x5e0c...91ab",
+  "chain": "evm:196",
+  "amount_usd": 330,
+  "expires_at": "2026-11-16T18:30:00.000Z",
+  "payout": { "chain": "evm:8453", "address": "0x8f3c...e21a" },
+  "family": "evm",
+  "contract": "0x7b1e...c0de",
+  "quote": {
+    "tokenId": "81264573985362058461377125337283195667",
+    "kind": 1,
+    "quoteId": "0x5e0c...91ab",
+    "holder": "0x8f3c...e21a",
+    "payoutHash": "0x2c71...",
+    "amount": "330000000",
+    "expiresAt": "1795372200"
+  },
+  "signature": "0x4a1f...1b"
+}
+```
+
+The holder's wallet calls `burnWithQuote(quote, signature)` on `contract`. `tokenId`, `amount` (USDC with 6 decimals) and `expiresAt` (unix seconds) are decimal strings: convert them to bigints.
+
+The `Quote` tuple, in order:
+
+| Field | Solidity type |
+|---|---|
+| `tokenId` | `uint256` |
+| `kind` | `uint8` (1 = sell-back, 2 = shipment) |
+| `quoteId` | `bytes32` |
+| `holder` | `address` |
+| `payoutHash` | `bytes32` |
+| `amount` | `uint256` |
+| `expiresAt` | `uint64` |
+
+```ts
+import { createWalletClient, http, type Hex } from 'viem';
+
+const CATCHBACK_CARDS_ABI = [
+  { type: 'function', name: 'ownerOf', stateMutability: 'view', inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ type: 'address' }] },
+  { type: 'function', name: 'transferFrom', stateMutability: 'nonpayable', inputs: [{ name: 'from', type: 'address' }, { name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], outputs: [] },
+  {
+    type: 'function', name: 'burnWithQuote', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'q', type: 'tuple', components: [
+        { name: 'tokenId', type: 'uint256' }, { name: 'kind', type: 'uint8' }, { name: 'quoteId', type: 'bytes32' },
+        { name: 'holder', type: 'address' }, { name: 'payoutHash', type: 'bytes32' }, { name: 'amount', type: 'uint256' },
+        { name: 'expiresAt', type: 'uint64' },
+      ] },
+      { name: 'signature', type: 'bytes' },
+    ],
+    outputs: [],
+  },
+] as const;
+
+// `res` holds { contract, quote, signature }: a sell-back quote response, or a shipment's `burn`
+// plus your contract address. `holderWallet` is a viem WalletClient for quote.holder.
+async function burnForQuote(holderWallet: ReturnType<typeof createWalletClient>, res: { contract: string; quote: any; signature: Hex }) {
+  const q = res.quote;
+  return holderWallet.writeContract({
+    address: res.contract as Hex,
+    abi: CATCHBACK_CARDS_ABI,
+    functionName: 'burnWithQuote',
+    args: [{
+      tokenId: BigInt(q.tokenId), kind: Number(q.kind), quoteId: q.quoteId, holder: q.holder,
+      payoutHash: q.payoutHash, amount: BigInt(q.amount), expiresAt: BigInt(q.expiresAt),
+    }, res.signature],
+    account: holderWallet.account!,
+    chain: holderWallet.chain,
+  });
+}
+```
+
+### Check the quote before the customer signs
+
+The quote is an EIP-712 message you can check before asking the customer to sign:
+
+```ts
+const domain = { name: 'CatchBackCards', version: '1', chainId: <mint chain id>, verifyingContract: <contract> };
+const types = { Quote: [
+  { name: 'tokenId', type: 'uint256' }, { name: 'kind', type: 'uint8' }, { name: 'quoteId', type: 'bytes32' },
+  { name: 'holder', type: 'address' }, { name: 'payoutHash', type: 'bytes32' }, { name: 'amount', type: 'uint256' },
+  { name: 'expiresAt', type: 'uint64' },
+] };
+// kind: 1 = sell-back, 2 = shipment.
+// Sell-back payoutHash = keccak256(abi.encode(string payout.chain, string payout.address)),
+//   e.g. keccak256(encodeAbiParameters([{type:'string'},{type:'string'}], ['evm:8453', '0x8f3c...e21a']))
+// Shipment payoutHash  = keccak256(abi.encode(string 'shipment', string quote_id)), amount 0.
+```
+
+### Reverts
+
+The contract checks, in order, and reverts with:
+
+| Revert | Cause | What to do |
+|---|---|---|
+| `QuoteExpired(quoteId, expiresAt)` | The block is past `expiresAt` | Get a new quote (a shipment: [renew it](/partner-api/v2/endpoints/renew-shipment)) |
+| `NotQuoteHolder(caller, holder)` | The transaction was not sent by `holder` | Send from the holder's own wallet (no relayers) |
+| `HolderNotOwner(tokenId, holder, owner)` | The token moved after the quote | Quote again for the new holder |
+| `ERC721NonexistentToken(tokenId)` | The token was already burned | Nothing to sell |
+| `QuoteAlreadyUsed(quoteId)` | This quote was already burned with | Nothing to do: the first burn counts |
+| `InvalidQuoteKind(kind)`, `InvalidQuoteSigner(recovered)` | The quote was altered | Pass the quote exactly as returned |
+| `EnforcedPause()` | Burns are paused by CatchBack | Retry later |
+
+## Solana: sign the returned transaction
+
+On a Solana program the quote response carries an unsigned transaction:
+
+```json
+{
+  "quote_id": "0x5e0c...91ab",
+  "chain": "solana:mainnet",
+  "amount_usd": 330,
+  "expires_at": "2026-11-16T18:30:00.000Z",
+  "payout": { "chain": "evm:8453", "address": "0x8f3c...e21a" },
+  "family": "solana",
+  "collection": "CoLL...",
+  "asset": "AsSt...",
+  "vault": "VauL...",
+  "transaction": "<base64 unsigned transaction>",
+  "last_valid_block_height": 312345678
+}
+```
+
+`transaction` moves the asset to our vault, with the quote id as a memo; the holder is its fee payer and only signer. Have the holder's wallet sign and send it unchanged:
+
+```ts
+import { VersionedTransaction } from '@solana/web3.js';
+
+const tx = VersionedTransaction.deserialize(Buffer.from(res.transaction, 'base64'));
+const signed = await wallet.signTransaction(tx); // the holder's wallet adapter
+const sig = await connection.sendRawTransaction(signed.serialize());
+```
+
+- It must land before `last_valid_block_height` (about a minute) and before `expires_at`. If either passes, get a new quote and sign the new transaction.
+- A transfer into the vault that doesn't match a valid quote (sent after expiry, from another wallet, without the memo) is not paid: we send the asset back to the wallet it came from.
+
+## Follow the payout
+
+[`GET /quotes/{quoteId}`](/partner-api/v2/endpoints/get-quote) returns the quote with its payout:
+
+| `status` | Meaning |
+|---|---|
+| `ready` | Issued and not yet burned with |
+| `expired` | Not burned before `expires_at`; can no longer be used |
+| `redeemed` | We saw the burn; the payout is queued |
+
+| `payout.status` | Meaning |
+|---|---|
+| `null` | No burn seen yet |
+| `pending` | Queued to send |
+| `sending` | Sent to the network, waiting to settle |
+| `sent` | Paid: `tx_hash` is the USDC transfer on `payout.chain` |
+| `held` | Under review by our team (`held: true`); see [Limits and compliance](/partner-api/v2/limits-and-compliance#held-payouts) |
+| `failed` | A send failed; it is retried automatically |
+
+We count a burn after a few block confirmations (EVM) or finalization (Solana), then pay within minutes. The amount paid is always exactly `amount_usd`. Every payout status change is also sent as a `sellback.updated` webhook.

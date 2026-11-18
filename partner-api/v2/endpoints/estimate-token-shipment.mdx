@@ -1,0 +1,68 @@
+---
+title: "Estimate a one-token shipment"
+api: "POST /api/partner/v2/tokens/{tokenId}/shipment/estimate"
+description: "Carrier rates to ship one token's item to its holder. Charges nothing and stores nothing."
+---
+
+Scope: `nft:orders` · Rate limit: 30 a minute, shared with [Estimate a shipment](/partner-api/v2/endpoints/estimate-shipment)
+
+The same as [Estimate a shipment](/partner-api/v2/endpoints/estimate-shipment), for one token, with the token in the path. Build on the multi-token endpoint; this one is a convenience.
+
+<ParamField path="tokenId" type="string" required>
+  The token's decimal `token_id`.
+</ParamField>
+<ParamField body="holder" type="string" required>
+  The wallet that holds the token now. Checked on chain.
+</ParamField>
+<ParamField body="address" type="object" required>
+  As for [Estimate a shipment](/partner-api/v2/endpoints/estimate-shipment).
+</ParamField>
+<ParamField body="cover_amount" type="number | null">
+  Shipping insurance cover in dollars, within the range the item allows.
+</ParamField>
+
+## Response
+
+<ResponseField name="rates" type="object[]">
+  `carrier`, `service`, `token`, `amount` (the carrier rate), `estimated_days` and `total` (what the holder pays: the rate plus any cover premium).
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_JSON` | The body isn't JSON |
+| `400` | `BAD_HOLDER` | `holder` is not a wallet address on your mint chain |
+| `400` | `BAD_ADDRESS` | The shipping address is invalid; `fields` maps each bad field to a message |
+| `400` | `BAD_COVER` | `cover_amount` isn't a positive dollar amount with at most two decimals |
+| `400` | `COVER_NOT_ALLOWED` | `cover_amount` is outside what the item can be insured for; the body has `order_value`, `min_cover` and `max_cover` |
+| `400` | `NOT_SHIPPABLE` | This item can't ship |
+| `400` | `PARTNER_GOODS` | The item is held by its brand partner and can't ship through CatchBack; it can still be sold back |
+| `400` | `COUNTRY_NOT_SUPPORTED` | We don't ship to that country |
+| `400` | `OVER_CUSTOMS_CAP` | The item is worth more than we can ship internationally |
+| `403` | `NOT_HOLDER` | That wallet does not hold the token on chain right now |
+| `404` | `UNKNOWN_TOKEN` | No such token on your program's contract |
+| `409` | `TOKEN_NOT_LIVE` | The token isn't minted yet, or was already burned |
+| `503` | `CHAIN_UNAVAILABLE` | We couldn't read the token's owner from the chain; retry shortly |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/shipment/estimate \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "holder": "0x8f3c...e21a",
+    "address": { "name": "Alice Tester", "address1": "1 Market St", "city": "San Francisco", "state": "CA", "zip": "94105", "country": "US", "phone": "4155550100" }
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "rates": [
+    { "carrier": "USPS", "service": "Priority Mail", "token": "usps_priority", "amount": 9.85, "estimated_days": 3, "total": 9.85 }
+  ]
+}
+```
+</ResponseExample>

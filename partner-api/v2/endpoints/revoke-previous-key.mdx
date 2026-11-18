@@ -1,0 +1,32 @@
+---
+title: "Revoke the previous key"
+api: "POST /api/partner/v2/keys/revoke-previous"
+description: "End the key this one replaced now, instead of at the end of its 24 hours."
+---
+
+Scope: `nft:orders`
+
+Call it with the **new** key once every server uses it. The key it replaced stops working immediately instead of at the end of the 24 hours, and its webhook stops with it. Do this whenever you rotate because a key may have leaked. No body.
+
+## Response
+
+<ResponseField name="revoked" type="object">`id` (the key that was ended) and `at`.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `409` | `NO_PREVIOUS_KEY` | This key didn't replace another key |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/keys/revoke-previous \
+  -H "Authorization: Bearer cb_live_<new key>"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{ "revoked": { "id": "c2f0e8b4-...", "at": "2026-11-17T10:05:00.000Z" } }
+```
+</ResponseExample>

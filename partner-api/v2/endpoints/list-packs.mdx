@@ -1,0 +1,79 @@
+---
+title: "List packs"
+api: "GET /api/partner/v2/catalog/packs"
+description: "The packs you can sell in one category, with price, odds choices, art and the chase on offer."
+---
+
+Scope: `nft:orders`
+
+The packs a wallet order can buy in one category, with your program's `mint_chain`.
+
+<ParamField query="category" type="string" default="pokemon">
+  `pokemon`, `onepiece`, `sports`, `riftbound`, `watches` or `goods`. `goods` packs hold streetwear and jewelry. Raw singles have no category of their own: they come out of other categories' packs.
+</ParamField>
+
+## Response
+
+<ResponseField name="category" type="string" />
+<ResponseField name="mint_chain" type="string">The chain your program mints on, e.g. `evm:196`. See [Chains](/partner-api/v2/chains-and-metadata).</ResponseField>
+<ResponseField name="packs" type="object[]">
+  <Expandable title="pack">
+    <ResponseField name="pack_type" type="string">Pass it to [Get a pack's odds and pool](/partner-api/v2/endpoints/get-pack-pool) and [Create an order](/partner-api/v2/endpoints/create-order).</ResponseField>
+    <ResponseField name="name" type="string" />
+    <ResponseField name="price" type="number">What the customer pays, in dollars.</ResponseField>
+    <ResponseField name="available" type="boolean">Mirrors the pack's shelf in our app. A pack that isn't on sale right now stays listed with `available: false` and a `reason`.</ResponseField>
+    <ResponseField name="reason" type="string">Only when `available` is false: `Out of stock`, `Odds maintenance in progress`, `Restocking` or `Not available right now`.</ResponseField>
+    <ResponseField name="odds" type="string[]">The [odds choices](/partner-api/v2/odds) the pack sells, in the order our app's picker shows them. Whether a particular choice is selling right now is on the pool endpoint.</ResponseField>
+    <ResponseField name="default_odds" type="string">The one an order gets when it names none (Standard wherever it is sold).</ResponseField>
+    <ResponseField name="image_url" type="string | null">The pack art: an absolute URL, resized for display, or null.</ResponseField>
+    <ResponseField name="banner_url" type="string | null">The pack's wide banner, or null.</ResponseField>
+    <ResponseField name="description" type="string | null">The pack's own text, or null.</ResponseField>
+    <ResponseField name="chase" type="object | null">
+      The hand-picked chase item (bounty) the pack is offering right now, else null: `label`, `odds` (its chance per pack, formatted as a percentage), `ends_at` (null when open-ended) and `item` with its catalog fields and `market_value`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | | Unknown `category` |
+
+Plus the errors [every endpoint can return first](/partner-api/v2/authentication#errors-every-endpoint-can-return-first).
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v2/catalog/packs?category=pokemon" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "category": "pokemon",
+  "mint_chain": "evm:196",
+  "packs": [
+    {
+      "pack_type": "bronze",
+      "name": "Bronze Pack",
+      "price": 25,
+      "available": true,
+      "odds": ["standard", "hot", "chill", "classic"],
+      "default_odds": "standard",
+      "image_url": "https://...",
+      "banner_url": "https://...",
+      "description": "Graded Pokemon slabs from $7.50 up.",
+      "chase": {
+        "label": "Charizard bounty",
+        "odds": "0.05%",
+        "ends_at": "2026-11-30T00:00:00.000Z",
+        "item": { "id": "0e94dc61-...", "category": "pokemon", "name": "Charizard ex", "grading_company": "PSA", "grading_rank": 10, "render_image": "https://...", "market_value": 410 }
+      }
+    },
+    { "pack_type": "gold", "name": "Gold Pack", "price": 100, "available": false, "reason": "Restocking", "odds": ["standard", "hot", "chill", "classic"], "default_odds": "standard", "image_url": "https://...", "banner_url": null, "description": null, "chase": null }
+  ]
+}
+```
+</ResponseExample>

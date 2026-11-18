@@ -1,0 +1,33 @@
+---
+title: "Idempotency"
+description: "Retry orders, shipments and key rotations safely with an Idempotency-Key."
+---
+
+`POST /orders`, `POST /shipments`, `POST /tokens/{tokenId}/shipment` and `POST /keys/rotate` require an **`Idempotency-Key`** header: 8-128 characters of `A-Z a-z 0-9 _ -`. Use your own order id, one per order.
+
+Orders, shipments and key rotations are separate key spaces; the two shipment endpoints share one.
+
+A missing or malformed key is `400 BAD_IDEMPOTENCY_KEY`.
+
+## Retries
+
+| Retry situation | Response |
+|---|---|
+| Same key, same request | **200** with the order (or shipment) as it stands now, its `payment` while it is unpaid, and `"idempotent_replay": true`. Nothing new is created and nothing is charged twice |
+| Same key, different request | **422** `IDEMPOTENCY_KEY_REUSED` |
+| First call timed out or returned 500 | Retry with the **same** key: you get what the first call created, or it is created now |
+
+## What counts as the same request
+
+- **An order** is the same request when `pack_type`, `category`, `odds`, `quantity`, `recipient` and `refund_address` match. `partner_user_ref` is not compared. `odds` is compared as resolved, so leaving it out and naming the pack's default are the same request (and so are `quantity: 1` and no `quantity`).
+- **A shipment** is the same request when the token (or the set of `token_ids`, in any order), `holder`, `address`, `rate` and `cover_amount` all match.
+
+## Getting a lost response back
+
+- Replaying the POST is how you get a lost `payment` object back: [`GET /orders/{id}`](/partner-api/v2/endpoints/get-order) and [`GET /shipments/{id}`](/partner-api/v2/endpoints/get-shipment) don't include it.
+- `GET /orders/{id}` also accepts the `Idempotency-Key` you sent, so after a lost response you can always find out how an order ended.
+- A key rotation replayed with the same key returns the same new key and its secret, within 10 minutes and before the new key is used. See [Rotate a key](/partner-api/v2/endpoints/rotate-key).
+
+## Endpoints without a key
+
+`POST /tokens/{tokenId}/quote` takes no key: every call issues a fresh quote, and an unused quote simply expires.

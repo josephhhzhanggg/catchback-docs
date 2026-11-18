@@ -1,0 +1,137 @@
+---
+title: "Quickstart and sandbox"
+description: "Run the whole v2 flow without real money: buy, pay, mint, transfer, sell back and ship on a public testnet."
+---
+
+The sandbox runs the whole flow without real money: payments are simulated, and mints, transfers and burns are real transactions on a public testnet. We give you a sandbox base URL, a sandbox key, the test chain and your sandbox contract address. The API is the same as production, plus three sandbox-only endpoints.
+
+## How the sandbox differs
+
+| Production | Sandbox |
+|---|---|
+| Unifold Payment Intent, paid by the customer | Intent ids start `sbx_pi_`; mark one paid with [`POST /sandbox/payments/{intentId}`](/partner-api/v2/endpoints/sandbox-pay) |
+| `publishable_key`, deposit addresses | Placeholders (`pk_sandbox`, fixed addresses) |
+| Background work and webhooks every two minutes | Run when you call [`POST /sandbox/tick`](/partner-api/v2/endpoints/sandbox-tick) |
+| USDC payouts and refunds | Complete instantly (transfer ids start `sbx_tr_`); Solana payouts are allowed |
+| Carrier rates | One fixed rate: USPS Priority Mail (sandbox), $9.85 |
+| Your mint chain | A public testnet, real contract |
+| Sanctions screening | The real OFAC list |
+| Webhook URLs | Public `https://` URLs, and also `http://localhost`, `http://127.0.0.1` or `http://[::1]` on any port when the sandbox runs next to your receiver |
+
+All three sandbox endpoints return **404** outside the sandbox.
+
+| Endpoint | What it does |
+|---|---|
+| [`POST /sandbox/payments/{intentId}`](/partner-api/v2/endpoints/sandbox-pay) | Pays an order's or a shipment's sandbox intent, exactly as a settled payment would |
+| [`POST /sandbox/tick`](/partner-api/v2/endpoints/sandbox-tick) | Runs one pass of the background work (open, mint, watch the chain, pay out, ship) and delivers the webhooks it produced |
+| [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship) | Plays our shipping team: marks a burned shipment `shipped`, then `delivered` |
+
+## The flow, step by step
+
+<Steps>
+  <Step title="Pick a pack and read its odds">
+    ```bash
+    curl "$CATCHBACK_BASE_URL/api/partner/v2/catalog/packs?category=pokemon" \
+      -H "Authorization: Bearer $CATCHBACK_KEY"
+
+    curl "$CATCHBACK_BASE_URL/api/partner/v2/catalog/packs/pool?pack_type=bronze&category=pokemon" \
+      -H "Authorization: Bearer $CATCHBACK_KEY"
+    ```
+  </Step>
+  <Step title="Create an order for the customer's wallet">
+    ```bash
+    curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/orders" \
+      -H "Authorization: Bearer $CATCHBACK_KEY" \
+      -H "Idempotency-Key: ord-0001-test" \
+      -H "Content-Type: application/json" \
+      -d '{ "pack_type": "bronze", "category": "pokemon", "recipient": "0x8f3c...e21a" }'
+    ```
+    Keep `payment.intent_id` from the response.
+  </Step>
+  <Step title="Pay it (sandbox)">
+    ```bash
+    curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/payments/sbx_pi_..." \
+      -H "Authorization: Bearer $CATCHBACK_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{}'
+    ```
+  </Step>
+  <Step title="Tick until the NFT is minted">
+    ```bash
+    curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/tick" \
+      -H "Authorization: Bearer $CATCHBACK_KEY"
+
+    curl "$CATCHBACK_BASE_URL/api/partner/v2/orders/ord-0001-test" \
+      -H "Authorization: Bearer $CATCHBACK_KEY"
+    ```
+    Repeat until `order.status` is `minted`; `order.token.token_id` is the NFT.
+  </Step>
+  <Step title="Sell it back, or ship it">
+    Get a [sell-back quote](/partner-api/v2/endpoints/create-sellback-quote) and have the holder burn with it, or [estimate](/partner-api/v2/endpoints/estimate-shipment) and [create](/partner-api/v2/endpoints/create-shipment) a shipment, pay it, and burn. Tick between steps.
+  </Step>
+</Steps>
+
+## A full run (TypeScript + viem)
+
+The same flow our own certification suite runs against the sandbox. `burnForQuote` and `CATCHBACK_CARDS_ABI` are on the [Sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote) page; `alice`, `bob`, their viem wallets and `CONTRACT` are yours.
+
+```ts
+const BASE = process.env.CATCHBACK_BASE_URL!;
+const KEY = process.env.CATCHBACK_API_KEY!;
+
+async function api(method: string, path: string, body?: unknown, idem?: string) {
+  const res = await fetch(`${BASE}/api/partner/v2${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', ...(idem ? { 'Idempotency-Key': idem } : {}) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return { status: res.status, body: await res.json() };
+}
+
+/** Tick the sandbox until `check` returns something. */
+async function settle<T>(check: () => Promise<T | null | undefined | false>, tries = 20): Promise<T> {
+  for (let i = 0; i < tries; i++) {
+    const v = await check();
+    if (v) return v;
+    await api('POST', '/sandbox/tick');
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  throw new Error('did not settle');
+}
+
+// 1. Pick an available pack and read its odds.
+const { body: cat } = await api('GET', '/catalog/packs?category=pokemon');
+const pack = cat.packs.find((p: any) => p.available);
+const { body: pool } = await api('GET', `/catalog/packs/pool?pack_type=${pack.pack_type}&category=pokemon`);
+
+// 2. Order it for Alice, and pay (sandbox).
+const key = `ord-${crypto.randomUUID()}`;
+const { body: created } = await api('POST', '/orders', { pack_type: pack.pack_type, category: 'pokemon', recipient: alice.address }, key);
+await api('POST', `/sandbox/payments/${created.payment.intent_id}`, {});
+
+// 3. Tick until minted.
+const order = await settle(async () => {
+  const o = (await api('GET', `/orders/${key}`)).body.order;
+  if (o.status === 'refund_due' || o.status === 'refunded') throw new Error(o.failure_reason);
+  return o.status === 'minted' ? o : null;
+});
+const tokenId = order.token.token_id;
+
+// 4. Alice trades it to Bob on chain; tick until CatchBack sees it.
+await aliceWallet.writeContract({ address: CONTRACT, abi: CATCHBACK_CARDS_ABI, functionName: 'transferFrom', args: [alice.address, bob.address, BigInt(tokenId)] });
+await settle(async () => (await api('GET', `/wallets/${bob.address}/tokens`)).body.tokens.some((t: any) => t.token_id === tokenId));
+
+// 5. Bob sells it back: quote, burn, then tick until paid.
+const { body: quote } = await api('POST', `/tokens/${tokenId}/quote`, { kind: 'sellback', holder: bob.address });
+await burnForQuote(bobWallet, quote);
+await settle(async () => {
+  const q = (await api('GET', `/quotes/${quote.quote_id}`)).body.quote;
+  return q.payout.status === 'sent' ? q : null;
+});
+```
+
+<Tip>
+  Use a separate key per environment (sandbox, production).
+</Tip>
+
+Next: the [go-live checklist](/partner-api/v2/go-live-checklist).

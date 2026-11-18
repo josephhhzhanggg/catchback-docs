@@ -1,0 +1,97 @@
+---
+title: "Get an order"
+api: "GET /api/partner/v2/orders/{id}"
+description: "One order, or a multi-pack order with its units, by our id or your Idempotency-Key."
+---
+
+Scope: `nft:orders`
+
+Returns `{ "order": { ... } }`. After a lost response, this is how you find out how an order ended.
+
+<ParamField path="id" type="string" required>
+  The order's `id`, or the `Idempotency-Key` you sent. A multi-pack order's `id` or key returns the whole order with its `units`; one unit's `id` returns that unit.
+</ParamField>
+
+## Response
+
+<ResponseField name="order" type="object">
+  <Expandable title="order">
+    <ResponseField name="order_id" type="string">Your `Idempotency-Key`.</ResponseField>
+    <ResponseField name="id" type="string">Our id.</ResponseField>
+    <ResponseField name="status" type="string">See [Orders and statuses](/partner-api/v2/orders#order-statuses). A multi-pack order adds `processing` and `completed`.</ResponseField>
+    <ResponseField name="pack_type" type="string" />
+    <ResponseField name="category" type="string" />
+    <ResponseField name="odds" type="string">The odds the pack is opened at.</ResponseField>
+    <ResponseField name="price" type="number">In dollars. On a multi-pack order, the total; `unit_price` is one pack.</ResponseField>
+    <ResponseField name="recipient" type="string" />
+    <ResponseField name="mint_chain" type="string" />
+    <ResponseField name="paid_at" type="string | null" />
+    <ResponseField name="pull" type="object | null">
+      Set once the pack opens: `card_id`, `category`, `name`, `value` (the item's value when it was pulled; it anchors the [sell-back offer](/partner-api/v2/sell-back)) and `pulled_at`.
+    </ResponseField>
+    <ResponseField name="token" type="object | null">
+      Set once the mint is reserved: `chain`, `contract` (on a Solana program, `collection` and `asset` instead), `token_id`, `status` and `tx`. `status` is `pending` (reserved, not sent), `submitted`, `confirmed`, `failed` (being retried), or `burned` once the token has been sold back or shipped.
+    </ResponseField>
+    <ResponseField name="failure_reason" type="string | null">Why an order is `mint_failed`, `expired`, `refund_due` or `refunded`; otherwise null.</ResponseField>
+    <ResponseField name="created_at" type="string" />
+    <ResponseField name="quantity" type="integer">Multi-pack orders only.</ResponseField>
+    <ResponseField name="unit_price" type="number">Multi-pack orders only.</ResponseField>
+    <ResponseField name="units" type="object[]">Multi-pack orders only: each unit in the single-order shape plus `batch_id` and `unit` (1 to `quantity`), with its own `pull` and `token`.</ResponseField>
+    <ResponseField name="batch_id" type="string">On a unit only: the multi-pack order's `id`.</ResponseField>
+    <ResponseField name="unit" type="integer">On a unit only: its number, 1 to `quantity`.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+This response never includes the `payment` object: replay [Create an order](/partner-api/v2/endpoints/create-order) with the same `Idempotency-Key` to get it back.
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `404` | `UNKNOWN_ORDER` | No such order in your program (by id or `Idempotency-Key`) |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v2/orders/okx-ord-7f3a9c21 \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "order": {
+    "order_id": "okx-ord-7f3a9c21",
+    "id": "3d2b8f0e-6c1a-4f7e-9a51-2b0d8c4e7f13",
+    "status": "minted",
+    "pack_type": "bronze",
+    "category": "pokemon",
+    "odds": "standard",
+    "price": 25,
+    "recipient": "0x8f3c...e21a",
+    "mint_chain": "evm:196",
+    "paid_at": "2026-11-16T18:04:40.002Z",
+    "pull": {
+      "card_id": "a1c4...",
+      "category": "pokemon",
+      "name": "Charizard ex 199/165 PSA 10",
+      "value": 412.5,
+      "pulled_at": "2026-11-16T18:04:41.317Z"
+    },
+    "token": {
+      "chain": "evm:196",
+      "contract": "0x7b1e...c0de",
+      "token_id": "81264573985362058461377125337283195667",
+      "status": "confirmed",
+      "tx": "0x9f2a..."
+    },
+    "failure_reason": null,
+    "created_at": "2026-11-16T18:02:11.420Z"
+  }
+}
+```
+
+```json 404
+{ "error": "Unknown order", "code": "UNKNOWN_ORDER" }
+```
+</ResponseExample>

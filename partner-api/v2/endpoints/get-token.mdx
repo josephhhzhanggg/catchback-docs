@@ -1,0 +1,95 @@
+---
+title: "Get a token"
+api: "GET /api/partner/v2/tokens/{tokenId}"
+description: "Any token of your program, live or burned: who holds it, the item behind it, and today's sell-back with its schedule."
+---
+
+Scope: `nft:orders`
+
+Any token of your program, live or burned: who holds it, the item behind it, and for a live token today's sell-back with its schedule.
+
+<ParamField path="tokenId" type="string" required>
+  The token's decimal `token_id`.
+</ParamField>
+
+## Response
+
+<ResponseField name="token" type="object">
+  <Expandable title="token">
+    <ResponseField name="chain" type="string" />
+    <ResponseField name="contract" type="string">EVM. On a Solana program, `collection` and `asset` instead.</ResponseField>
+    <ResponseField name="token_id" type="string" />
+    <ResponseField name="status" type="string">The mint status (`pending`, `submitted`, `confirmed`, `failed`), or `burned`.</ResponseField>
+    <ResponseField name="holder" type="string">The owner as our chain watcher last saw it (a quote re-reads the chain).</ResponseField>
+    <ResponseField name="order_id" type="string">The `Idempotency-Key` of the order that minted it.</ResponseField>
+    <ResponseField name="minted_at" type="string" />
+    <ResponseField name="confirmed_at" type="string | null" />
+    <ResponseField name="end" type="object | null">
+      A burned token has `end`: `{ "at": "...", "reason": "sellback" | "shipment" | "admin", "tx": "0x..." }`. `admin` means CatchBack burned it (a stuck or fraud case); contact us about it. Null for a live token.
+    </ResponseField>
+    <ResponseField name="item" type="object">The item's catalog fields (name, set, year, number, grade, cert, brand, size, condition, images, whichever it has) and its current `market_value`.</ResponseField>
+    <ResponseField name="sellback" type="object | null">
+      Null for a burned token, or one not yet confirmed. Otherwise:
+      <Expandable title="sellback">
+        <ResponseField name="amount" type="number">What a sell-back pays right now, in dollars. Indicative: only a quote fixes it.</ResponseField>
+        <ResponseField name="rate" type="number">As a fraction, e.g. `0.8`.</ResponseField>
+        <ResponseField name="fresh" type="boolean">True inside the 5-minute fresh window.</ResponseField>
+        <ResponseField name="value_locked" type="boolean">True while the 7-day value lock holds the amount.</ResponseField>
+        <ResponseField name="fresh_until" type="string">When the 5-minute fresh window ends (or ended).</ResponseField>
+        <ResponseField name="locked_until" type="string">When the lock lifts.</ResponseField>
+        <ResponseField name="schedule" type="object[]">
+          What a sell-back pays from now on, one phase per row: `from`, `until` (null for the last, open-ended phase), `rate` and `amount`. A `fixed: true` amount is locked; a `fixed: false` amount follows the market and is today's estimate.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `404` | `UNKNOWN_TOKEN` | No such token on your program's contract |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667 \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "token": {
+    "chain": "evm:196",
+    "contract": "0x7b1e...c0de",
+    "token_id": "81264573985362058461377125337283195667",
+    "status": "confirmed",
+    "holder": "0x8f3c...e21a",
+    "order_id": "okx-ord-7f3a9c21",
+    "minted_at": "2026-11-16T18:04:45.110Z",
+    "confirmed_at": "2026-11-16T18:04:52.000Z",
+    "end": null,
+    "item": {
+      "id": "a1c4...", "category": "pokemon", "name": "Charizard ex", "set": "Obsidian Flames", "number": "199/165",
+      "grading_company": "PSA", "grading_rank": 10, "cert_number": "81234567",
+      "front_image": "https://...", "back_image": "https://...", "render_image": "https://...",
+      "market_value": 415
+    },
+    "sellback": {
+      "amount": 330,
+      "rate": 0.8,
+      "fresh": false,
+      "value_locked": true,
+      "fresh_until": "2026-11-16T18:09:52.000Z",
+      "locked_until": "2026-11-23T18:04:41.317Z",
+      "schedule": [
+        { "from": "2026-11-17T09:00:00.000Z", "until": "2026-11-23T18:04:41.317Z", "rate": 0.8, "amount": 330, "fixed": true },
+        { "from": "2026-11-23T18:04:41.317Z", "until": null, "rate": 0.8, "amount": 332, "fixed": false }
+      ]
+    }
+  }
+}
+```
+</ResponseExample>

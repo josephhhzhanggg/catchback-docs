@@ -1,0 +1,82 @@
+---
+title: "Chains, tokens and metadata"
+description: "Chain keys, mint, payment and payout chains, token identity on EVM and Solana, the CatchBack Cards contract, and public NFT metadata."
+---
+
+## Chain keys
+
+Chains are written `<family>:<id>`:
+
+| Chain key | Chain |
+|---|---|
+| `evm:8453` | Base |
+| `evm:<chainId>` | Any other EVM chain, e.g. your own (`evm:196` is X Layer) |
+| `solana:mainnet` | Solana |
+
+## Which chain does what
+
+- **Mint chain:** your program mints on one chain, returned as `mint_chain` by the [catalog](/partner-api/v2/endpoints/list-packs). An EVM program has one ERC-721 contract; a Solana program has one Metaplex Core collection.
+- **Payment chains:** customers pay on **Base or Solana**, whatever your mint chain ([Payments](/partner-api/v2/payments)). On EVM one key is the same address on every EVM chain, so a customer paying from Base receives the NFT at that same address on your chain.
+- **Payout chain:** sell-backs pay **USDC**, by default on the token's own family: **Base** (`evm:8453`) for an EVM program, **Solana** (`solana:mainnet`) for a Solana program.
+- **Refunds** always go out as USDC on Base.
+- **Addresses:** EVM addresses are returned lowercase; Solana addresses as base58 (case-sensitive).
+
+<Warning>
+  Solana payouts are not switched on yet (`PAYOUT_CHAIN_NOT_ENABLED`). Until they are, a Solana program sends `payout_chain: "evm:8453"` and a Base `payout_address` with every [sell-back quote](/partner-api/v2/endpoints/create-sellback-quote).
+</Warning>
+
+## Token identity
+
+Every token has a decimal `token_id`, which is the `{tokenId}` in every token path, on both chain families.
+
+| Mint chain | Identity fields | Notes |
+|---|---|---|
+| EVM | `chain`, `contract`, `token_id` | A standard ERC-721 token: `ownerOf(token_id)`, `transferFrom`, `safeTransferFrom` all work. Token ids are large (up to 2^128): keep them as strings or bigints, never as JS numbers |
+| Solana | `chain`, `collection`, `asset`, `token_id` | A Metaplex Core asset in your program's collection. `asset` is its on-chain address; `token_id` is our id for it |
+
+## The EVM contract
+
+The EVM contract (name `CatchBack Cards`, symbol `CBCARD`) exposes what an integration needs:
+
+```solidity
+function ownerOf(uint256 tokenId) view returns (address);
+function transferFrom(address from, address to, uint256 tokenId);
+function tokenURI(uint256 tokenId) view returns (string);
+function burnWithQuote(Quote q, bytes signature);          // sell-back and shipping
+function usedQuote(bytes32 quoteId) view returns (bool);
+function hashQuote(Quote q) view returns (bytes32);         // the EIP-712 digest, for checking a signature
+
+event Redeemed(uint256 indexed tokenId, bytes32 indexed quoteId, uint8 kind,
+               address indexed holder, bytes32 payoutHash, uint256 amount);
+```
+
+The `Quote` tuple, the ABI and a viem example are on [Sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote).
+
+## Metadata
+
+Every token carries a standard metadata URL that wallets and marketplaces read without a key, from anywhere:
+
+| Mint chain | URL (the token's `tokenURI`, or the asset's `uri`) |
+|---|---|
+| EVM | `https://catchbackcards.com/api/partner-nfts/metadata/{chainId}/{tokenId}` |
+| Solana | `https://catchbackcards.com/api/partner-nfts/metadata/{id}` (our id for the asset) |
+
+```json
+{
+  "name": "Charizard ex 199/165 (PSA 10)",
+  "description": "A physical collectible held in the CatchBack vault. Burn this token to sell it back or have it shipped.",
+  "image": "https://...",
+  "external_url": "https://catchbackcards.com",
+  "attributes": [
+    { "trait_type": "Category", "value": "pokemon" },
+    { "trait_type": "Grade", "value": "PSA 10" },
+    { "trait_type": "Status", "value": "Vaulted" }
+  ]
+}
+```
+
+- Attributes include `Category`, `Set`, `Year`, `Number`, `Grade`, `Cert`, `Language`, `Brand`, `Size` and `Condition` where the item has them, and `Status` (`Vaulted`, or `Redeemed` once burned).
+- The metadata never includes a price.
+- It is cached for a few minutes, and a token whose mint hasn't been sent yet answers `404`.
+
+Details: [Token metadata](/partner-api/v2/endpoints/get-token-metadata).
