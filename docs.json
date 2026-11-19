@@ -112,6 +112,7 @@
               "partner-api/v2/endpoints/list-wallet-tokens",
               "partner-api/v2/endpoints/get-token",
               "partner-api/v2/endpoints/create-sellback-quote",
+              "partner-api/v2/endpoints/relay-burn",
               "partner-api/v2/endpoints/list-quotes",
               "partner-api/v2/endpoints/get-quote",
               "partner-api/v2/endpoints/get-token-metadata"

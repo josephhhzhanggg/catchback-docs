@@ -26,11 +26,11 @@ CatchBack is a platform where collectors can create mystery packs of collectible
 You don't need crypto expertise to integrate. The API is ordinary JSON over HTTPS, and we handle every on-chain step for you:
 
 - **Payments:** we give you a hosted payment screen, or an address to pay to. You never build a checkout or hold user funds.
-- **Minting and gas:** we create each digital representation and pay the network fee.
+- **Minting and gas:** we create each digital representation and pay the network fee. On EVM chains we can pay the fee for sell-backs and shipping too: the user signs, and we send the burn.
 - **Payouts and refunds:** we send USDC straight to the user.
 - **Shipping:** we pack and post the real item.
 
-The one thing your users do need is **their own crypto wallet**, the kind where only they hold the keys. Their digital representations go there, and they sign a transaction from it for each item they sell back or ship. If your users already have wallets, as on an exchange or wallet app, there's nothing extra to set up.
+The one thing your users do need is **their own crypto wallet**, the kind where only they hold the keys. Their digital representations go there, and they sign from it for each item they sell back or ship (on EVM chains a signature is enough, so they need no gas). If your users already have wallets, as on an exchange or wallet app, there's nothing extra to set up.
 
 We're also working with partners to give users automatically provisioned wallets, so they won't have to set one up themselves.
 
