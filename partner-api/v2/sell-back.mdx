@@ -6,7 +6,7 @@ description: "What a sell-back pays and when, getting a quote, burning on EVM wi
 Any holder can sell a token back to us for USDC. The flow:
 
 1. [`POST /tokens/{tokenId}/quote`](/partner-api/v2/endpoints/create-sellback-quote) fixes the amount, the payer and the payout destination for 10 minutes.
-2. The holder burns the token with the quote: on EVM by calling `burnWithQuote`, on Solana by signing the returned transaction.
+2. The holder burns the token with the quote: on EVM by calling `burnWithQuote` (or by signing the quote, and we send the burn: [EVM without gas](#evm-without-gas)), on Solana by signing the returned transaction.
 3. We see the burn and send the USDC. Follow it with the [`sellback.updated`](/partner-api/v2/webhooks#events) webhook or [`GET /quotes/{quoteId}`](/partner-api/v2/endpoints/get-quote).
 
 ## What a sell-back pays
@@ -136,12 +136,40 @@ The contract checks, in order, and reverts with:
 | Revert | Cause | What to do |
 |---|---|---|
 | `QuoteExpired(quoteId, expiresAt)` | The block is past `expiresAt` | Get a new quote (a shipment: [renew it](/partner-api/v2/endpoints/renew-shipment)) |
-| `NotQuoteHolder(caller, holder)` | The transaction was not sent by `holder` | Send from the holder's own wallet (no relayers) |
+| `NotQuoteHolder(caller, holder)` | `burnWithQuote` was not sent by `holder` | Send from the holder's own wallet, or [burn without gas](#evm-without-gas) |
 | `HolderNotOwner(tokenId, holder, owner)` | The token moved after the quote | Quote again for the new holder |
 | `ERC721NonexistentToken(tokenId)` | The token was already burned | Nothing to sell |
 | `QuoteAlreadyUsed(quoteId)` | This quote was already burned with | Nothing to do: the first burn counts |
 | `InvalidQuoteKind(kind)`, `InvalidQuoteSigner(recovered)` | The quote was altered | Pass the quote exactly as returned |
 | `EnforcedPause()` | Burns are paused by CatchBack | Retry later |
+
+## EVM without gas
+
+A holder with no native coin on the mint chain can still burn. They sign the quote (a signature, not a transaction, so no gas), you send us the signature with [Burn without gas](/partner-api/v2/endpoints/relay-burn), and our wallet sends `burnWithQuoteFor(quote, signature, holderSignature)`. It works for a sell-back quote and for each token's `burn` in a paid [shipment](/partner-api/v2/shipping). The payout or shipment follows exactly as for a burn the holder sent.
+
+The holder signs the quote exactly as returned, with the `domain` and `types` [above](#check-the-quote-before-the-customer-signs):
+
+```ts
+const q = res.quote;
+const holderSignature = await holderWallet.signTypedData({
+  account: holderWallet.account!,
+  domain: { name: 'CatchBackCards', version: '1', chainId: <mint chain id>, verifyingContract: res.contract },
+  types,
+  primaryType: 'Quote',
+  message: {
+    tokenId: BigInt(q.tokenId), kind: Number(q.kind), quoteId: q.quoteId, holder: q.holder,
+    payoutHash: q.payoutHash, amount: BigInt(q.amount), expiresAt: BigInt(q.expiresAt),
+  },
+});
+
+await fetch(`https://catchbackcards.com/api/partner/v2/tokens/${q.tokenId}/burn`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${process.env.CATCHBACK_KEY}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ quote_id: q.quoteId, holder_signature: holderSignature }),
+}); // 202 { quote_id, tx_hash }
+```
+
+The signature authorizes only that quote: its token, payout, amount and expiry, once. It is checked on chain, so we can't burn a token without it. Smart-contract wallets (ERC-1271) can sign too.
 
 ## Solana: sign the returned transaction
 

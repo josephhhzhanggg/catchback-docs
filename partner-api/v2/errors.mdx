@@ -57,12 +57,12 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `BAD_ADDRESS` | `400` | lists, wallet tokens, shipments, estimates | A wallet (`wallet`, or the path's address) is not an address on your mint chain; on a shipment or estimate, the shipping address is invalid and `fields` maps each bad field to a message |
 | `BAD_PARTNER_USER_REF` | `400` | order list | `partner_user_ref` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
 | `TOO_MANY_WALLETS` | `400` | order list | That `partner_user_ref` covers more than 200 wallets; filter by `wallet` instead |
-| `UNKNOWN_TOKEN` | `404` | token GET, quote, shipments, estimates | No such token on your program's contract; on the multi-token endpoints `token_ids` lists the unknown ones |
+| `UNKNOWN_TOKEN` | `404` | token GET, quote, shipments, estimates, burn | No such token on your program's contract; on the multi-token endpoints `token_ids` lists the unknown ones |
 | `BAD_HOLDER` | `400` | quote, shipments, estimates | `holder` is not a wallet address on your mint chain |
-| `NOT_HOLDER` | `403` | quote, shipments, estimates | That wallet does not hold the token on chain right now; on the multi-token endpoints `token_ids` lists the tokens it doesn't hold |
+| `NOT_HOLDER` | `403` | quote, shipments, estimates, burn | That wallet does not hold the token on chain right now; on the multi-token endpoints `token_ids` lists the tokens it doesn't hold |
 | `CHAIN_UNAVAILABLE` | `503` | quote, shipments, estimates, renew | We couldn't read the token's owner from the chain; retry shortly |
 | `TOKEN_NOT_MINTED` | `409` | quote | The token's mint hasn't confirmed yet |
-| `TOKEN_BURNED` | `409` | quote | The token was already sold back or shipped |
+| `TOKEN_BURNED` | `409` | quote, burn | The token was already sold back or shipped |
 | `TOKEN_NOT_LIVE` | `409` | shipments, estimates, renew | The token isn't minted yet, or was already burned; on the multi-token endpoints `token_ids` lists them |
 | `NO_OFFER` | `409` | quote | The item has no sell-back offer right now |
 | `PAYOUT_CHAIN_NOT_SUPPORTED` | `400` | quote | `payout_chain` is not one we pay on (`evm:8453` or `solana:mainnet`) |
@@ -82,10 +82,18 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `RATE_UNAVAILABLE` | `409` | shipments | The carrier no longer offers that rate; estimate again |
 | `PRICE_CHANGED` | `409` | shipments | The shipping cost is now above `max_cost`; the body has the current `amount` |
 | `UNKNOWN_SHIPMENT` | `404` | shipment GET, renew, sandbox shipments | No such shipment in your program |
-| `NOT_PAID` | `409` | renew | The shipping isn't paid yet |
+| `NOT_PAID` | `409` | renew, burn | The shipping isn't paid yet |
 | `ALREADY_REDEEMED` | `409` | renew | The token (every token, on a multi-token shipment) was already burned and the box is shipping |
 | `HOLDER_CHANGED` | `409` | renew | A token changed hands after the shipping was paid (`token_ids` lists them on a multi-token shipment); contact CatchBack support with the `quote_id` or `shipment_id` |
-| `UNKNOWN_QUOTE` | `404` | quote GET | No such sell-back quote in your program |
+| `UNKNOWN_QUOTE` | `404` | quote GET, burn | No such sell-back quote in your program (on burn: no such quote for this token) |
+| `BAD_QUOTE_ID` | `400` | burn | `quote_id` is missing |
+| `BAD_HOLDER_SIGNATURE` | `400` | burn | `holder_signature` isn't hex, or isn't the holder's signature over this quote |
+| `RELAY_NOT_SUPPORTED` | `400` | burn | A Solana program; sign the quote's transaction instead |
+| `QUOTE_USED` | `409` | burn | This quote was already burned with |
+| `QUOTE_EXPIRED` | `409` | burn | Get a new quote, or renew the shipment |
+| `QUOTE_NOT_RELAYABLE` | `409` | burn | The quote was issued before relayed burns; get a new one |
+| `CHAIN_REFUSED` | `502` | burn | The chain refused the burn; nothing was burned |
+| `CONTRACT_PAUSED` | `503` | burn | Burns are paused by CatchBack; retry later |
 | `BAD_JSON` | `400` | every POST with a body | The body isn't JSON |
 | `INVALID_WEBHOOK_URL` | `400` | webhooks | The URL isn't a public `https://` URL ([Webhooks](/partner-api/v2/webhooks)); the message says why |
 | `WEBHOOK_ACCOUNT_CHANGED` | `409` | webhooks | This key's webhook was registered under an earlier setup of your program; `DELETE` it and register again |

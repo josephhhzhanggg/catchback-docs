@@ -768,6 +768,95 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: Could not read the token owner; try again shortly., code: CHAIN_UNAVAILABLE }
+  /api/partner/v2/tokens/{tokenId}/burn:
+    post:
+      tags: [Sell-back]
+      operationId: relayBurn
+      summary: Burn without gas
+      description: |-
+        EVM only. The holder signs the quote (EIP-712, the same domain and `Quote` type the contract checks) instead of sending a transaction, and we send `burnWithQuoteFor(quote, signature, holderSignature)` and pay its gas. Works for a sell-back quote and for each token's `burn` in a paid shipment; the payout or shipment follows as for a burn the holder sent. ERC-1271 wallets can sign.
+
+        The signature authorizes only that quote, once, and is checked on chain. We simulate the burn before sending it, so a refusal sends nothing. Retrying after a 202 can send a second transaction that reverts harmlessly with `QuoteAlreadyUsed`: follow the quote instead. [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
+      parameters:
+        - $ref: '#/components/parameters/TokenId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quote_id, holder_signature]
+              properties:
+                quote_id: { type: string, description: 'A sell-back `quote_id`, or the token''s `quote_id` in a paid shipment.' }
+                holder_signature: { type: string, description: 'The holder''s EIP-712 signature over the quote exactly as returned, `0x` hex.' }
+            example: { quote_id: 0x5e0c...91ab, holder_signature: 0x9b2e...1c }
+      responses:
+        '202':
+          description: The burn is sent, not yet final. Follow the quote or the shipment as usual.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [quote_id, tx_hash]
+                properties:
+                  quote_id: { type: string }
+                  tx_hash: { type: string, description: The burn transaction on the mint chain. }
+              example: { quote_id: 0x5e0c...91ab, tx_hash: 0x3f8a...d41e }
+        '400':
+          description: |-
+            - `BAD_JSON`: the body isn't JSON.
+            - `BAD_QUOTE_ID`: `quote_id` is missing.
+            - `BAD_HOLDER_SIGNATURE`: `holder_signature` isn't hex, or isn't the holder's signature over this quote.
+            - `RELAY_NOT_SUPPORTED`: a Solana program; sign the quote's transaction instead.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: "holder_signature is not the holder's signature over this quote.", code: BAD_HOLDER_SIGNATURE }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: |-
+            - `NOT_HOLDER`: the token moved after the quote.
+            - Any of the key and program refusals every endpoint can return.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: The quote holder no longer holds this token., code: NOT_HOLDER }
+        '404':
+          description: |-
+            - `UNKNOWN_TOKEN`: no such token on your program's contract.
+            - `UNKNOWN_QUOTE`: no such quote for this token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: No such quote for this token., code: UNKNOWN_QUOTE }
+        '409':
+          description: |-
+            - `TOKEN_BURNED`: the token was already sold back or shipped.
+            - `QUOTE_USED`: this quote was already burned with.
+            - `QUOTE_EXPIRED`: get a new quote, or renew the shipment.
+            - `NOT_PAID`: the shipment's shipping isn't paid yet.
+            - `QUOTE_NOT_RELAYABLE`: the quote was issued before this endpoint existed; get a new one.
+            - No code: your program has no contract yet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: This quote has expired; request a new one., code: QUOTE_EXPIRED }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '502':
+          description: '`CHAIN_REFUSED`: the chain refused the burn; nothing was burned.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: The chain refused this burn; nothing was burned., code: CHAIN_REFUSED }
+        '503':
+          description: |-
+            - `CONTRACT_PAUSED`: burns are paused by CatchBack; retry later.
+            - `AUTH_UNAVAILABLE`, or no code: we couldn't check your key or load your program; retry after `Retry-After`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Redemptions are paused; try again later., code: CONTRACT_PAUSED }
   /api/partner/v2/quotes:
     get:
       tags: [Sell-back]

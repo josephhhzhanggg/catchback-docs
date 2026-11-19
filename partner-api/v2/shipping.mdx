@@ -40,7 +40,7 @@ Shipping is paid first, then the holder burns each token, then we ship. One ship
 - **EVM:** `burn` is `{ "quote": { ...same tuple as a sell-back, "kind": 2, "amount": "0" }, "signature": "0x..." }`. Call `burnWithQuote` exactly as for a sell-back (`burnForQuote` on [Sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote), with your contract address).
 - **Solana:** `burn` is `{ "transaction": "<base64>", "vault": "...", "last_valid_block_height": ... }`. Each GET builds a fresh transaction, so fetch it right before signing.
 
-Every burn must come from the wallet named in the shipment (`holder`). Each token's `status` becomes `redeemed` with `burned_at` and `burn_tx` as its burn is seen.
+Every burn must come from the wallet named in the shipment (`holder`): sent by it, or, on EVM, signed by it and sent by us with [Burn without gas](/partner-api/v2/endpoints/relay-burn). Each token's `status` becomes `redeemed` with `burned_at` and `burn_tx` as its burn is seen.
 
 ## Renew an expired burn window
 

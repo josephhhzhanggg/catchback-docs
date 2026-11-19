@@ -1,0 +1,71 @@
+---
+title: "Burn without gas"
+api: "POST /api/partner/v2/tokens/{tokenId}/burn"
+description: "EVM only. The holder signs the quote instead of sending a transaction; we send the burn and pay its gas."
+---
+
+Scope: `nft:orders`
+
+For a holder with no native coin on the mint chain. The holder signs the quote (a signature, not a transaction, so no gas), you send us that signature, and our wallet sends `burnWithQuoteFor(quote, signature, holderSignature)`. It works for a [sell-back quote](/partner-api/v2/endpoints/create-sellback-quote) and for each token's `burn` in a paid [shipment](/partner-api/v2/shipping). The payout or shipment then follows exactly as for a burn the holder sent.
+
+How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
+
+- The signature authorizes only that quote: its token, payout, amount and expiry, once. It is checked on chain, so we can't burn a token without it.
+- We check the burn before sending it, so a refusal sends nothing and burns nothing.
+- Smart-contract wallets (ERC-1271) can sign too.
+- Retrying after a `202` can send a second transaction, which reverts harmlessly with `QuoteAlreadyUsed`. Follow the quote instead of retrying.
+
+<ParamField path="tokenId" type="string" required>
+  The token's decimal `token_id`.
+</ParamField>
+<ParamField body="quote_id" type="string" required>
+  The quote to burn with: a sell-back `quote_id`, or the token's `quote_id` in a paid shipment.
+</ParamField>
+<ParamField body="holder_signature" type="string" required>
+  The holder's EIP-712 signature over the quote exactly as returned, `0x` hex.
+</ParamField>
+
+## Response
+
+**202.** The burn is sent, not yet final. Follow the quote ([Get a quote](/partner-api/v2/endpoints/get-quote), the `sellback.updated` webhook) or the shipment as usual.
+
+<ResponseField name="quote_id" type="string" />
+<ResponseField name="tx_hash" type="string">The burn transaction on the mint chain.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_JSON` | The body isn't JSON |
+| `400` | `BAD_QUOTE_ID` | `quote_id` is missing |
+| `400` | `BAD_HOLDER_SIGNATURE` | `holder_signature` isn't hex, or isn't the holder's signature over this quote |
+| `400` | `RELAY_NOT_SUPPORTED` | A Solana program; sign the quote's transaction instead |
+| `403` | `NOT_HOLDER` | The token moved after the quote |
+| `404` | `UNKNOWN_TOKEN` | No such token on your program's contract |
+| `404` | `UNKNOWN_QUOTE` | No such quote for this token |
+| `409` | `TOKEN_BURNED` | The token was already sold back or shipped |
+| `409` | `QUOTE_USED` | This quote was already burned with |
+| `409` | `QUOTE_EXPIRED` | Get a new quote, or [renew the shipment](/partner-api/v2/endpoints/renew-shipment) |
+| `409` | `NOT_PAID` | The shipment's shipping isn't paid yet |
+| `409` | `QUOTE_NOT_RELAYABLE` | The quote was issued before this endpoint existed; get a new one |
+| `409` | | Your program has no contract yet |
+| `502` | `CHAIN_REFUSED` | The chain refused the burn; nothing was burned |
+| `503` | `CONTRACT_PAUSED` | Burns are paused by CatchBack; retry later |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/burn \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "quote_id": "0x5e0c...91ab", "holder_signature": "0x9b2e...1c" }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 202
+{
+  "quote_id": "0x5e0c...91ab",
+  "tx_hash": "0x3f8a...d41e"
+}
+```
+</ResponseExample>

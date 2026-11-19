@@ -5,6 +5,11 @@ description: "What changed in Partner API v2, newest first."
 
 Changes to `v2` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. Dates are US Pacific time.
 
+<Update label="November 19, 2026" description="Burn without gas">
+  - New: [Burn without gas](/partner-api/v2/endpoints/relay-burn), `POST /tokens/{tokenId}/burn`. On EVM programs the holder signs the sell-back or shipment quote instead of sending a transaction, and we send the burn and pay its gas. See [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
+  - The contract gains `burnWithQuoteFor(quote, signature, holderSignature)`. `burnWithQuote` is unchanged.
+</Update>
+
 <Update label="November 17, 2026" description="Partner API v2: wallets & NFTs">
   - New: Partner API v2 under `/api/partner/v2`, scope `nft:orders`. Each customer pays for their own pack in USDC on Base or Solana, and each pulled item is delivered as an NFT to the customer's own wallet. See the [overview](/partner-api/v2/overview).
   - Packs and orders: [List packs](/partner-api/v2/endpoints/list-packs), [Get a pack's odds and pool](/partner-api/v2/endpoints/get-pack-pool) with the Standard, Hot, Chill and Classic [odds](/partner-api/v2/odds), [Create an order](/partner-api/v2/endpoints/create-order) for 1-10 packs, [List orders](/partner-api/v2/endpoints/list-orders), [Get an order](/partner-api/v2/endpoints/get-order) and its [provably-fair proof](/partner-api/v2/endpoints/get-order-verification).
