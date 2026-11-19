@@ -12,8 +12,8 @@ How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
 
 - The signature authorizes only that quote: its token, payout, amount and expiry, once. It is checked on chain, so we can't burn a token without it.
 - We check the burn before sending it, so a refusal sends nothing and burns nothing.
-- Smart-contract wallets (ERC-1271) can sign too.
-- Retrying after a `202` can send a second transaction, which reverts harmlessly with `QuoteAlreadyUsed`. Follow the quote instead of retrying.
+- Smart-contract wallets (ERC-1271) can sign too. One that approved the quote on chain may send an empty `holder_signature` (`0x`).
+- One send per quote: a repeat call returns the first `tx_hash` and sends nothing.
 
 <ParamField path="tokenId" type="string" required>
   The token's decimal `token_id`.
@@ -22,7 +22,7 @@ How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
   The quote to burn with: a sell-back `quote_id`, or the token's `quote_id` in a paid shipment.
 </ParamField>
 <ParamField body="holder_signature" type="string" required>
-  The holder's EIP-712 signature over the quote exactly as returned, `0x` hex.
+  The holder's EIP-712 signature over the quote exactly as returned, `0x` hex. `0x` alone for a contract wallet that approved it on chain.
 </ParamField>
 
 ## Response
@@ -48,6 +48,7 @@ How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
 | `409` | `QUOTE_EXPIRED` | Get a new quote, or [renew the shipment](/partner-api/v2/endpoints/renew-shipment) |
 | `409` | `NOT_PAID` | The shipment's shipping isn't paid yet |
 | `409` | `QUOTE_NOT_RELAYABLE` | The quote was issued before this endpoint existed; get a new one |
+| `409` | `RELAY_IN_PROGRESS` | The first send for this quote is still in flight; follow the quote |
 | `409` | | Your program has no contract yet |
 | `502` | `CHAIN_REFUSED` | The chain refused the burn; nothing was burned |
 | `503` | `CONTRACT_PAUSED` | Burns are paused by CatchBack; retry later |

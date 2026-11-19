@@ -92,6 +92,7 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `QUOTE_USED` | `409` | burn | This quote was already burned with |
 | `QUOTE_EXPIRED` | `409` | burn | Get a new quote, or renew the shipment |
 | `QUOTE_NOT_RELAYABLE` | `409` | burn | The quote was issued before relayed burns; get a new one |
+| `RELAY_IN_PROGRESS` | `409` | burn | The first send for this quote is still in flight; follow the quote |
 | `CHAIN_REFUSED` | `502` | burn | The chain refused the burn; nothing was burned |
 | `CONTRACT_PAUSED` | `503` | burn | Burns are paused by CatchBack; retry later |
 | `BAD_JSON` | `400` | every POST with a body | The body isn't JSON |

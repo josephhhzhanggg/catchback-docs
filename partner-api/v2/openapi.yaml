@@ -776,7 +776,7 @@ paths:
       description: |-
         EVM only. The holder signs the quote (EIP-712, the same domain and `Quote` type the contract checks) instead of sending a transaction, and we send `burnWithQuoteFor(quote, signature, holderSignature)` and pay its gas. Works for a sell-back quote and for each token's `burn` in a paid shipment; the payout or shipment follows as for a burn the holder sent. ERC-1271 wallets can sign.
 
-        The signature authorizes only that quote, once, and is checked on chain. We simulate the burn before sending it, so a refusal sends nothing. Retrying after a 202 can send a second transaction that reverts harmlessly with `QuoteAlreadyUsed`: follow the quote instead. [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
+        The signature authorizes only that quote, once, and is checked on chain. We simulate the burn before sending it, so a refusal sends nothing. A repeat call for the same quote returns the first `tx_hash` and sends nothing (`RELAY_IN_PROGRESS` while that send is in flight). [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
       parameters:
         - $ref: '#/components/parameters/TokenId'
       requestBody:
@@ -836,6 +836,7 @@ paths:
             - `QUOTE_EXPIRED`: get a new quote, or renew the shipment.
             - `NOT_PAID`: the shipment's shipping isn't paid yet.
             - `QUOTE_NOT_RELAYABLE`: the quote was issued before this endpoint existed; get a new one.
+            - `RELAY_IN_PROGRESS`: the first send for this quote is still in flight; follow the quote.
             - No code: your program has no contract yet.
           content:
             application/json:
