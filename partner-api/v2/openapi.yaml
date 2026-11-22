@@ -23,15 +23,17 @@ info:
       message text. [Errors](/partner-api/v2/errors).
     - **Idempotency:** `POST /orders`, `POST /shipments`, `POST /tokens/{tokenId}/shipment` and
       `POST /keys/rotate` require an `Idempotency-Key`. [Idempotency](/partner-api/v2/idempotency).
-    - **Sandbox:** the sandbox runs the same API with simulated payments on a public testnet. Its base
-      URL is issued on request, with a sandbox key. The operations tagged `Sandbox` exist only there
+    - **Sandbox:** the sandbox runs the same API with simulated payments on a public testnet. Set it up
+      yourself: in your manager (`catchback.com/<slug>/admin/api`), Get started, **Set up my sandbox**, then create a sandbox key there. The operations tagged `Sandbox` exist only there
       and answer `404` in production.
   contact:
     name: CatchBack support
     email: support@catchbackcards.com
 servers:
   - url: https://catchbackcards.com
-    description: Production. Every payment is real money. The sandbox base URL is issued on request.
+    description: Production. Every payment is real money.
+  - url: https://sandbox.catchbackcards.com
+    description: Sandbox. Simulated payments, real NFTs on Base Sepolia. Set it up from Get started in your manager.
 tags:
   - name: Packs
     description: The packs you can sell, their odds and every item they can pull.
@@ -67,6 +69,8 @@ paths:
       summary: List packs
       description: |-
         The packs you can sell in one category, with price, the odds choices each sells, art and the chase item on offer. A pack that isn't on sale right now stays listed with `available: false` and a `reason`. Whether a particular odds choice is selling right now is on [Get a pack's pool](#operation/getPackPool).
+
+        Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them so they answer fast however often you call them. Stock is checked again when you create the order, so a pack that sold out in that minute is refused there (`409 PACK_UNAVAILABLE`, with its `reason`).
       parameters:
         - $ref: '#/components/parameters/PackCategory'
       responses:
@@ -137,6 +141,8 @@ paths:
       summary: Get a pack's pool
       description: |-
         What one pack can pull at one odds choice: the value bands with their chances, whether those odds are selling right now, and every item a pull can produce, highest value first. This is the same information as the odds panel in our app; show it to your customers before they buy.
+
+        Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them so they answer fast however often you call them. Stock is checked again when you create the order, so a pack that sold out in that minute is refused there (`409 PACK_UNAVAILABLE`, with its `reason`).
 
         A pack that sells only its own odds answers `odds: "classic"` with its own band shape (`ClassicPackPool`). Every other pack answers `ModePackPool`.
       parameters:
@@ -367,7 +373,7 @@ paths:
       operationId: listOrders
       summary: List orders
       description: |-
-        Your orders, newest first, each in the Get an order shape. The units of a multi-pack order are listed one by one, each with the order's `order_id`, its `batch_id` and its `unit` number. `partner_user_ref` matches the wallets you first sent with that ref.
+        Your orders, newest first, each in the Get an order shape. The units of a multi-pack order are listed one by one, each with the order's `order_id`, its `batch_id` and its `unit` number. `partner_user_ref` matches the orders you sent with that ref, whichever wallet they went to.
       parameters:
         - $ref: '#/components/parameters/WalletFilter'
         - name: partner_user_ref
@@ -419,7 +425,6 @@ paths:
             - `BAD_STATUS`: `status` isn't one the list filters on.
             - `BAD_ADDRESS`: `wallet` is not an address on your mint chain.
             - `BAD_PARTNER_USER_REF`: `partner_user_ref` isn't 1-128 characters of `A-Za-z0-9_.:-`.
-            - `TOO_MANY_WALLETS`: that `partner_user_ref` covers more than 200 wallets; filter by `wallet` instead.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2386,7 +2391,6 @@ components:
         - BAD_STATUS
         - BAD_ADDRESS
         - BAD_PARTNER_USER_REF
-        - TOO_MANY_WALLETS
         - UNKNOWN_TOKEN
         - BAD_HOLDER
         - NOT_HOLDER

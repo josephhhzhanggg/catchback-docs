@@ -6,18 +6,19 @@ In about 15 minutes you'll run the whole flow a customer goes through: buy a pac
 
 ## Before you start
 
-**What we send you.** Email [support@catchbackcards.com](mailto:support@catchbackcards.com) and we'll set you up with:
+**Get your sandbox key.** Sign in to your manager at `catchback.com/<slug>/admin/api` and open **Get started**. An owner clicks **Set up my sandbox**, then creates a sandbox key there. Copy it when it's shown: it isn't shown again.
 
-- a **sandbox base URL**, where the test API lives;
-- a **sandbox API key**, which only works there;
-- your **test chain** and **sandbox contract address**.
+- The **sandbox base URL**, where the test API lives, is `https://sandbox.catchbackcards.com`.
+- Your **test chain** is Base Sepolia (`evm:84532`). The **sandbox contract address** comes back as `contract` on every token and quote.
 
-**What you need.** A test wallet address on that chain, standing in for your customer. Any EVM wallet works (MetaMask, Rabby, or one your code creates). Selling back needs the wallet to sign one transaction, so give it a little testnet gas from a public faucet.
+No manager access yet? Email [support@catchbackcards.com](mailto:support@catchbackcards.com) and we'll set you up.
+
+**What you need.** A test wallet address on that chain, standing in for your customer. Any EVM wallet works (MetaMask, Rabby, or one your code creates). It needs no gas: selling back and shipping only ask the wallet to sign, and we send the burn ([Burn without gas](/partner-api/v2/endpoints/relay-burn)). Only a transfer between your own test wallets needs a little testnet ETH from a public faucet.
 
 Save the two values you'll use in every call:
 
 ```bash
-export CATCHBACK_BASE_URL="https://…"     # the sandbox base URL we sent
+export CATCHBACK_BASE_URL="https://sandbox.catchbackcards.com"
 export CATCHBACK_KEY="cb_live_…"          # your sandbox key (keys look the same in every environment)
 export WALLET="0x…"                       # your test wallet address
 ```

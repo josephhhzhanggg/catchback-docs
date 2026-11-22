@@ -12,7 +12,7 @@ Newest first, each order in the [Get an order](/partner-api/v2/endpoints/get-ord
   A `recipient` address on your mint chain. Default: all.
 </ParamField>
 <ParamField query="partner_user_ref" type="string">
-  A `partner_user_ref` you sent with an order. It matches the wallets you first sent with that ref. Default: all.
+  A `partner_user_ref` you sent with an order. It matches the orders you sent with that ref, whichever wallet they went to. Default: all.
 </ParamField>
 <ParamField query="status" type="string">
   `awaiting_payment`, `paid`, `rolled`, `minted`, `mint_failed`, `expired`, `refund_due` or `refunded`. Default: all.
@@ -38,7 +38,6 @@ Newest first, each order in the [Get an order](/partner-api/v2/endpoints/get-ord
 | `400` | `BAD_STATUS` | `status` isn't one the list filters on; the message lists them |
 | `400` | `BAD_ADDRESS` | `wallet` is not an address on your mint chain |
 | `400` | `BAD_PARTNER_USER_REF` | `partner_user_ref` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
-| `400` | `TOO_MANY_WALLETS` | That `partner_user_ref` covers more than 200 wallets; filter by `wallet` instead |
 
 <RequestExample>
 ```bash cURL

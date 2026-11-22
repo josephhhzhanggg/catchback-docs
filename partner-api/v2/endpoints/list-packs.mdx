@@ -8,6 +8,8 @@ Scope: `nft:orders`
 
 The packs a wallet order can buy in one category, with your program's `mint_chain`.
 
+Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them so they answer fast however often you call them. Stock is checked again when you create the order, so a pack that sold out in that minute is refused there (`409 PACK_UNAVAILABLE`, with its `reason`).
+
 <ParamField query="category" type="string" default="pokemon">
   `pokemon`, `onepiece`, `sports`, `riftbound`, `watches` or `goods`. `goods` packs hold streetwear and jewelry. Raw singles have no category of their own: they come out of other categories' packs.
 </ParamField>

@@ -56,7 +56,6 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `BAD_STATUS` | `400` | order and shipment lists | `status` isn't one the list filters on; the message lists them |
 | `BAD_ADDRESS` | `400` | lists, wallet tokens, shipments, estimates | A wallet (`wallet`, or the path's address) is not an address on your mint chain; on a shipment or estimate, the shipping address is invalid and `fields` maps each bad field to a message |
 | `BAD_PARTNER_USER_REF` | `400` | order list | `partner_user_ref` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
-| `TOO_MANY_WALLETS` | `400` | order list | That `partner_user_ref` covers more than 200 wallets; filter by `wallet` instead |
 | `UNKNOWN_TOKEN` | `404` | token GET, quote, shipments, estimates, burn | No such token on your program's contract; on the multi-token endpoints `token_ids` lists the unknown ones |
 | `BAD_HOLDER` | `400` | quote, shipments, estimates | `holder` is not a wallet address on your mint chain |
 | `NOT_HOLDER` | `403` | quote, shipments, estimates, burn | That wallet does not hold the token on chain right now; on the multi-token endpoints `token_ids` lists the tokens it doesn't hold |

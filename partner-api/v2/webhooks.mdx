@@ -48,6 +48,7 @@ Every event is a JSON `POST` with this envelope:
 - **Multi-pack orders:** `nft_order.updated` fires for each unit, carrying the order's `order_id`, its `batch_id` and the `unit` number.
 - **Shipments:** `data.shipment` has the fields of the one-token shape: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `burn` and `fulfilment`. In a multi-token shipment each event is about one token (its `quote_id`); `GET /shipments/{quote_id}` returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction.
 - **A burn window lapsing sends no event.** Watch `expires_at` and [renew](/partner-api/v2/endpoints/renew-shipment).
+- **Test events:** your manager (`catchback.com/<slug>/admin/api`, Webhooks) can send any of these types as a test: signed like a real event, sent once, with `"test": true` in `data` and `test_` ids. Ignore them in production. The same tab shows each delivery's payload, retries a failed one and rotates the signing secret (the next delivery is signed with the new one).
 
 ## Delivery and retries
 

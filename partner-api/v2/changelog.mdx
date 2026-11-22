@@ -5,6 +5,13 @@ description: "What changed in Partner API v2, newest first."
 
 Changes to `v2` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. Dates are US Pacific time.
 
+<Update label="November 22, 2026" description="Self-serve sandbox; order lists by ref">
+  - Set up your sandbox yourself: Get started in your manager has **Set up my sandbox**, then you create a sandbox key there. See the [Sandbox](/partner-api/v2/quickstart).
+  - [List orders](/partner-api/v2/endpoints/list-orders) with `partner_user_ref` now matches the orders you sent with that ref, whichever wallet they went to. `TOO_MANY_WALLETS` is gone.
+  - [List packs](/partner-api/v2/endpoints/list-packs) and [Get a pack's odds and pool](/partner-api/v2/endpoints/get-pack-pool) can be up to a minute old; stock is checked again when you order.
+  - [Webhooks](/partner-api/v2/webhooks): send test events, see payloads, retry deliveries and rotate the signing secret from your manager.
+</Update>
+
 <Update label="November 19, 2026" description="Burn without gas">
   - New: [Burn without gas](/partner-api/v2/endpoints/relay-burn), `POST /tokens/{tokenId}/burn`. On EVM programs the holder signs the sell-back or shipment quote instead of sending a transaction, and we send the burn and pay its gas. See [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
   - The contract gains `burnWithQuoteFor(quote, signature, holderSignature)`. `burnWithQuote` is unchanged.

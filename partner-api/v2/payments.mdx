@@ -39,7 +39,7 @@ Your checkout either opens Unifold's checkout with `client_secret` and `publisha
 ## Rules
 
 - **Chains:** pay on **Base** or **Solana**. USDC is the simplest; Unifold converts other tokens it accepts, and conversion costs come off what arrives.
-- **Tolerance:** an intent counts as paid once at least **99%** of the amount has arrived (swap slippage and wallet fees are absorbed). Payments toward one intent add up, so an underpaid customer can send the rest to the same address.
+- **Tolerance:** an intent counts as paid once at least **99%** of the amount has arrived (swap slippage and wallet fees are absorbed).
 - **Underpayment:** a payment more than 1% short opens nothing: the order goes to `refund_due` with `failure_reason: "underpaid"` and everything that arrived is refunded.
 - **Overpayment** is not returned automatically. Send exactly `amount`.
 - **Payment window:** an order must be paid within **24 hours** of its creation, after which it becomes `expired`. A payment that lands after that is refunded in full (`paid_after_expiry`). An unpaid shipment never expires.

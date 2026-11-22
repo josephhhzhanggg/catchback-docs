@@ -8,6 +8,8 @@ Scope: `nft:orders`
 
 What one pack can pull at one [odds choice](/partner-api/v2/odds): the value bands with their chances, whether those odds are selling right now, and every item a pull can produce. This is the same information as the odds panel in our app, so show it to your customers before they buy.
 
+Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them so they answer fast however often you call them. Stock is checked again when you create the order, so a pack that sold out in that minute is refused there (`409 PACK_UNAVAILABLE`, with its `reason`).
+
 <ParamField query="pack_type" type="string" required>
   A `pack_type` from [List packs](/partner-api/v2/endpoints/list-packs).
 </ParamField>
