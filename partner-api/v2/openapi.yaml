@@ -2924,8 +2924,8 @@ components:
         holder: { type: string, description: 'The wallet that holds the token now. Checked on chain.' }
         payout_chain:
           type: string
-          enum: ['evm:8453', 'solana:mainnet']
-          description: 'Default: the token''s family (Base for an EVM program, Solana for a Solana program). Solana payouts answer `PAYOUT_CHAIN_NOT_ENABLED` until they are switched on.'
+          enum: ['evm:8453', 'solana:mainnet', 'evm:84532', 'solana:devnet']
+          description: 'Default: the token''s family (Base for an EVM program, Solana for a Solana program). Solana payouts answer `PAYOUT_CHAIN_NOT_ENABLED` until they are switched on. Production pays on `evm:8453` or `solana:mainnet`. The sandbox pays on the test networks, `evm:84532` and `solana:devnet`, and reads the production names as those.'
         payout_address: { type: string, description: 'Where the USDC goes. Required when the payout chain isn''t your mint chain''s family; otherwise defaults to `holder`.' }
     PayoutDestination:
       type: object
