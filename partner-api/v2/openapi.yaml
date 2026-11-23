@@ -2008,8 +2008,8 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: cb_live_<48 hex>
-      description: 'Your API key (`cb_live_…`), sent as a bearer token, with the scope `nft:orders`. Keep it on your servers: never in a browser, app or wallet. Use a separate key per environment. A request from a country on our sanctions list gets a `403` with `Access denied`, whether or not it has a valid key. See [Authentication and keys](/partner-api/v2/authentication).'
+      bearerFormat: cb_live_<48 hex> (production) or cb_test_<48 hex> (sandbox)
+      description: 'Your API key, sent as a bearer token, with the scope `nft:orders`. A production key starts `cb_live_` and works only at https://catchbackcards.com; a sandbox key starts `cb_test_` and works only at https://sandbox.catchbackcards.com (production refuses one with `401 SANDBOX_KEY`). Keep it on your servers: never in a browser, app or wallet. Use a separate key per environment. A request from a country on our sanctions list gets a `403` with `Access denied`, whether or not it has a valid key. See [Authentication and keys](/partner-api/v2/authentication).'
   parameters:
     OrderIdempotencyKey:
       name: Idempotency-Key
@@ -2112,7 +2112,8 @@ components:
   responses:
     Unauthorized:
       description: |-
-        - `Missing or malformed API key`: no `Bearer cb_live_…` header.
+        - `Missing or malformed API key`: no `Bearer cb_live_…` or `Bearer cb_test_…` header.
+        - `This is a sandbox key. Send it to https://sandbox.catchbackcards.com instead.` (code `SANDBOX_KEY`): a `cb_test_` key sent to production.
         - `Invalid API key`: unknown or disabled, or a rotated key past its 24 hours.
       content:
         application/json:
@@ -3260,7 +3261,7 @@ components:
           properties:
             id: { type: string, format: uuid }
             name: { type: string }
-            secret: { type: string, description: 'The new `cb_live_…` key. Shown here only.' }
+            secret: { type: string, description: 'The new key, with the same prefix as the old one (`cb_live_…` or `cb_test_…`). Shown here only.' }
             created_at: { type: string, format: date-time }
         previous_key:
           type: object

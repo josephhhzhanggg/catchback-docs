@@ -9,11 +9,22 @@ Every v2 request sends your key as a bearer token:
 Authorization: Bearer cb_live_...
 ```
 
+## Sandbox and production keys
+
+A key's prefix says which environment it works in. Send it to that environment's base URL, and only that one.
+
+| Key starts with | Environment | Base URL | MCP server |
+|---|---|---|---|
+| `cb_test_` | Sandbox: test data, simulated payments | `https://sandbox.catchbackcards.com/api/partner/v2` | `https://sandbox.catchbackcards.com/api/mcp` |
+| `cb_live_` | Production: real money | `https://catchbackcards.com/api/partner/v2` | `https://catchbackcards.com/api/mcp` |
+
+Production turns a `cb_test_` key away with `401` and the code `SANDBOX_KEY`. Sandbox keys made before November 23, 2026 start `cb_live_`, and they still work in the sandbox only.
+
 The only endpoint that takes no key is the [public token metadata](/partner-api/v2/endpoints/get-token-metadata), which wallets and marketplaces read.
 
 ## Base URL and formats
 
-- **Base URL:** `https://catchbackcards.com/api/partner/v2`.
+- **Base URL:** `https://catchbackcards.com/api/partner/v2` for production, `https://sandbox.catchbackcards.com/api/partner/v2` for the sandbox.
 - **Formats:** JSON, UTF-8. Money is USD in dollars (`25`, `9.85`).
 - **New fields can appear at any time.** Ignore fields you don't recognize.
 - **OpenAPI spec:** the OpenAPI 3.1 spec is the official contract, with every endpoint, error code and webhook event. Generate your client from it: `https://catchbackcards.mintlify.app/partner-api/v2/openapi.yaml`.
@@ -29,7 +40,8 @@ These come before an endpoint does anything else:
 
 | Status | `code` | When |
 |---|---|---|
-| `401` | | `Missing or malformed API key` (no `Bearer cb_live_...` header) or `Invalid API key` (unknown, disabled, or a rotated key past its 24 hours) |
+| `401` | | `Missing or malformed API key` (no `Bearer cb_live_...` or `Bearer cb_test_...` header) or `Invalid API key` (unknown, disabled, or a rotated key past its 24 hours) |
+| `401` | `SANDBOX_KEY` | A sandbox key (`cb_test_`) sent to production. Send it to `https://sandbox.catchbackcards.com` |
 | `403` | | `API key lacks required scope: nft:orders` |
 | `429` | `RATE_LIMITED` | Too many requests from this key ([limits](/partner-api/v2/limits-and-compliance)); the body has `retry_after_seconds` and the response a `Retry-After` header |
 | `403` | `NO_PROGRAM` | The key isn't linked to a partner program |

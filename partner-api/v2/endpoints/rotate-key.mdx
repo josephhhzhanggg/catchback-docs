@@ -23,7 +23,7 @@ Issues a new key for the same program, with the same scopes. No body; an `Idempo
 **201** (200 with `"idempotent_replay": true` on a replay).
 
 <ResponseField name="key" type="object">
-  The new key: `id`, `name`, `secret` (`cb_live_...`, shown only here) and `created_at`.
+  The new key: `id`, `name`, `secret` (shown only here; it keeps your old key's prefix, `cb_live_` or `cb_test_`) and `created_at`.
 </ResponseField>
 <ResponseField name="previous_key" type="object">
   The key you called with: `id` and `expires_at`, 24 hours from now.
