@@ -18,7 +18,7 @@ A key's prefix says which environment it works in. Send it to that environment's
 | `cb_test_` | Sandbox: test data, simulated payments | `https://sandbox.catchbackcards.com/api/partner/v2` | `https://sandbox.catchbackcards.com/api/mcp` |
 | `cb_live_` | Production: real money | `https://catchbackcards.com/api/partner/v2` | `https://catchbackcards.com/api/mcp` |
 
-Production turns a `cb_test_` key away with `401` and the code `SANDBOX_KEY`. Sandbox keys made before November 23, 2026 start `cb_live_`, and they still work in the sandbox only.
+Production turns a `cb_test_` key away with `401` and the code `SANDBOX_KEY`. Sandbox keys made before this change (November 22, 2026) start `cb_live_`, and they still work in the sandbox only.
 
 The only endpoint that takes no key is the [public token metadata](/partner-api/v2/endpoints/get-token-metadata), which wallets and marketplaces read.
 
