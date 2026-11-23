@@ -1,10 +1,14 @@
 ---
 title: "Create a one-token shipment"
 api: "POST /api/partner/v2/tokens/{tokenId}/shipment"
-description: "Create and pay for a shipment of one token, with the token in the path."
+description: "Create a shipment of one token: one tap (the holder signs once to pay and burn) where supported, or pay first."
 ---
 
 Scope: `nft:orders`
+
+<Tip>
+  **One tap.** Where your program supports it, `payment.method` is `"signature"` (the default there): the holder signs `payment.sign` once, and you send that to [Burn without gas](/partner-api/v2/endpoints/relay-burn) as `permit_signature`. It pays the postage and burns together. See [One tap](/partner-api/v2/shipping#one-tap-pay-and-burn-together).
+</Tip>
 
 The same as [Create a shipment](/partner-api/v2/endpoints/create-shipment), for one token: it takes the same body without `token_ids` and answers with the shipment as `quote` (no `shipment_id`, no `tokens`: the token's own `quote_id` names the shipment). Once paid, [Get a shipment](/partner-api/v2/endpoints/get-shipment) with the `quote_id` returns what the holder burns with; the burn ships the item.
 
@@ -26,6 +30,9 @@ The same as [Create a shipment](/partner-api/v2/endpoints/create-shipment), for 
 </ParamField>
 <ParamField body="rate" type="object" required>
   `{ "carrier": "...", "token": "..." }` from an estimate's `rates`.
+</ParamField>
+<ParamField body="payment_method" type="string">
+  `"signature"`: one tap, pay and burn together (the default where your program supports it; `409 SIGNATURE_PAYMENT_UNAVAILABLE` where it doesn't). `"checkout"`: pay first through the returned `payment`, then burn.
 </ParamField>
 <ParamField body="max_cost" type="number" required>
   The most the holder will pay for shipping, in dollars: pass the estimate's `total`.

@@ -5,6 +5,12 @@ description: "What changed in Partner API v2, newest first."
 
 Changes to `v2` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. Dates are US Pacific time.
 
+<Update label="November 23, 2026" description="One-tap shipping">
+  - Ship one token in one tap: where your program supports it, [Create a one-token shipment](/partner-api/v2/endpoints/create-token-shipment) returns `payment.method: "signature"` and a `sign` message. The holder signs it once, you send it to [Burn without gas](/partner-api/v2/endpoints/relay-burn) as `permit_signature`, and the postage and the burn land in one transaction. No separate payment, and no 24-hour burn window. See [One tap](/partner-api/v2/shipping#one-tap-pay-and-burn-together).
+  - New: `payment_method` on one-token shipments (`signature` or `checkout`); `permit_signature` on the burn endpoint; error codes `BAD_PAYMENT_METHOD`, `SIGNATURE_PAYMENT_UNAVAILABLE`, `POSTAGE_DUE`, `BAD_PERMIT_SIGNATURE`, `INSUFFICIENT_FUNDS` and `PERMIT2_NOT_APPROVED`.
+  - Multi-token shipments are unchanged: pay first, then burn.
+</Update>
+
 <Update label="November 22, 2026" description="Self-serve sandbox; sandbox keys start cb_test_; order lists by ref">
   - Sandbox keys now start `cb_test_`, so a key says where it works: `cb_test_` keys at `https://sandbox.catchbackcards.com`, `cb_live_` keys at `https://catchbackcards.com`. Production refuses a sandbox key with `401` and the code `SANDBOX_KEY`. Sandbox keys made earlier start `cb_live_` and keep working in the sandbox. See [Authentication and keys](/partner-api/v2/authentication#sandbox-and-production-keys).
   - The [MCP server](/partner-api/v2/mcp) now opens by telling the assistant which environment it is connected to, and where a sandbox key's direct API calls go.

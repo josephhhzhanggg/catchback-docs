@@ -797,10 +797,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [quote_id, holder_signature]
+              required: [quote_id]
+              description: 'Send `holder_signature` for a sell-back or a shipment paid first, or `permit_signature` for a one-tap shipment.'
               properties:
-                quote_id: { type: string, description: 'A sell-back `quote_id`, or the token''s `quote_id` in a paid shipment.' }
+                quote_id: { type: string, description: 'A sell-back `quote_id`, or the token''s `quote_id` in a shipment.' }
                 holder_signature: { type: string, description: 'The holder''s EIP-712 signature over the quote exactly as returned, `0x` hex.' }
+                permit_signature: { type: string, description: 'One-tap shipment only: the holder''s EIP-712 signature over the shipment''s `payment.sign`, `0x` hex. We send shipWithPayment: the postage moves and the token burns together.' }
             example: { quote_id: 0x5e0c...91ab, holder_signature: 0x9b2e...1c }
       responses:
         '202':
@@ -2373,6 +2375,12 @@ components:
       type: string
       description: Every `code` v2 returns. Branch on these, never on the message text.
       enum:
+        - BAD_PAYMENT_METHOD
+        - SIGNATURE_PAYMENT_UNAVAILABLE
+        - POSTAGE_DUE
+        - BAD_PERMIT_SIGNATURE
+        - INSUFFICIENT_FUNDS
+        - PERMIT2_NOT_APPROVED
         - RATE_LIMITED
         - AUTH_UNAVAILABLE
         - NO_PROGRAM
@@ -3082,7 +3090,14 @@ components:
         max_cost: { type: number, exclusiveMinimum: 0, description: 'The most the holder will pay for shipping, in dollars (the estimate''s `total`).' }
         cover_amount: { $ref: '#/components/schemas/CoverAmount' }
     CreateTokenShipmentRequest:
-      $ref: '#/components/schemas/TokenShipmentCreateFields'
+      allOf:
+        - $ref: '#/components/schemas/TokenShipmentCreateFields'
+        - type: object
+          properties:
+            payment_method:
+              type: string
+              enum: [signature, checkout]
+              description: '`signature`: one tap, the holder signs once to pay the postage and burn together (the default where the program supports it; `409 SIGNATURE_PAYMENT_UNAVAILABLE` otherwise). `checkout`: pay first through the returned payment, then burn.'
     CreateShipmentRequest:
       allOf:
         - type: object
@@ -3135,10 +3150,11 @@ components:
         status:
           type: string
           enum: [awaiting_payment, ready, expired, redeemed]
-          description: '`awaiting_payment`, `ready` (paid; burn it), `expired` (the paid burn window lapsed: renew it), `redeemed` (the burn was seen).'
+          description: '`awaiting_payment` (pay it, or for a one-tap shipment sign it), `ready` (paid; burn it), `expired` (the paid burn window lapsed: renew it; or a one-tap shipment nobody signed in time: create it again), `redeemed` (the burn was seen).'
+        payment_method: { type: string, enum: [signature, checkout], description: '`signature`: one tap, paid in its burn. `checkout`: paid first, then burned.' }
         shipping_cost: { type: [number, 'null'] }
         holder: { type: string }
-        expires_at: { type: string, format: date-time, description: 'The end of the burn window once paid. An unpaid shipment never expires.' }
+        expires_at: { type: string, format: date-time, description: 'Pay first: the end of the burn window once paid (an unpaid one never expires). One tap: the end of the 30-minute window to sign.' }
         paid_at: { type: [string, 'null'], format: date-time }
         burn: { $ref: '#/components/schemas/ShipmentBurn' }
         fulfilment:
@@ -3203,8 +3219,26 @@ components:
         payment:
           oneOf:
             - $ref: '#/components/schemas/Payment'
+            - $ref: '#/components/schemas/OneTapPayment'
             - type: 'null'
         idempotent_replay: { type: boolean, const: true }
+    OneTapPayment:
+      type: object
+      description: 'A one-tap shipment: the holder signs `sign` once (a Permit2 PermitWitnessTransferFrom whose witness is the shipment quote), which pays `amount` of `token` and releases the burn. Send the signature to POST /tokens/{tokenId}/burn as `permit_signature`.'
+      required: [method, amount, token, sign]
+      properties:
+        method: { type: string, const: signature }
+        amount: { type: number, description: 'The postage in dollars.' }
+        token: { type: string, description: 'The stablecoin the postage is paid in, on the mint chain.' }
+        sign:
+          type: object
+          description: 'EIP-712 typed data for eth_signTypedData_v4: domain (Permit2), types, primaryType PermitWitnessTransferFrom, message. uint fields are decimal strings.'
+          required: [domain, types, primaryType, message]
+          properties:
+            domain: { type: object }
+            types: { type: object }
+            primaryType: { type: string, const: PermitWitnessTransferFrom }
+            message: { type: object }
     Webhook:
       type: object
       required: [id, url, enabled, created_at, updated_at]

@@ -69,6 +69,12 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `BAD_PAYOUT_ADDRESS` | `400` | quote | No usable `payout_address` for the payout chain (required when it isn't your mint chain's family) |
 | `USE_SHIPMENT_ENDPOINT` | `400` | quote | `kind: "shipment"` sent to the quote endpoint; shipments start at `POST /shipments` |
 | `BAD_TOKEN_IDS` | `400` | shipments, estimate | `token_ids` isn't a list of 1-25 distinct decimal token ids |
+| `BAD_PAYMENT_METHOD` | `400` | one-token shipment | `payment_method` is not `signature` or `checkout` |
+| `SIGNATURE_PAYMENT_UNAVAILABLE` | `409` | one-token shipment, burn | One-tap shipping isn't set up for this token's contract; send `payment_method: "checkout"` |
+| `POSTAGE_DUE` | `409` | burn | A one-tap shipment was sent `holder_signature`; send `permit_signature` |
+| `BAD_PERMIT_SIGNATURE` | `400` | burn | `permit_signature` isn't the holder's signature over the shipment's `payment.sign`, or the quote isn't a one-tap shipment |
+| `INSUFFICIENT_FUNDS` | `402` | burn | The holder's wallet doesn't hold the postage in the stablecoin |
+| `PERMIT2_NOT_APPROVED` | `409` | burn | The holder's wallet hasn't approved Permit2 for the stablecoin yet (once per token) |
 | `TOKEN_IN_SHIPMENT` | `409` | shipments | A token already has a paid shipment waiting for its burn; the body's `token_ids` lists them (and `quote_id` on the one-token endpoint). Burn or renew that shipment instead |
 | `BAD_COVER` | `400` | shipments, estimates | `cover_amount` isn't a positive dollar amount with at most two decimals |
 | `COVER_NOT_ALLOWED` | `400` | shipments, estimates | `cover_amount` is outside what the items can be insured for; the body has `order_value`, `min_cover` and `max_cover` (`max_cover` is null when they can't be insured) |

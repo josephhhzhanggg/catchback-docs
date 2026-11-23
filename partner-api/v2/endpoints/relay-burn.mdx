@@ -10,6 +10,8 @@ For a holder with no native coin on the mint chain. The holder signs the quote (
 
 How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
 
+**A one-tap shipment** uses this endpoint with `permit_signature` instead of `holder_signature`: the holder's signature over the shipment's `payment.sign`. We send `shipWithPayment`, which pays the postage and burns in one transaction, both or neither. Sending `holder_signature` for it answers `409 POSTAGE_DUE`. See [One tap](/partner-api/v2/shipping#one-tap-pay-and-burn-together).
+
 - The signature authorizes only that quote: its token, payout, amount and expiry, once. It is checked on chain, so we can't burn a token without it.
 - We check the burn before sending it, so a refusal sends nothing and burns nothing.
 - Smart-contract wallets (ERC-1271) can sign too. One that approved the quote on chain may send an empty `holder_signature` (`0x`).
@@ -21,7 +23,10 @@ How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
 <ParamField body="quote_id" type="string" required>
   The quote to burn with: a sell-back `quote_id`, or the token's `quote_id` in a paid shipment.
 </ParamField>
-<ParamField body="holder_signature" type="string" required>
+<ParamField body="permit_signature" type="string">
+  For a one-tap shipment only, instead of `holder_signature`: the holder's EIP-712 signature over the shipment's `payment.sign`, `0x` hex.
+</ParamField>
+<ParamField body="holder_signature" type="string">
   The holder's EIP-712 signature over the quote exactly as returned, `0x` hex. `0x` alone for a contract wallet that approved it on chain.
 </ParamField>
 

@@ -3,7 +3,37 @@ title: "Shipping"
 description: "Ship the physical item: estimate, pay once for 1-25 tokens in one box, burn each token, renew a lapsed window, and track the delivery."
 ---
 
-Shipping is paid first, then the holder burns each token, then we ship. One shipment carries **1 to 25 tokens** held by one wallet, in one box, for one shipping payment.
+There are two ways to ship:
+
+- **One tap (one token).** Where your program supports it, it's the default: the holder signs once, and that one signature both pays the postage and burns the token, in the same transaction. See [One tap](#one-tap-pay-and-burn-together).
+- **Pay first, then burn (1 to 25 tokens in one box).** The customer pays the shipping, then the holder burns each token within 24 hours, then we ship.
+
+## One tap: pay and burn together
+
+[`POST /tokens/{tokenId}/shipment`](/partner-api/v2/endpoints/create-token-shipment) returns `payment.method: "signature"` when your program's contract takes postage in the burn.
+
+<Steps>
+  <Step title="Estimate and create">
+    Estimate as below, then create the shipment with the chosen `rate` and `max_cost`. The response's `payment` has `method: "signature"`, the postage `amount`, the stablecoin `token`, and `sign`: the one message the holder signs.
+  </Step>
+  <Step title="The holder signs once">
+    The holder's wallet signs `payment.sign` (`eth_signTypedData_v4`, or viem's `signTypedData` with the uint fields as bigints). It is a signature, not a transaction, so no gas. It lets our contract take exactly that postage, and it names this one shipment, so it can pay for nothing else. Sign within **30 minutes** (`quote.expires_at`); after that, estimate and create again.
+  </Step>
+  <Step title="Send it">
+    [`POST /tokens/{tokenId}/burn`](/partner-api/v2/endpoints/relay-burn) with `{ "quote_id", "permit_signature" }`. We send it and pay the gas: the postage moves and the token burns in **one transaction, both or neither**. Then track it as below.
+  </Step>
+</Steps>
+
+- **What the holder needs:** the postage in that stablecoin in the same wallet, and a one-time approval of [Permit2](https://github.com/Uniswap/permit2) for it. Most wallets that have used Uniswap or another Permit2 app already have one; otherwise it's one approval, once per token. A refusal says which: `402 INSUFFICIENT_FUNDS` or `409 PERMIT2_NOT_APPROVED`.
+- **No funds on that chain?** Create the shipment with `payment_method: "checkout"`: the customer pays from anywhere, then the holder burns.
+- **In the sandbox** the stablecoin is CatchBack Sandbox USDC: we top the test wallet up with the postage, and no approval is needed.
+- **Why it's safe:** the holder's one signature is a [Permit2](https://github.com/Uniswap/permit2) payment whose witness is this shipment's quote. Our contract only burns a postage-due quote in the same transaction that takes exactly its postage. A plain burn of it is refused, so it can never ship unpaid, and a used signature can't be replayed.
+
+Multi-token shipments are pay first, then burn, for now.
+
+## Pay first, then burn
+
+One shipment carries **1 to 25 tokens** held by one wallet, in one box, for one shipping payment.
 
 [`POST /shipments/estimate`](/partner-api/v2/endpoints/estimate-shipment) and [`POST /shipments`](/partner-api/v2/endpoints/create-shipment) take a `token_ids` list and are the endpoints to build on. [`POST /tokens/{tokenId}/shipment/estimate`](/partner-api/v2/endpoints/estimate-token-shipment) and [`POST /tokens/{tokenId}/shipment`](/partner-api/v2/endpoints/create-token-shipment) do the same for one token, with the token in the path.
 
