@@ -26,6 +26,10 @@ info:
     - **Sandbox:** the sandbox runs the same API with simulated payments on a public testnet. Set it up
       yourself: in your manager (`catchback.com/<slug>/admin/api`), Get started, **Set up my sandbox**, then create a sandbox key there. The operations tagged `Sandbox` exist only there
       and answer `404` in production.
+    - **`x-moves-money: true`:** marks the operations that start real money moving in production: the
+      customer pays (an order or a shipment), or the holder is paid in USDC (a sell-back quote, and the
+      burn that settles it). Nothing is ever charged to your key. In the sandbox the same operations move
+      only simulated money, so flag them in your tooling, but they are safe to call there.
   contact:
     name: CatchBack support
     email: support@catchbackcards.com
@@ -222,6 +226,7 @@ paths:
     post:
       tags: [Orders]
       operationId: createOrder
+      x-moves-money: true
       summary: Create an order
       description: |-
         **Rate limit:** 30 a minute.
@@ -667,6 +672,7 @@ paths:
     post:
       tags: [Sell-back]
       operationId: createSellbackQuote
+      x-moves-money: true
       summary: Create a sell-back quote
       description: |-
         A quote fixes the amount, the payer and the payout destination, and expires 10 minutes after it is issued, or when the 5-minute fresh window ends if the quote is at the fresh rate (whichever is sooner). Every call issues a new quote; an unused quote just expires. Takes no `Idempotency-Key`.
@@ -777,6 +783,7 @@ paths:
     post:
       tags: [Sell-back]
       operationId: relayBurn
+      x-moves-money: true
       summary: Burn without gas
       description: |-
         EVM only. The holder signs the quote (EIP-712, the same domain and `Quote` type the contract checks) instead of sending a transaction, and we send `burnWithQuoteFor(quote, signature, holderSignature)` and pay its gas. Works for a sell-back quote and for each token's `burn` in a paid shipment; the payout or shipment follows as for a burn the holder sent. ERC-1271 wallets can sign.
@@ -999,6 +1006,7 @@ paths:
     post:
       tags: [Shipments]
       operationId: createShipment
+      x-moves-money: true
       summary: Create a shipment
       description: |-
         Creates and opens one payment for a shipment of 1-25 tokens held by one wallet, in one box. We re-quote the chosen rate for all the tokens together. Pay it exactly like an order. Once paid, Get a shipment returns a `burn` per token; the box ships once every token is burned, within 24 hours of payment (renew a lapsed window).
@@ -1157,6 +1165,7 @@ paths:
     post:
       tags: [Shipments]
       operationId: createTokenShipment
+      x-moves-money: true
       summary: Create a one-token shipment
       description: |-
         Creates and opens a payment for shipping one token, with the token in the path. Answers with the shipment as `quote` (no `shipment_id`, no `tokens`: the token's own `quote_id` names the shipment). It shares its `Idempotency-Key` space with Create a shipment. A token that already has a paid shipment waiting for its burn is refused with `TOKEN_IN_SHIPMENT` and that shipment's `quote_id`.
