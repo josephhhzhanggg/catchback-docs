@@ -65,7 +65,7 @@ Once connected, ask your assistant to:
 | `whoami` | Your key and its program | [Read the key](/partner-api/v2/endpoints/get-key) |
 | `list_packs` | Packs you can sell, with prices | [List packs](/partner-api/v2/endpoints/list-packs) |
 | `get_pack_pool` | One pack's odds and items | [Get a pack's odds and pool](/partner-api/v2/endpoints/get-pack-pool) |
-| `create_order` | Buy 1-10 packs for a customer's wallet | [Create an order](/partner-api/v2/endpoints/create-order) |
+| `create_order` | Buy 1-10 packs for a customer's wallet, or by `customer` on a [Paying through you](/partner-api/v2/settlement) program | [Create an order](/partner-api/v2/endpoints/create-order) |
 | `list_orders` | Your orders, newest first | [List orders](/partner-api/v2/endpoints/list-orders) |
 | `get_order` | One order and its status | [Get an order](/partner-api/v2/endpoints/get-order) |
 | `get_order_verification` | The provably fair proof of a pull | [Verify an order's pull](/partner-api/v2/endpoints/get-order-verification) |
@@ -86,6 +86,12 @@ Once connected, ask your assistant to:
 | `delete_webhook` | Remove your webhook | [Delete a webhook](/partner-api/v2/endpoints/delete-webhook) |
 | `test_webhook` | Send a signed test event now | [Test a webhook](/partner-api/v2/endpoints/test-webhook) |
 | `get_revenue` | Your monthly revenue statement | [Get your revenue statement](/partner-api/v2/endpoints/get-revenue) |
+| `get_customer_vault` | Paying through you: a customer's vault cards with today's sell-back | [Their vault](/partner-api/v2/settlement) |
+| `sell_back_customer_card` | Paying through you: sell a vault card back, credited to your statement | [Sell back](/partner-api/v2/settlement) |
+| `estimate_customer_shipment` | Paying through you: rates to ship vault cards | [Ship](/partner-api/v2/settlement) |
+| `create_customer_shipment` | Paying through you: ship vault cards, postage on your statement | [Ship](/partner-api/v2/settlement) |
+| `list_customer_shipments` | Paying through you: a customer's shipments and tracking | [Ship](/partner-api/v2/settlement) |
+| `get_settlement` | Paying through you: what you owe, your limits and a month of your statement | [Your statement](/partner-api/v2/settlement) |
 | `sandbox_pay` | Sandbox only: pay a payment | [Sandbox: pay](/partner-api/v2/endpoints/sandbox-pay) |
 | `sandbox_tick` | Sandbox only: run the background work now | [Sandbox: tick](/partner-api/v2/endpoints/sandbox-tick) |
 | `sandbox_ship` | Sandbox only: mark a shipment shipped or delivered | [Sandbox: ship](/partner-api/v2/endpoints/sandbox-ship) |
@@ -94,8 +100,8 @@ The `sandbox_` tools return `404` outside the sandbox.
 
 ## Arguments
 
-- **`order_id`:** `create_order`, `create_shipment` and `create_token_shipment` take an `order_id`, which is sent as the `Idempotency-Key`. Have the assistant make a new one for each order and reuse it when retrying that order: a retry with the same `order_id` returns the same order, while a new `order_id` creates a second one. `get_order` and `get_order_verification` also take `order_id`, your id or ours.
-- **Ids in the path:** `token_id` (token, quote and one-token shipment tools), `quote_id` (`get_quote`), `shipment_id` (`get_shipment`, `renew_shipment`, `sandbox_ship`), `wallet` (`list_wallet_tokens`), `webhook_id` (`delete_webhook`, `test_webhook`) and `intent_id` (`sandbox_pay`).
+- **`order_id`:** `create_order`, `create_shipment`, `create_token_shipment` and `create_customer_shipment` take an `order_id`, which is sent as the `Idempotency-Key`. Have the assistant make a new one for each order and reuse it when retrying that order: a retry with the same `order_id` returns the same order, while a new `order_id` creates a second one. `get_order` and `get_order_verification` also take `order_id`, your id or ours.
+- **Ids in the path:** `token_id` (token, quote and one-token shipment tools), `quote_id` (`get_quote`), `shipment_id` (`get_shipment`, `renew_shipment`, `sandbox_ship`), `wallet` (`list_wallet_tokens`), `webhook_id` (`delete_webhook`, `test_webhook`), `intent_id` (`sandbox_pay`), and on a Paying through you program `customer` (the customer tools) and `card_id` (`sell_back_customer_card`).
 - **Everything else** is the endpoint's query parameter or body field of the same name.
 - **Errors** come back as a tool result with `isError: true`, the HTTP status and the error body, including its `code`, so the assistant can read it and react.
 
