@@ -15,7 +15,7 @@ Carrier rates to ship every token's item to the holder in one box. Charges nothi
   The wallet that holds every token now. Checked on chain.
 </ParamField>
 <ParamField body="address" type="object" required>
-  `name`, `address1`, `city` and `country` (ISO 3166 alpha-2) are required; `address2` is optional; `state` and `zip` where the country uses them; `phone` is required outside the US. `name`, `address1`, `address2`, `city` and `state` take up to 100 characters, `zip` and `phone` up to 20.
+  `name`, `address1`, `city` and `country` (ISO 3166 alpha-2) are required; `address2` is optional; `state` and `zip` where the country uses them; `phone` is required outside the US. `name`, `address1`, `address2`, `city` and `state` take up to 100 characters, `zip` and `phone` up to 20. No field may hold a control character or an invisible formatting character, and a US `state` must be a state or territory (`CA` or `California`).
 </ParamField>
 <ParamField body="cover_amount" type="number | null">
   Shipping insurance cover in dollars, within the range the items allow (a `400 COVER_NOT_ALLOWED` gives the range).
@@ -40,6 +40,7 @@ A refusal about particular tokens lists them in `token_ids`.
 
 | Status | Code | When |
 |---|---|---|
+| `400` | `CRYPTO_WALLET_MODEL_ONLY` | Your program is on the Non-crypto model: it has no tokens or wallets. Use [Estimate a customer shipment](/partner-api/v2/endpoints/estimate-customer-shipment) |
 | `400` | `BAD_JSON` | The body isn't JSON |
 | `400` | `BAD_TOKEN_IDS` | `token_ids` isn't a list of 1-25 distinct decimal token ids |
 | `400` | `BAD_HOLDER` | `holder` is not a wallet address on your mint chain |
@@ -53,11 +54,12 @@ A refusal about particular tokens lists them in `token_ids`.
 | `403` | `NOT_HOLDER` | `holder` doesn't hold these tokens on chain right now |
 | `404` | `UNKNOWN_TOKEN` | No such token on your program's contract |
 | `409` | `TOKEN_NOT_LIVE` | A token isn't minted yet, or was already burned |
+| `409` | `TOKEN_BURNED` | The chain shows a token burned before our record caught up |
 | `503` | `CHAIN_UNAVAILABLE` | We couldn't read the tokens' owner from the chain; retry shortly |
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/shipments/estimate \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/shipments/estimate \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
   -d '{

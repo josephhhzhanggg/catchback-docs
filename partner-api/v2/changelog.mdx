@@ -5,6 +5,30 @@ description: "What changed in Partner API v2, newest first."
 
 Changes to `v2` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. Dates are US Pacific time.
 
+<Update label="November 24, 2026" description="Fixes from sandbox testing">
+  - Each model's endpoints refuse the other model's programs: a wallet, token, quote, burn or shipment endpoint on a Non-crypto program answers `400 CRYPTO_WALLET_MODEL_ONLY` (it used to return empty results), and `customer` on a Crypto Wallet order answers `400 NOT_PARTNER_SETTLED`.
+  - Non-crypto model: an order, shipment estimate or shipment that sends any wallet field (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address`) is refused with `WALLET_FIELDS_NOT_ACCEPTED`, and `fields` names them. Before, some were ignored.
+  - Non-crypto model: a customer shipment's `Idempotency-Key` is unique per program, not per customer: the same key for another customer answers `422 IDEMPOTENCY_KEY_REUSED`.
+  - Non-crypto model: a customer id that is only dots is refused (`BAD_CUSTOMER`), and `GET /orders` filters by `?customer=`.
+  - Non-crypto model: sell-back retries sent at the same moment all return the first sale (`already_sold`), and a UUID `card_id` matches in any case. Refusals keep their own code (`CARD_IN_BATTLE`, `CARD_LISTED_ON_MARKETPLACE`, `SHOP_PURCHASE_NOT_SELLABLE`, `GOODS_NOT_SELLABLE`, `NO_PURCHASE_RECORD`, `PRICE_CHANGED`); any other is `SELLBACK_REFUSED`. Their messages now speak about your customer.
+  - Non-crypto model: `DAILY_SHIPMENT_LIMIT_REACHED` carries `retry_after_seconds` and a `Retry-After` header.
+  - Non-crypto model: a customer shipment's first `nft_shipment.updated` arrives when it is created (`processing`), and the vault names every pack of a multi-pack order by your order id.
+  - Crypto Wallet model: `nft_shipment.updated` carries `shipment_id`, and when a multi-token box moves every token in it gets the event, with the box's `shipping_cost`.
+  - Crypto Wallet model: while a token has a paid shipment waiting for its burn, only that shipment's burn goes. A sell-back quote, or a burn with any other quote (including a one-tap shipment's), answers `409 TOKEN_IN_SHIPMENT`. A token can have only one paid shipment at a time.
+  - Crypto Wallet model: a shipment payment we can't honour (a second payment for a token, a one-token shipment paid short, or a payment after the token was burned with another quote) is kept for a refund, and the shipment shows `payment_refund_due: true`.
+  - Crypto Wallet model: the zero address, your NFT contract, Permit2 and USDC are refused as `recipient`, `refund_address` and `payout_address`. Smart-contract wallets still work.
+  - Crypto Wallet model: a malformed `partner_user_ref` is refused with `BAD_PARTNER_USER_REF` instead of being dropped, and too many unpaid packs for one wallet answer `429 TOO_MANY_UNPAID_ORDERS`.
+  - Crypto Wallet model: renewing a shipment for a token that was burned answers `409 TOKEN_NOT_LIVE`, a quote or shipment while a burn is landing answers `409 TOKEN_BURNED`, and a retried burn after it is final returns its `tx_hash`.
+  - Crypto Wallet model: a burn of a token that no longer exists, or while another of its quotes' burns is in flight, answers `409 TOKEN_BURNED`, and a recorded burn expires the token's other open quotes.
+  - Crypto Wallet model: a mixed-case address must carry a valid EIP-55 checksum (one case throughout still works), and invisible characters are refused. Shipping addresses refuse control and invisible characters, and a US address needs a real state or territory.
+  - The catalog lists Classic only on packs whose Classic odds are published, and an unknown `category` answers `400 BAD_CATEGORY`. The pool lists every odds choice a pack sells, with `available: false` on one whose odds aren't published.
+  - `GET /orders` lists a batch's units in unit order, a forged cursor answers `400 BAD_CURSOR`, quote and shipment times all end in `Z`, and Non-crypto shipments' `expected_delivery` is a `YYYY-MM-DD` date.
+  - A path that no endpoint matches answers a JSON `404` with `NOT_FOUND`, not a web page.
+  - Sandbox: `POST /sandbox/payments/{intentId}` refuses an `amount` that isn't a positive number with `400 BAD_AMOUNT`, and a second payment with `409 ALREADY_PAID`. A shipment moves one step at a time, `processing` → `shipped` → `delivered` (`409 BAD_TRANSITION` otherwise, with its `status`); resending its status is a no-op.
+  - MCP: an argument a tool doesn't take answers `UNKNOWN_ARGUMENT`, a wrong type `BAD_ARGUMENT`, a required one left null or empty `MISSING_ARGUMENT`, and `read_doc` on a missing page `DOC_NOT_FOUND`. Each names the `argument`.
+  - The [OpenAPI spec](/partner-api/v2/openapi.yaml) lists every error code, including the MCP server's own (see [Errors](/partner-api/v2/errors#mcp-server-codes)), and allows `singles` as an item's category.
+</Update>
+
 <Update label="November 24, 2026" description="Non-crypto model">
   - New page: [Integration models](/partner-api/v2/integration-models) lays out the two models side by side, with an architecture diagram for each, where the money goes, what you build and which endpoints each uses. The docs now call them the **Crypto Wallet model** and the **Non-crypto model**, as your manager does (`payment_mode` `wallet` and `partner`).
   - Customer shipment requests now return a `code` for every bad field: `BAD_CARD_IDS`, `BAD_ADDRESS` (with `fields`), `BAD_COVER`, `BAD_RATE` and `BAD_MAX_COST`.

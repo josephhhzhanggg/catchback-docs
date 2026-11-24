@@ -29,11 +29,11 @@ The key you call with. Never a secret. Rotation and handling: [Authentication an
 
 | Status | Code | When |
 |---|---|---|
-| `401` | `INVALID_KEY` | The key is disabled, or a rotated key past its 24 hours |
+| `401` | `INVALID_KEY` | The key was disabled, or its 24 hours after a rotation ran out, while this request ran. A key already in that state is refused first with a plain `401 Invalid API key` |
 
 <RequestExample>
 ```bash cURL
-curl https://catchbackcards.com/api/partner/v2/keys \
+curl https://sandbox.catchbackcards.com/api/partner/v2/keys \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 </RequestExample>

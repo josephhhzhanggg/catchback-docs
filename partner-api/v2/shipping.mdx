@@ -28,7 +28,7 @@ There are two ways to ship:
   </Step>
 </Steps>
 
-- **What the holder needs:** the postage in that stablecoin in the same wallet, and a one-time approval of [Permit2](https://github.com/Uniswap/permit2) for it. Most wallets that have used Uniswap or another Permit2 app already have one; otherwise it's one approval, once per token. A refusal says which: `402 INSUFFICIENT_FUNDS` or `409 PERMIT2_NOT_APPROVED`.
+- **What the holder needs:** the postage in that stablecoin in the same wallet, and a one-time approval of [Permit2](https://github.com/Uniswap/permit2) for it. Most wallets that have used Uniswap or another Permit2 app already have one; otherwise it's one approval, once per wallet for that stablecoin. A refusal says which: `402 INSUFFICIENT_FUNDS` or `409 PERMIT2_NOT_APPROVED`.
 - **No funds on that chain?** Create the shipment with `payment_method: "checkout"`: the customer pays from anywhere, then the holder burns.
 - **In the sandbox** the stablecoin is CatchBack Sandbox USDC: we top the test wallet up with the postage, and no approval is needed.
 - **Why it's safe:** the holder's one signature is a [Permit2](https://github.com/Uniswap/permit2) payment whose witness is this shipment's quote. Our contract only burns a postage-due quote in the same transaction that takes exactly its postage. A plain burn of it is refused, so it can never ship unpaid, and a used signature can't be replayed.
@@ -46,7 +46,7 @@ One shipment carries **1 to 25 tokens** held by one wallet, in one box, for one 
     [`POST /shipments/estimate`](/partner-api/v2/endpoints/estimate-shipment) with `token_ids`, `holder`, `address` and an optional `cover_amount` returns carrier `rates`. It charges nothing and stores nothing. `amount` is the carrier rate; `total` is what the holder pays (the rate plus any cover premium).
   </Step>
   <Step title="Create and pay">
-    [`POST /shipments`](/partner-api/v2/endpoints/create-shipment) with the chosen `rate` and `max_cost` (pass the estimate's `total`). We re-quote the rate for all the tokens together and return the `shipment` and its `payment`. Pay it exactly like an order ([Payments](/partner-api/v2/payments)). An unpaid shipment never expires: it stays `awaiting_payment` and can be paid at any time.
+    [`POST /shipments`](/partner-api/v2/endpoints/create-shipment) with the chosen `rate` and `max_cost` (pass the estimate's `total`). We re-quote the rate for all the tokens together and return the `shipment` and its `payment`. Pay it exactly like an order ([Payments](/partner-api/v2/payments)). An unpaid shipment never expires: it stays `awaiting_payment` and can be paid at any time. Its `expires_at` (24 hours from creation) doesn't apply until it is paid; paying it starts a fresh 24-hour burn window.
   </Step>
   <Step title="Burn">
     Once the shipping payment settles, `status` becomes `ready` and each token's `burn` in [`GET /shipments/{id}`](/partner-api/v2/endpoints/get-shipment) holds what the holder burns it with. The burn window is **24 hours from payment** (`expires_at`), shared by every token in the shipment.
@@ -60,12 +60,14 @@ One shipment carries **1 to 25 tokens** held by one wallet, in one box, for one 
 
 - `name`, `address1`, `city` and `country` (ISO 3166 alpha-2) are required; `state` and `zip` where the country uses them; `phone` is required outside the US.
 - `name`, `address1`, `address2`, `city` and `state` take up to 100 characters, `zip` and `phone` up to 20.
+- No field may hold a control character or an invisible formatting character (zero-width, direction overrides).
+- A US `state` must be a state or territory, as its code (`CA`) or name (`California`).
 - An invalid address is `400 BAD_ADDRESS`, with `fields` mapping each bad field to a message.
 - We never return the delivery address or the shipping label.
 
 ## Insurance
 
-`cover_amount` (optional) is shipping insurance cover in dollars, within the range the items allow. Outside it, `400 COVER_NOT_ALLOWED` gives `order_value`, `min_cover` and `max_cover` (`max_cover` is null when the items can't be insured). A service with no cover option answers `409 COVER_UNAVAILABLE` on create: choose another rate or leave `cover_amount` out.
+`cover_amount` (optional) is shipping insurance cover in dollars, within the range the items allow. Outside it, `400 COVER_NOT_ALLOWED` gives `order_value`, `min_cover` and `max_cover` (`max_cover` is null when the items can't be insured). A service with no cover option answers `409 COVER_UNAVAILABLE` on create: choose another rate or leave `cover_amount` out. **The sandbox has no insurance:** its one rate has no cover option, so leave `cover_amount` out there.
 
 ## Burning
 
@@ -91,7 +93,7 @@ If not every token was burned within the 24 hours, the shipment shows `status: "
 |---|---|
 | `awaiting_payment` | Waiting for the shipping payment |
 | `ready` | Paid; each unburned token's `burn` holds its burn details |
-| `expired` | Paid, but not every token was burned within 24 hours: renew it |
+| `expired` | Paid, but not every token was burned within 24 hours: renew it. A one-token shipment is also `expired` when a one-tap shipment wasn't signed within 30 minutes (create it again), or when its token was burned with another quote first |
 | `redeemed` | We saw every burn; the shipment is being created |
 | `partially_redeemed` | Multi-token only: the window and its 24-hour grace passed; the burned tokens ship, the rest are `dropped` |
 
@@ -124,5 +126,11 @@ If not every token was burned within the 24 hours, the shipment shows `status: "
 | `COUNTRY_NOT_SUPPORTED` | We don't ship to that country |
 | `OVER_CUSTOMS_CAP` | The items are worth more than we can ship internationally |
 | `TOKEN_IN_SHIPMENT` | A token already has a paid shipment waiting for its burn: burn or renew that shipment instead |
+
+A token with a paid shipment waiting for its burn can't be sold back or shipped another way: a sell-back quote, and a burn with any other quote (a sell-back, or a one-tap shipment created before the other was paid), are refused with `409 TOKEN_IN_SHIPMENT` (`quote_id` names the shipment). Only that shipment's own burn goes.
+
+## A payment that opens nothing
+
+A shipment shows `payment_refund_due: true` when a payment arrived but opened no burn: a one-token shipment paid more than 1% short, a token that already had another paid shipment, or a token burned another way before the payment landed. Nothing ships on it, and CatchBack refunds it.
 
 A refusal about particular tokens lists them in `token_ids`.

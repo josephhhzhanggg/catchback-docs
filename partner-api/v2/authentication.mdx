@@ -48,7 +48,11 @@ These come before an endpoint does anything else:
 | `403` | `PROGRAM_INACTIVE` | Your program is not live |
 | `403` | `NOT_AVAILABLE` | Wallet orders aren't switched on for your program yet |
 | `503` | `AUTH_UNAVAILABLE` | We couldn't check your key right now (never means the key is bad); retry after `Retry-After` |
-| `503` | | We couldn't load your program; retry shortly |
+| `503` | | We couldn't load your key or your program; retry shortly |
+
+A path under `/api/partner/v2` that is no endpoint answers `404` with the code `NOT_FOUND`, before any key check.
+
+Each model's own endpoints refuse the other model's programs with `400`: `NOT_PARTNER_SETTLED` on the [Non-crypto model](/partner-api/v2/settlement) endpoints, `CRYPTO_WALLET_MODEL_ONLY` on the wallet, token, quote and shipment endpoints.
 
 ## Read the key
 

@@ -17,7 +17,7 @@ The response is the shipment (`processing`) with its `id`. It then moves to `shi
 </Warning>
 
 <ParamField header="Idempotency-Key" type="string" required>
-  Your own shipment id: 8-128 characters of `A-Za-z0-9_-`. The same key with a different request (`card_ids`, `address`, `rate`, `cover_amount`) is `422`.
+  Your own shipment id: 8-128 characters of `A-Za-z0-9_-`. Keys are per program: one key is one shipment, whichever customer it names. The same key with a different request (another customer, `card_ids`, `address`, `rate`, `max_cost`, `cover_amount`) is `422`.
 </ParamField>
 <ParamField path="customer" type="string" required>
   Your own id for the customer.
@@ -35,7 +35,7 @@ The response is the shipment (`processing`) with its `id`. It then moves to `shi
   The most the shipping may cost, in dollars: the estimate rate's `total` if you sent `cover_amount`, else its `amount`. If the re-quote is higher, nothing is created and you get `PRICE_CHANGED` with the current `amount`.
 </ParamField>
 <ParamField body="cover_amount" type="number | null">
-  Shipping insurance cover in dollars, as for the estimate.
+  Shipping insurance cover in dollars, as for the estimate. The sandbox's one rate offers no cover, so leave it out there.
 </ParamField>
 
 ## Response
@@ -59,6 +59,8 @@ The response is the shipment (`processing`) with its `id`. It then moves to `shi
 <ResponseField name="shipped_at" type="string | null" />
 <ResponseField name="expected_delivery" type="string | null">A `YYYY-MM-DD` date.</ResponseField>
 <ResponseField name="delivered_at" type="string | null" />
+<ResponseField name="needs_review" type="boolean">Present and `true` when `status` is `needs_review`.</ResponseField>
+<ResponseField name="address_removed" type="boolean">Present and `true` once the address has been deleted.</ResponseField>
 <ResponseField name="idempotent_replay" type="boolean">Present and `true` on a replay.</ResponseField>
 
 We never return the delivery address.
@@ -77,23 +79,23 @@ Nothing is created or charged on any refusal below, except `SHIPMENT_OUTCOME_UNK
 | `403` | `CUSTOMER_BLOCKED` | This customer may not ship cards |
 | `403` | `CUSTOMER_UNAVAILABLE` | This customer's account is unavailable |
 | `404` | `CUSTOMER_NOT_FOUND` | No customer with that id has bought from your program |
-| `409` | `CARDS_NOT_IN_VAULT` | A card isn't in this customer's vault from your program; `card_ids` lists them |
-| `409` | `CARDS_NOT_SHIPPABLE` | A card can't ship, or left the vault while the shipment was being created |
+| `409` | `CARDS_NOT_IN_VAULT` | Your program never pulled a card into this customer's vault (another customer's card, or a wrong id); `card_ids` lists them |
+| `409` | `CARDS_NOT_SHIPPABLE` | A card your program pulled into this vault can't ship now (sold back, already shipping, listed or on hold; `cards` gives each `reason`), or left the vault while the shipment was being created |
 | `409` | `RATE_UNAVAILABLE` | The carrier no longer offers that rate; estimate again |
 | `409` | `COVER_UNAVAILABLE` | The chosen service has no cover option; choose another rate or leave `cover_amount` out |
-| `409` | `PRICE_CHANGED` | The rate (with any cover) now costs more than `max_cost`; the body has the current `amount` |
-| `409` | `IDEMPOTENCY_IN_PROGRESS` | A shipment with this key is still being created; wait, then retry with the same key |
+| `409` | `PRICE_CHANGED` | The rate (with any cover) now costs more than `max_cost`; the body has the current `amount` and your `max_cost` (and, with cover, `shipping_cost` and `insurance_premium`) |
+| `409` | `IDEMPOTENCY_IN_PROGRESS` | A shipment with this key is still being created (`shipment_id`, `started_at`; `needs_review` when it is with our team); wait, then retry with the same key |
 | `409` | `IDEMPOTENCY_RETRY` | An earlier attempt with this key just failed and charged nothing; retry with the same key |
-| `422` | `IDEMPOTENCY_KEY_REUSED` | The key was already used for a different shipment |
-| `429` | `DAILY_SHIPMENT_LIMIT_REACHED` | This key has created 50 shipments this UTC day; the body has `limit` and `resets_at` |
-| `500` | `SHIPMENT_OUTCOME_UNKNOWN` | We couldn't confirm whether it went through; it is with our team. Retrying with the same key is safe and never charges twice; don't resend under a new key |
+| `422` | `IDEMPOTENCY_KEY_REUSED` | The key was already used in your program for a different shipment, including one for another customer |
+| `429` | `DAILY_SHIPMENT_LIMIT_REACHED` | This key has created 50 shipments this UTC day; the body has `limit`, `resets_at` and `retry_after_seconds`, and the response a `Retry-After` header |
+| `500` | `SHIPMENT_OUTCOME_UNKNOWN` | We couldn't confirm whether it went through; it is with our team (`shipment_id`, `needs_review`). Retrying with the same key is safe and never charges twice; don't resend under a new key |
 | `502` | | We couldn't confirm the carrier rate; retry |
 | `503` | `SHIPMENT_NOT_CREATED` | It didn't go through, and its postage is being taken off your statement |
 | `503` | | It didn't go through and nothing was charged, or a check couldn't run; retry with the same key |
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/customers/user-1842/shipments \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/customers/user-1842/shipments \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Idempotency-Key: acme-ship-1c9e04" \
   -H "Content-Type: application/json" \

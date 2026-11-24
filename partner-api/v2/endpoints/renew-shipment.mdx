@@ -26,16 +26,18 @@ If not every token was burned within the 24 hours, the shipment shows `status: "
 
 | Status | Code | When |
 |---|---|---|
+| `400` | `CRYPTO_WALLET_MODEL_ONLY` | Your program is on the Non-crypto model: it has no tokens or wallets. Use the [customer endpoints](/partner-api/v2/settlement) |
 | `404` | `UNKNOWN_SHIPMENT` | No such shipment in your program |
-| `409` | `NOT_PAID` | The shipping isn't paid yet |
-| `409` | `ALREADY_REDEEMED` | The token (every token, on a multi-token shipment) was already burned and the box is shipping |
-| `409` | `TOKEN_NOT_LIVE` | A token isn't live |
+| `409` | `NOT_PAID` | The shipping isn't paid yet. A one-tap shipment is paid in its burn: past its 30 minutes to sign, estimate and create it again |
+| `409` | `ALREADY_REDEEMED` | The token was already burned; on a multi-token shipment, the box is shipping (every token burned, or the grace period closed it) |
+| `409` | `TOKEN_NOT_LIVE` | A token was burned some other way (`token_ids` lists them on a multi-token shipment). Checked even while the window is still open |
+| `409` | `TOKEN_BURNED` | The chain shows a token burned before our record caught up |
 | `409` | `HOLDER_CHANGED` | A token still to be burned changed hands after the shipping was paid (`token_ids` lists them on a multi-token shipment). The shipment can't be renewed: contact CatchBack support with the `shipment_id` or `quote_id`. Tokens already burned still ship once the grace period ends |
 | `503` | `CHAIN_UNAVAILABLE` | We couldn't read the token's owner from the chain; retry shortly |
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/shipments/7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73/renew \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/shipments/7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73/renew \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 </RequestExample>
@@ -50,6 +52,7 @@ curl -X POST https://catchbackcards.com/api/partner/v2/shipments/7e2a91c4-5b0d-4
     "holder": "0x8f3c...e21a",
     "expires_at": "2026-11-19T09:12:40.000Z",
     "paid_at": "2026-11-16T18:41:02.000Z",
+    "payment_refund_due": false,
     "tokens": [
       { "token_id": "90311820476190023716442901288201455", "quote_id": "0x1b7c...e4a0", "status": "redeemed", "burned_at": "2026-11-16T19:02:10.000Z", "burn_tx": "0x51c0...", "burn": null },
       { "token_id": "81264573985362058461377125337283195667", "quote_id": "0xa93f...0c2d", "status": "ready", "burned_at": null, "burn_tx": null, "burn": { "quote": { "tokenId": "...", "kind": 2, "...": "..." }, "signature": "0x..." } }

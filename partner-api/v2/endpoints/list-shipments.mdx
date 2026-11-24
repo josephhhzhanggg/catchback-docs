@@ -30,6 +30,7 @@ Newest first: one-token and multi-token shipments together, each in its [Get a s
 
 | Status | Code | When |
 |---|---|---|
+| `400` | `CRYPTO_WALLET_MODEL_ONLY` | Your program is on the Non-crypto model: it has no tokens or wallets. Use the [customer endpoints](/partner-api/v2/settlement) |
 | `400` | `BAD_CURSOR` | `cursor` isn't a `next_cursor` from a previous page |
 | `400` | `BAD_LIMIT` | `limit` isn't 1-100 |
 | `400` | `BAD_STATUS` | `status` isn't one the list filters on; the message lists them |
@@ -37,7 +38,7 @@ Newest first: one-token and multi-token shipments together, each in its [Get a s
 
 <RequestExample>
 ```bash cURL
-curl "https://catchbackcards.com/api/partner/v2/shipments?wallet=0x8f3c...e21a&status=ready&limit=25" \
+curl "https://sandbox.catchbackcards.com/api/partner/v2/shipments?wallet=0x8f3c...e21a&status=ready&limit=25" \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 </RequestExample>

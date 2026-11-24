@@ -15,7 +15,9 @@ How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
 - The signature authorizes only that quote: its token, payout, amount and expiry, once. It is checked on chain, so we can't burn a token without it.
 - We check the burn before sending it, so a refusal sends nothing and burns nothing.
 - Smart-contract wallets (ERC-1271) can sign too. One that approved the quote on chain may send an empty `holder_signature` (`0x`).
-- One send per quote: a repeat call returns the first `tx_hash` and sends nothing.
+- One send per quote: a repeat call returns the first `tx_hash` and sends nothing, also after the burn is final. While the first send is still in flight it answers `RELAY_IN_PROGRESS`.
+- One burn per token: while a burn with another of the token's quotes is in flight, or once it has landed, the call answers `TOKEN_BURNED`. When a burn is recorded, the token's other unpaid quotes (outside a multi-token shipment) expire.
+- While the token has a paid shipment waiting for its burn, only that shipment's burn goes; any other quote answers `TOKEN_IN_SHIPMENT`.
 
 <ParamField path="tokenId" type="string" required>
   The token's decimal `token_id`.
@@ -44,14 +46,21 @@ How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
 | `400` | `BAD_JSON` | The body isn't JSON |
 | `400` | `BAD_QUOTE_ID` | `quote_id` is missing |
 | `400` | `BAD_HOLDER_SIGNATURE` | `holder_signature` isn't hex, or isn't the holder's signature over this quote |
+| `400` | `BAD_PERMIT_SIGNATURE` | `permit_signature` isn't hex, isn't the holder's signature over the shipment's `payment.sign`, or the quote isn't a one-tap shipment |
 | `400` | `RELAY_NOT_SUPPORTED` | A Solana program; sign the quote's transaction instead |
+| `400` | `CRYPTO_WALLET_MODEL_ONLY` | Your program is on the Non-crypto model: it has no tokens or wallets |
+| `402` | `INSUFFICIENT_FUNDS` | One-tap: the holder's wallet doesn't hold the postage in the stablecoin |
 | `403` | `NOT_HOLDER` | The token moved after the quote |
 | `404` | `UNKNOWN_TOKEN` | No such token on your program's contract |
 | `404` | `UNKNOWN_QUOTE` | No such quote for this token |
-| `409` | `TOKEN_BURNED` | The token was already sold back or shipped |
-| `409` | `QUOTE_USED` | This quote was already burned with |
-| `409` | `QUOTE_EXPIRED` | Get a new quote, or [renew the shipment](/partner-api/v2/endpoints/renew-shipment) |
+| `409` | `TOKEN_BURNED` | The token was already sold back or shipped, or a burn with another of its quotes is in flight |
+| `409` | `QUOTE_USED` | This quote (or its permit) was already burned with |
+| `409` | `QUOTE_EXPIRED` | Get a new quote, or [renew the shipment](/partner-api/v2/endpoints/renew-shipment). A one-tap shipment whose postage no longer matches: estimate and create it again |
 | `409` | `NOT_PAID` | The shipment's shipping isn't paid yet |
+| `409` | `POSTAGE_DUE` | A one-tap shipment was sent `holder_signature`; send `permit_signature` |
+| `409` | `PERMIT2_NOT_APPROVED` | One-tap: the holder's wallet hasn't approved Permit2 for the stablecoin yet |
+| `409` | `SIGNATURE_PAYMENT_UNAVAILABLE` | One-tap shipping isn't set up for this contract; create the shipment with `payment_method: "checkout"` |
+| `409` | `TOKEN_IN_SHIPMENT` | The token has a paid shipment waiting for its burn (`quote_id` names it), and this is a different quote. Nothing is burned |
 | `409` | `QUOTE_NOT_RELAYABLE` | The quote was issued before this endpoint existed; get a new one |
 | `409` | `RELAY_IN_PROGRESS` | The first send for this quote is still in flight; follow the quote |
 | `409` | | Your program has no contract yet |
@@ -60,7 +69,7 @@ How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/burn \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/burn \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "quote_id": "0x5e0c...91ab", "holder_signature": "0x9b2e...1c" }'

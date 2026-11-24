@@ -19,11 +19,13 @@ This response never includes the `payment` object: replay the create POST to get
 <ResponseField name="shipment" type="object">
   <Expandable title="shipment">
     <ResponseField name="shipment_id" type="string">Multi-token shipments only.</ResponseField>
-    <ResponseField name="status" type="string">`awaiting_payment`, `ready`, `expired`, `redeemed` or `partially_redeemed`.</ResponseField>
+    <ResponseField name="status" type="string">`awaiting_payment`, `ready`, `expired`, `redeemed` or `partially_redeemed` (multi-token only).</ResponseField>
     <ResponseField name="shipping_cost" type="number" />
     <ResponseField name="holder" type="string">Every burn must come from this wallet.</ResponseField>
-    <ResponseField name="expires_at" type="string">The end of the burn window: 24 hours from payment, shared by every token.</ResponseField>
+    <ResponseField name="expires_at" type="string">The end of the burn window: 24 hours from payment, shared by every token. A one-tap shipment: the end of its 30 minutes to sign.</ResponseField>
     <ResponseField name="paid_at" type="string | null" />
+    <ResponseField name="payment_refund_due" type="boolean">`true` when a payment arrived but opened no burn: a one-token shipment paid more than 1% short, a token that already had another paid shipment, or a token burned another way first. CatchBack refunds it; nothing ships on it.</ResponseField>
+    <ResponseField name="payment_method" type="string">One-token shipments only: `signature` (one tap, paid in its burn) or `checkout` (paid first).</ResponseField>
     <ResponseField name="tokens" type="object[]">
       Multi-token shipments only: `token_id`, `quote_id`, `status` (`awaiting_payment`, `ready`, `expired`, `redeemed` or `dropped`), `burned_at`, `burn_tx` and `burn`.
     </ResponseField>
@@ -41,11 +43,12 @@ This response never includes the `payment` object: replay the create POST to get
 
 | Status | Code | When |
 |---|---|---|
+| `400` | `CRYPTO_WALLET_MODEL_ONLY` | Your program is on the Non-crypto model: it has no tokens or wallets. Use the [customer endpoints](/partner-api/v2/settlement) |
 | `404` | `UNKNOWN_SHIPMENT` | No such shipment in your program |
 
 <RequestExample>
 ```bash cURL
-curl https://catchbackcards.com/api/partner/v2/shipments/7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73 \
+curl https://sandbox.catchbackcards.com/api/partner/v2/shipments/7e2a91c4-5b0d-4f3e-8a6c-1d9b0e2f4a73 \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 </RequestExample>
@@ -60,6 +63,7 @@ curl https://catchbackcards.com/api/partner/v2/shipments/7e2a91c4-5b0d-4f3e-8a6c
     "holder": "0x8f3c...e21a",
     "expires_at": "2026-11-17T18:41:02.000Z",
     "paid_at": "2026-11-16T18:41:02.000Z",
+    "payment_refund_due": false,
     "tokens": [
       { "token_id": "90311820476190023716442901288201455", "quote_id": "0x1b7c...e4a0", "status": "redeemed", "burned_at": "2026-11-16T19:02:10.000Z", "burn_tx": "0x51c0...", "burn": null },
       { "token_id": "81264573985362058461377125337283195667", "quote_id": "0xa93f...0c2d", "status": "redeemed", "burned_at": "2026-11-16T19:04:55.000Z", "burn_tx": "0x3be1...", "burn": null }
@@ -88,6 +92,7 @@ curl https://catchbackcards.com/api/partner/v2/shipments/7e2a91c4-5b0d-4f3e-8a6c
     "holder": "0x8f3c...e21a",
     "expires_at": "2026-11-17T18:41:02.000Z",
     "paid_at": "2026-11-16T18:41:02.000Z",
+    "payment_refund_due": false,
     "tokens": [
       { "token_id": "81264573985362058461377125337283195667", "quote_id": "0xa93f...0c2d", "status": "ready", "burned_at": null, "burn_tx": null, "burn": { "quote": { "tokenId": "...", "kind": 2, "...": "..." }, "signature": "0x..." } }
     ],

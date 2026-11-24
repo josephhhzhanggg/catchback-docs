@@ -31,6 +31,7 @@ The same as [Estimate a shipment](/partner-api/v2/endpoints/estimate-shipment), 
 
 | Status | Code | When |
 |---|---|---|
+| `400` | `CRYPTO_WALLET_MODEL_ONLY` | Your program is on the Non-crypto model: it has no tokens or wallets. Use [Estimate a customer shipment](/partner-api/v2/endpoints/estimate-customer-shipment) |
 | `400` | `BAD_JSON` | The body isn't JSON |
 | `400` | `BAD_HOLDER` | `holder` is not a wallet address on your mint chain |
 | `400` | `BAD_ADDRESS` | The shipping address is invalid; `fields` maps each bad field to a message |
@@ -43,11 +44,12 @@ The same as [Estimate a shipment](/partner-api/v2/endpoints/estimate-shipment), 
 | `403` | `NOT_HOLDER` | That wallet does not hold the token on chain right now |
 | `404` | `UNKNOWN_TOKEN` | No such token on your program's contract |
 | `409` | `TOKEN_NOT_LIVE` | The token isn't minted yet, or was already burned |
+| `409` | `TOKEN_BURNED` | The chain shows the token burned before our record caught up |
 | `503` | `CHAIN_UNAVAILABLE` | We couldn't read the token's owner from the chain; retry shortly |
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/shipment/estimate \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/shipment/estimate \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
   -d '{

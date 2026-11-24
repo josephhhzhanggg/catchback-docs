@@ -12,7 +12,7 @@ The live tokens of your program that a wallet holds, newest first, each with wha
 - At most 200 tokens are returned; `truncated: true` means there are more.
 
 <ParamField path="address" type="string" required>
-  A wallet address on your mint chain.
+  A wallet address on your mint chain. An EVM address may be any case, but a mixed-case one must carry a valid EIP-55 checksum.
 </ParamField>
 
 ## Response
@@ -38,10 +38,11 @@ The live tokens of your program that a wallet holds, newest first, each with wha
 | Status | Code | When |
 |---|---|---|
 | `400` | `BAD_ADDRESS` | `{address}` is not an address on your mint chain |
+| `400` | `CRYPTO_WALLET_MODEL_ONLY` | Your program is on the Non-crypto model: it has no tokens or wallets. Use the [customer endpoints](/partner-api/v2/settlement) |
 
 <RequestExample>
 ```bash cURL
-curl https://catchbackcards.com/api/partner/v2/wallets/0x8f3c...e21a/tokens \
+curl https://sandbox.catchbackcards.com/api/partner/v2/wallets/0x8f3c...e21a/tokens \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 </RequestExample>

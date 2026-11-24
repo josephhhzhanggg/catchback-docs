@@ -50,6 +50,7 @@ What you owe now against your credit limit, your daily limits, and one UTC month
     <ResponseField name="sellback_id" type="string">On `sellback`: the sale's `transaction_id`.</ResponseField>
     <ResponseField name="shipment_id" type="string">On `shipping` and `shipping_refund`: the customer shipment's `id`.</ResponseField>
     <ResponseField name="reason" type="string | null">On `order_refund` and `shipping_refund`: why.</ResponseField>
+    <ResponseField name="period" type="string | null">On `revenue_share`: the month it is for.</ResponseField>
     <ResponseField name="note" type="string | null">On `payment` and `adjustment`.</ResponseField>
   </Expandable>
 </ResponseField>
@@ -66,7 +67,7 @@ What you owe now against your credit limit, your daily limits, and one UTC month
 
 <RequestExample>
 ```bash cURL
-curl "https://catchbackcards.com/api/partner/v2/settlement?period=2026-11&limit=50" \
+curl "https://sandbox.catchbackcards.com/api/partner/v2/settlement?period=2026-11&limit=50" \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 </RequestExample>

@@ -17,13 +17,13 @@ What the holder does with it: [Sell-back](/partner-api/v2/sell-back).
   `sellback`. Shipments start at [Create a shipment](/partner-api/v2/endpoints/create-shipment).
 </ParamField>
 <ParamField body="holder" type="string" required>
-  The wallet that holds the token now. Checked on chain.
+  The wallet that holds the token now. Checked on chain. An EVM address may be any case, but a mixed-case one must carry a valid EIP-55 checksum.
 </ParamField>
 <ParamField body="payout_chain" type="string">
-  `evm:8453` (Base) or `solana:mainnet`. Default: the token's family, Base for an EVM program and Solana for a Solana program. Solana payouts answer `PAYOUT_CHAIN_NOT_ENABLED` until they are switched on.
+  `evm:8453` (Base) or `solana:mainnet`. Default: the token's family, Base for an EVM program and Solana for a Solana program. In production, Solana payouts answer `PAYOUT_CHAIN_NOT_ENABLED` until they are switched on; the sandbox pays Solana (simulated).
 </ParamField>
 <ParamField body="payout_address" type="string">
-  Where the USDC goes. Defaults to `holder` when the payout chain is the same family as your mint chain. **Required when the payout chain isn't your mint chain's family**, so today a Solana program sends `payout_chain: "evm:8453"` with a Base `payout_address`.
+  Where the USDC goes. Defaults to `holder` when the payout chain is the same family as your mint chain. **Required when the payout chain isn't your mint chain's family**, so today a Solana program sends `payout_chain: "evm:8453"` with a Base `payout_address`. An EVM `payout_address` can't be a contract that could never pass the USDC on: the zero address, your program's NFT contract, Permit2 or USDC itself. Smart-contract wallets are fine.
 </ParamField>
 
 ## Response
@@ -33,7 +33,7 @@ What the holder does with it: [Sell-back](/partner-api/v2/sell-back).
 <ResponseField name="quote_id" type="string">Follow it with [Get a quote](/partner-api/v2/endpoints/get-quote).</ResponseField>
 <ResponseField name="chain" type="string">The token's chain.</ResponseField>
 <ResponseField name="amount_usd" type="number">What the payout sends, exactly.</ResponseField>
-<ResponseField name="expires_at" type="string" />
+<ResponseField name="expires_at" type="string">UTC, ending in `Z`.</ResponseField>
 <ResponseField name="payout" type="object">`chain` and `address`.</ResponseField>
 <ResponseField name="family" type="string">`evm` or `solana`.</ResponseField>
 
@@ -62,21 +62,23 @@ On a **Solana** program:
 | `400` | | `kind` is something other than `sellback` |
 | `400` | `BAD_HOLDER` | `holder` is not a wallet address on your mint chain |
 | `400` | `PAYOUT_CHAIN_NOT_SUPPORTED` | `payout_chain` is not `evm:8453` or `solana:mainnet` |
-| `400` | `PAYOUT_CHAIN_NOT_ENABLED` | Payouts on that chain aren't switched on yet (today: `solana:mainnet`) |
-| `400` | `BAD_PAYOUT_ADDRESS` | No usable `payout_address` for the payout chain |
+| `400` | `PAYOUT_CHAIN_NOT_ENABLED` | Production only: payouts on that chain aren't switched on yet (today: `solana:mainnet`) |
+| `400` | `BAD_PAYOUT_ADDRESS` | No usable `payout_address` for the payout chain, or it is the zero address, your NFT contract, Permit2 or USDC |
+| `400` | `CRYPTO_WALLET_MODEL_ONLY` | Your program is on the Non-crypto model: it has no tokens or wallets. Use [Sell back a card](/partner-api/v2/endpoints/sell-back-customer-card) |
 | `403` | `NOT_HOLDER` | That wallet does not hold the token on chain right now |
 | `403` | `WALLET_REFUSED` | The holder or payout address failed sanctions screening |
 | `404` | `UNKNOWN_TOKEN` | No such token on your program's contract |
 | `409` | `TOKEN_NOT_MINTED` | The token's mint hasn't confirmed yet |
-| `409` | `TOKEN_BURNED` | The token was already sold back or shipped |
+| `409` | `TOKEN_BURNED` | The token was already sold back or shipped, or its burn is landing on chain now |
 | `409` | `NO_OFFER` | The item has no sell-back offer right now |
+| `409` | `TOKEN_IN_SHIPMENT` | The token has a paid shipment waiting for its burn (`quote_id` names it): burn or renew that shipment. It can't be sold back meanwhile |
 | `409` | | Your program has no contract yet |
 | `503` | `CHAIN_UNAVAILABLE` | We couldn't read the token's owner from the chain; retry shortly |
 | `503` | `SCREENING_UNAVAILABLE` | Wallet screening is briefly unavailable; retry shortly |
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/quote \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/quote \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "kind": "sellback", "holder": "0x8f3c...e21a", "payout_chain": "evm:8453", "payout_address": "0x8f3c...e21a" }'

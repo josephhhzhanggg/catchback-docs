@@ -3,9 +3,16 @@ title: "Idempotency"
 description: "Retry orders, shipments and key rotations safely with an Idempotency-Key."
 ---
 
-`POST /orders`, `POST /shipments`, `POST /tokens/{tokenId}/shipment` and `POST /keys/rotate` require an **`Idempotency-Key`** header: 8-128 characters of `A-Z a-z 0-9 _ -`. Use your own order id, one per order.
+`POST /orders`, `POST /shipments`, `POST /tokens/{tokenId}/shipment`, `POST /customers/{customer}/shipments` and `POST /keys/rotate` require an **`Idempotency-Key`** header: 8-128 characters of `A-Z a-z 0-9 _ -`. Use your own order id, one per order.
 
-Orders, shipments and key rotations are separate key spaces; the two shipment endpoints share one.
+Orders, shipments and key rotations are separate key spaces; the two Crypto Wallet shipment endpoints share one. Each space has its own scope:
+
+| Key space | Scope | So |
+|---|---|---|
+| Orders (both models) | Your program | One key is one order, across all your keys and customers |
+| Crypto Wallet shipments (`POST /shipments`, `POST /tokens/{tokenId}/shipment`) | Your program | One key is one shipment |
+| Non-crypto shipments (`POST /customers/{customer}/shipments`) | Your program | One key is one shipment, whichever customer it names: the same key for another customer is `422` |
+| Key rotations | The key being rotated | |
 
 A missing or malformed key is `400 BAD_IDEMPOTENCY_KEY`.
 
@@ -19,8 +26,8 @@ A missing or malformed key is `400 BAD_IDEMPOTENCY_KEY`.
 
 ## What counts as the same request
 
-- **An order** is the same request when `pack_type`, `category`, `odds`, `quantity`, `recipient` and `refund_address` match. `partner_user_ref` is not compared. `odds` is compared as resolved, so leaving it out and naming the pack's default are the same request (and so are `quantity: 1` and no `quantity`).
-- **A shipment** is the same request when the token (or the set of `token_ids`, in any order), `holder`, `address`, `rate` and `cover_amount` all match.
+- **An order** is the same request when `pack_type`, `category`, `odds`, `quantity`, `recipient` and `refund_address` match (on the Non-crypto model, `customer` in place of the wallet fields). `partner_user_ref` is not compared. `odds` is compared as resolved, so leaving it out and naming the pack's default are the same request (and so are `quantity: 1` and no `quantity`).
+- **A shipment** is the same request when the token (or the set of `token_ids`, in any order), `holder`, `address`, `rate` and `cover_amount` all match. A customer shipment compares the customer, `card_ids`, `address`, `rate`, `max_cost` and `cover_amount`.
 
 ## Getting a lost response back
 
@@ -31,3 +38,5 @@ A missing or malformed key is `400 BAD_IDEMPOTENCY_KEY`.
 ## Endpoints without a key
 
 `POST /tokens/{tokenId}/quote` takes no key: every call issues a fresh quote, and an unused quote simply expires.
+
+`POST /customers/{customer}/cards/{card_id}/sellback` takes no key either: a card sells once, and every retry returns that first sale (`already_sold`).

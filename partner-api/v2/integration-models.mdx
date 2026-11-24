@@ -194,7 +194,7 @@ The rates elsewhere in these docs are our standard terms. Your revenue share is 
 | **Crypto Wallet model only** | Holdings (`GET /wallets/{address}/tokens`, `GET /tokens/{tokenId}`), sell-back (`POST /tokens/{tokenId}/quote`, `POST /tokens/{tokenId}/burn`, `GET /quotes`, `GET /quotes/{quoteId}`), shipping (`POST /shipments/estimate`, `POST /shipments`, `POST /tokens/{tokenId}/shipment/estimate`, `POST /tokens/{tokenId}/shipment`, `GET /shipments`, `GET /shipments/{id}`, `POST /shipments/{id}/renew`), `POST /sandbox/payments/{intentId}` |
 | **Non-crypto model only** | `GET /customers/{customer}/vault`, `POST /customers/{customer}/cards/{card_id}/sellback`, `POST /customers/{customer}/shipments/estimate`, `POST /customers/{customer}/shipments`, `GET /customers/{customer}/shipments`, `GET /settlement` |
 
-A Non-crypto endpoint called by a Crypto Wallet program answers `400 NOT_PARTNER_SETTLED`, and a Non-crypto order that sends `recipient` is refused with `WALLET_FIELDS_NOT_ACCEPTED`.
+A Non-crypto endpoint called by a Crypto Wallet program answers `400 NOT_PARTNER_SETTLED`, and a Non-crypto order that sends any wallet field (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address`) is refused with `WALLET_FIELDS_NOT_ACCEPTED`.
 
 ## Which should I choose?
 

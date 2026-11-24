@@ -19,15 +19,26 @@ Over a limit is a `429 RATE_LIMITED` with `retry_after_seconds` and a `Retry-Aft
 { "error": "Too many requests. Slow down.", "code": "RATE_LIMITED", "retry_after_seconds": 12 }
 ```
 
+## Unpaid packs
+
+Crypto Wallet model, per wallet, in your program (a multi-pack order counts each pack):
+
+| Limit | Value |
+|---|---|
+| Unpaid packs ordered in the last 10 minutes | 30 |
+| Unpaid packs open at once | 100 (unpaid orders expire after 24 hours) |
+
+An order that would go over either is a `429 TOO_MANY_UNPAID_ORDERS`, with `unpaid_packs`, `limit`, `retry_after_seconds` and a `Retry-After` header, and creates nothing. Paying an open order frees it at once, so a customer who pays as they go never meets these. Paid orders never count.
+
 ## Money limits
 
 | Limit | Value | What happens |
 |---|---|---|
 | Sell-back payouts per address | **$5,000 per UTC day**, per payout address | A payout that would take the USDC sent to that address that day over the limit is `held` for review by our team, then released |
 | Sell-back payouts per program | A daily cap across all your customers (set with you at onboarding) | Beyond it, payouts that day are `held` for review, then released. A safety net against pricing errors or a compromised integration; normal volume never reaches it |
-| Underpayment | 1% tolerance | A payment more than 1% short opens nothing: the order goes to `refund_due` with `failure_reason: "underpaid"` and everything that arrived is refunded |
+| Underpayment | 1% tolerance | A payment more than 1% short opens nothing: the order goes to `refund_due` with `failure_reason: "underpaid"` and everything that arrived is refunded. A shipment payment that short isn't honoured: the shipment stays `awaiting_payment` with `payment_refund_due: true`, and we refund it |
 
-There is no limit on how much a wallet buys.
+There is no limit on how much a wallet buys and pays for; only unpaid packs are capped (above).
 
 ### Non-crypto model
 
@@ -36,7 +47,9 @@ There is no limit on how much a wallet buys.
 | Credit limit | **$10,000** to start, set by CatchBack | What you owe (orders and postage, less sell-back credits and your share) can't pass it: an order or shipment that would is refused with `402 CREDIT_LIMIT` and charges nothing |
 | Per customer | **$500 per UTC day** by default | Beyond it, that customer's orders are refused with `429 CUSTOMER_DAILY_LIMIT` until the next UTC day (`retry_after_seconds`) |
 | Per program | Optional daily cap, set with you | Beyond it, orders are refused with `429 DAILY_LIMIT` until the next UTC day |
-| Customer shipments | **50 per key per UTC day** | Beyond it, `429 DAILY_SHIPMENT_LIMIT_REACHED` until the next UTC day |
+| Customer shipments | **50 per key per UTC day** | Beyond it, `429 DAILY_SHIPMENT_LIMIT_REACHED` until the next UTC day, with `limit`, `resets_at`, `retry_after_seconds` and a `Retry-After` header |
+
+The daily limits count every order accepted that UTC day. An order refused at the door (any of these limits, or `CUSTOMER_BLOCKED`) counts for nothing, but a pack that was accepted and then couldn't open still counts, even though its price is taken back off your statement.
 
 Ask your CatchBack contact to change them. [`GET /settlement`](/partner-api/v2/settlement) always shows your current limits and what's available.
 

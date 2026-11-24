@@ -8,10 +8,10 @@ Scope: `nft:orders`
 
 The packs a wallet order can buy in one category, with your program's `mint_chain`.
 
-Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them so they answer fast however often you call them. Stock is checked again when you create the order, so a pack that sold out in that minute is refused there (`409 PACK_UNAVAILABLE`, with its `reason`).
+Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them for a minute, so repeat reads are fast however often you call them (the first read after a quiet spell or a deploy can take several seconds). Stock is checked again when you create the order, so a pack that sold out in that minute is refused there: `409 ODDS_UNAVAILABLE` (with `odds`) on a pack that sells the odds choice, `409 PACK_UNAVAILABLE` (with its `reason`) on one that sells only its own odds.
 
 <ParamField query="category" type="string" default="pokemon">
-  `pokemon`, `onepiece`, `sports`, `riftbound`, `watches` or `goods`. `goods` packs hold streetwear and jewelry. Raw singles have no category of their own: they come out of other categories' packs.
+  `pokemon`, `onepiece`, `sports`, `riftbound`, `watches` or `goods`. `goods` packs hold streetwear and jewelry. Raw singles have no pack category of their own: they come out of other categories' packs, and an item pulled that way has `category: "singles"`.
 </ParamField>
 
 ## Response
@@ -25,7 +25,7 @@ Both catalog reads (List packs and Get a pack's odds and pool) can be up to a mi
     <ResponseField name="price" type="number">What the customer pays, in dollars.</ResponseField>
     <ResponseField name="available" type="boolean">Mirrors the pack's shelf in our app. A pack that isn't on sale right now stays listed with `available: false` and a `reason`.</ResponseField>
     <ResponseField name="reason" type="string">Only when `available` is false: `Out of stock`, `Odds maintenance in progress`, `Restocking` or `Not available right now`.</ResponseField>
-    <ResponseField name="odds" type="string[]">The [odds choices](/partner-api/v2/odds) the pack sells, in the order our app's picker shows them. Whether a particular choice is selling right now is on the pool endpoint.</ResponseField>
+    <ResponseField name="odds" type="string[]">The [odds choices](/partner-api/v2/odds) the pack sells, in the order our app's picker shows them. `classic` is listed only where its bands are published. Whether a particular choice is selling right now is on the pool endpoint.</ResponseField>
     <ResponseField name="default_odds" type="string">The one an order gets when it names none (Standard wherever it is sold).</ResponseField>
     <ResponseField name="image_url" type="string | null">The pack art: an absolute URL, resized for display, or null.</ResponseField>
     <ResponseField name="banner_url" type="string | null">The pack's wide banner, or null.</ResponseField>
@@ -40,13 +40,13 @@ Both catalog reads (List packs and Get a pack's odds and pool) can be up to a mi
 
 | Status | Code | When |
 |---|---|---|
-| `400` | | Unknown `category` |
+| `400` | `BAD_CATEGORY` | Unknown `category` |
 
 Plus the errors [every endpoint can return first](/partner-api/v2/authentication#errors-every-endpoint-can-return-first).
 
 <RequestExample>
 ```bash cURL
-curl "https://catchbackcards.com/api/partner/v2/catalog/packs?category=pokemon" \
+curl "https://sandbox.catchbackcards.com/api/partner/v2/catalog/packs?category=pokemon" \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 </RequestExample>

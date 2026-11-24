@@ -52,7 +52,13 @@ curl "$CATCHBACK_BASE_URL/api/partner/v2/catalog/packs?category=pokemon" \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 
-Each pack has a `pack_type` (for example `bronze`), a `price` in dollars, and `available`. Pick one where `available` is `true`. To see its odds and every item it can pull, the same view you'd show a customer, call [Get a pack's odds and pool](/partner-api/v2/endpoints/get-pack-pool) with that `pack_type`.
+Each pack has a `pack_type` (for example `bronze`), a `price` in dollars, and `available`. Pick one where `available` is `true`: sandbox stock is thin, so a pack that sells in production may be out here. To see its odds and every item it can pull, the same view you'd show a customer, call [Get a pack's odds and pool](/partner-api/v2/endpoints/get-pack-pool) with that `pack_type`; for a pack that sells the odds choice, its `available` says whether those odds are selling.
+
+Save the one you picked:
+
+```bash
+export PACK="…"                           # a pack_type with "available": true
+```
 
 ## 3. Create an order for your test wallet
 
@@ -61,7 +67,7 @@ curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/orders" \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Idempotency-Key: quickstart-001" \
   -H "Content-Type: application/json" \
-  -d "{ \"pack_type\": \"bronze\", \"category\": \"pokemon\", \"recipient\": \"$WALLET\" }"
+  -d "{ \"pack_type\": \"$PACK\", \"category\": \"pokemon\", \"recipient\": \"$WALLET\" }"
 ```
 
 - `recipient` is the wallet the item is delivered to.
@@ -78,7 +84,7 @@ curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/payments/sbx_pi_…" \
   -d '{}'
 ```
 
-This marks the payment as settled, exactly as a real customer payment would.
+This marks the payment as settled, exactly as a real customer payment would. The pack opens as the payment settles, so the response usually says `"status": "rolled"` rather than `paid`, and `webhooks` counts the webhook deliveries the call made.
 
 ## 5. Open the pack and receive the item
 
@@ -113,7 +119,16 @@ curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/tokens/TOKEN_ID/quote" \
   -d "{ \"kind\": \"sellback\", \"holder\": \"$WALLET\" }"
 ```
 
-`amount_usd` is what the customer gets. To accept, the **wallet holder** signs one transaction that burns the token with the signed `quote`. The code for that is on the [Sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote) page. Then tick and check the quote:
+`amount_usd` is what the customer gets. To accept, the **wallet holder** signs the `quote` (a signature, not a transaction, so no gas), and you send the signature to [`POST /tokens/{tokenId}/burn`](/partner-api/v2/endpoints/relay-burn): we send the burn and pay its gas. The signing code is on the [Sell-back](/partner-api/v2/sell-back#evm-without-gas) page, and the full run below does it end to end. (A holder with Base Sepolia ETH can instead send the burn itself: [Burn with the signed quote](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote).)
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/tokens/TOKEN_ID/burn" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "quote_id": "QUOTE_ID", "holder_signature": "0x…" }'
+```
+
+Then tick and check the quote:
 
 ```bash
 curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/tick" \
@@ -129,7 +144,7 @@ That's the whole flow. To try shipping instead, see [Shipping](/partner-api/v2/s
 
 ## Non-crypto model in the sandbox
 
-No wallet and no payment: orders go on your sandbox statement, and a customer is your own id for them. Pick any test id.
+No wallet and no payment: orders go on your sandbox statement, and a customer is your own id for them. Pick any test id, and a pack with `available: true` from [step 2](#2-pick-a-pack) as `PACK`.
 
 ```bash
 export CUSTOMER="test-customer-1"
@@ -140,7 +155,7 @@ export CUSTOMER="test-customer-1"
 ```bash
 curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/orders" \
   -H "Authorization: Bearer $CATCHBACK_KEY" -H "Idempotency-Key: order-$(date +%s)" -H "Content-Type: application/json" \
-  -d "{\"pack_type\":\"bronze\",\"category\":\"pokemon\",\"quantity\":2,\"customer\":\"$CUSTOMER\"}"
+  -d "{\"pack_type\":\"$PACK\",\"category\":\"pokemon\",\"quantity\":2,\"customer\":\"$CUSTOMER\"}"
 ```
 
 **2. Read their vault.** Each card has its `card.id` and what it sells back for right now:
@@ -156,7 +171,7 @@ curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/customers/$CUSTOMER/cards/CARD_
   -H "Authorization: Bearer $CATCHBACK_KEY" -H "Content-Type: application/json" -d '{}'
 ```
 
-**4. Ship the other.** Estimate (the sandbox has one fixed rate), then create the shipment with that rate and its `amount` as `max_cost`:
+**4. Ship the other.** Estimate (the sandbox has one fixed rate, with no insurance: leave `cover_amount` out), then create the shipment with that rate and its `amount` as `max_cost`:
 
 ```bash
 curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/customers/$CUSTOMER/shipments/estimate" \
@@ -182,6 +197,8 @@ curl "$CATCHBACK_BASE_URL/api/partner/v2/customers/$CUSTOMER/shipments" -H "Auth
 curl "$CATCHBACK_BASE_URL/api/partner/v2/settlement" -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 
+**Webhooks.** If you registered one, the events for these steps (`nft_order.updated`, `sellback.updated`, `nft_shipment.updated`) arrive within about two minutes, when our background work picks them up. To get them at once, call [`POST /sandbox/tick`](/partner-api/v2/endpoints/sandbox-tick) after a step; `POST /sandbox/shipments/{id}` sends its own straight away.
+
 Get started in your manager runs these same steps for you and ticks each one off as it sees it. Full details: [Non-crypto model](/partner-api/v2/settlement).
 
 ## How the sandbox differs from production
@@ -192,7 +209,7 @@ Get started in your manager runs these same steps for you and ticks each one off
 | `publishable_key`, deposit addresses | Placeholders (`pk_sandbox`, fixed addresses) |
 | Background work and webhooks every two minutes | Also every two minutes, or right away when you call [`POST /sandbox/tick`](/partner-api/v2/endpoints/sandbox-tick) |
 | USDC payouts and refunds | Real transactions on Base Sepolia in **CatchBack Sandbox USDC** (`sbxUSDC`, 6 decimals, [`0x20f75eed30960c7420363eba937634be7c331141`](https://sepolia.basescan.org/token/0x20f75eed30960c7420363eba937634be7c331141)), a test token worth nothing: a `sent` payout's `tx_hash` opens on BaseScan. Solana payouts are simulated, with no `tx_hash`. Payouts, refunds and deposit addresses name the test networks, `evm:84532` (Base Sepolia) and `solana:devnet`; `evm:8453` and `solana:mainnet` are accepted there as those |
-| Carrier rates | One fixed rate: USPS Priority Mail (sandbox), $9.85 |
+| Carrier rates | One fixed rate: USPS Priority Mail (sandbox), $9.85, with no insurance option. A `cover_amount` there is refused (`COVER_UNAVAILABLE` on create) |
 | Your mint chain | A public testnet, real contract |
 | Sanctions screening | The real OFAC list |
 | Webhook URLs | Public `https://` URLs, as in production. To receive on your own machine, use a tunnel such as ngrok |
@@ -208,7 +225,7 @@ All three sandbox endpoints return **404** outside the sandbox.
 
 ## A full run (TypeScript + viem)
 
-The same flow our own certification suite runs against the sandbox. `burnForQuote` and `CATCHBACK_CARDS_ABI` are on the [Sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote) page; `alice`, `bob`, their viem wallets and `CONTRACT` are yours.
+Order, pay, mint and sell back, with no gas at all: the sell-back is signed by the wallet and sent by us ([EVM without gas](/partner-api/v2/sell-back#evm-without-gas)). `alice` and her viem wallet are yours; `types` (the EIP-712 quote types) is on the [Sell-back](/partner-api/v2/sell-back#check-the-quote-before-the-customer-signs) page.
 
 ```ts
 const BASE = process.env.CATCHBACK_BASE_URL!;
@@ -252,18 +269,27 @@ const order = await settle(async () => {
 });
 const tokenId = order.token.token_id;
 
-// 4. Alice trades it to Bob on chain; tick until CatchBack sees it.
-await aliceWallet.writeContract({ address: CONTRACT, abi: CATCHBACK_CARDS_ABI, functionName: 'transferFrom', args: [alice.address, bob.address, BigInt(tokenId)] });
-await settle(async () => (await api('GET', `/wallets/${bob.address}/tokens`)).body.tokens.some((t: any) => t.token_id === tokenId));
-
-// 5. Bob sells it back: quote, burn, then tick until paid.
-const { body: quote } = await api('POST', `/tokens/${tokenId}/quote`, { kind: 'sellback', holder: bob.address });
-await burnForQuote(bobWallet, quote);
+// 4. Alice sells it back without gas: quote, sign, we send the burn; tick until paid.
+const { body: quote } = await api('POST', `/tokens/${tokenId}/quote`, { kind: 'sellback', holder: alice.address });
+const q = quote.quote;
+const holderSignature = await aliceWallet.signTypedData({
+  account: aliceWallet.account!,
+  domain: { name: 'CatchBackCards', version: '1', chainId: 84532, verifyingContract: quote.contract },
+  types,
+  primaryType: 'Quote',
+  message: {
+    tokenId: BigInt(q.tokenId), kind: Number(q.kind), quoteId: q.quoteId, holder: q.holder,
+    payoutHash: q.payoutHash, amount: BigInt(q.amount), expiresAt: BigInt(q.expiresAt),
+  },
+});
+await api('POST', `/tokens/${tokenId}/burn`, { quote_id: quote.quote_id, holder_signature: holderSignature });
 await settle(async () => {
-  const q = (await api('GET', `/quotes/${quote.quote_id}`)).body.quote;
-  return q.payout.status === 'sent' ? q : null;
+  const r = (await api('GET', `/quotes/${quote.quote_id}`)).body.quote;
+  return r.payout.status === 'sent' ? r : null;
 });
 ```
+
+A trade between wallets (`transferFrom`) and a burn the holder sends itself (`burnWithQuote`) are transactions, so they need a little Base Sepolia ETH from a public faucet. The sandbox gives test wallets none, so the run above uses only signatures.
 
 <Tip>
   Use a separate key per environment (sandbox, production).

@@ -6,28 +6,32 @@ description: "Sandbox only: pay an order's or a shipment's sandbox Payment Inten
 
 Scope: `nft:orders` · **Sandbox only:** `404` outside the [sandbox](/partner-api/v2/quickstart)
 
-Pays an order's, a multi-pack order's, a shipment's or a multi-token shipment's sandbox intent, exactly as a settled payment would. Paying twice changes nothing. It also delivers any webhooks the payment produced.
+Pays an order's, a multi-pack order's, a shipment's or a multi-token shipment's sandbox intent, exactly as a settled payment would. An intent is paid once: paying one that is no longer awaiting payment is `409 ALREADY_PAID`. It also delivers any webhooks the payment produced.
 
 <ParamField path="intentId" type="string" required>
   The `payment.intent_id` from the create response. Sandbox intent ids start `sbx_pi_`.
 </ParamField>
 <ParamField body="amount" type="number">
-  Dollars paid. Default: the full amount. Send less to test the [1% tolerance](/partner-api/v2/payments#rules) and an `underpaid` refund.
+  Dollars paid, as a JSON number (not a string). Default: the full amount. Send less to test the [1% tolerance](/partner-api/v2/payments#rules): an order more than 1% short goes to `refund_due` (`failure_reason: "underpaid"`); a shipment stays `awaiting_payment` with `payment_refund_due: true`.
 </ParamField>
 
 ## Response
 
 <ResponseField name="paid" type="boolean">`true`.</ResponseField>
 <ResponseField name="kind" type="string">`order` or `shipment`.</ResponseField>
-<ResponseField name="status" type="string">The order's status (the multi-pack order's status for one), or the shipment's, after the payment.</ResponseField>
-<ResponseField name="webhooks" type="object">The webhook deliveries this call made.</ResponseField>
+<ResponseField name="status" type="string">The order's status (the multi-pack order's status for one), or the shipment's, after the payment. A pack opens as its payment settles, so an order usually answers `rolled`, not `paid` (`refund_due` if it couldn't open or `amount` was more than 1% short); [tick](/partner-api/v2/endpoints/sandbox-tick) until it is `minted`. A shipment answers `ready`, or stays `awaiting_payment` if `amount` was short.</ResponseField>
+<ResponseField name="order_status" type="string">On an order: the same as `status`.</ResponseField>
+<ResponseField name="shipment_status" type="string">On a shipment: the same as `status`.</ResponseField>
+<ResponseField name="webhooks" type="object">The webhook deliveries this call made: `delivered` and `retrying`.</ResponseField>
 
 ## Errors
 
 | Status | Code | When |
 |---|---|---|
+| `400` | `BAD_AMOUNT` | `amount` isn't a positive JSON number |
 | `404` | `UNKNOWN_PAYMENT` | No such payment in your program |
 | `404` | | Not the sandbox |
+| `409` | `ALREADY_PAID` | The order or shipment is no longer awaiting payment; `status` says where it is |
 
 <RequestExample>
 ```bash cURL
@@ -40,7 +44,7 @@ curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/payments/sbx_pi_01JD...
 
 <ResponseExample>
 ```json 200 order
-{ "paid": true, "kind": "order", "status": "paid", "order_status": "paid", "webhooks": { "delivered": 1, "retrying": 0 } }
+{ "paid": true, "kind": "order", "status": "rolled", "order_status": "rolled", "webhooks": { "delivered": 1, "retrying": 0 } }
 ```
 
 ```json 200 shipment
