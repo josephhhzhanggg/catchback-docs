@@ -7,6 +7,16 @@ description: "Chain keys, mint, payment and payout chains, token identity on EVM
   This page is for the **Crypto Wallet** model. On [Non-crypto model](/partner-api/v2/settlement) nothing is minted, so chains, tokens and metadata don't apply.
 </Info>
 
+## Chain agnostic
+
+Your program mints on the chain your users already use: **Base**, **Solana**, or **your own chain** (any EVM-compatible chain, where we deploy our contract for you). Payments, payouts, gas and the API work the same way on all of them.
+
+| Mint chain | Chain key | What your customers hold |
+|---|---|---|
+| **Base** | `evm:8453` | A standard ERC-721 NFT |
+| **Solana** | `solana:mainnet` | A Metaplex Core asset |
+| **Your own chain** (any EVM-compatible chain) | `evm:<chainId>`, for example `evm:196` for X Layer | A standard ERC-721 NFT, from our contract deployed on your chain |
+
 ## Chain keys
 
 Chains are written `<family>:<id>`:

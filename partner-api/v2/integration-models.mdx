@@ -7,7 +7,7 @@ Every partner program runs on exactly one of two models. You choose it in **Get 
 
 <CardGroup cols={2}>
   <Card title="Crypto Wallet model" icon="wallet" href="#crypto-wallet-model">
-    Your customers pay from their own crypto wallet. Each pull is minted to that wallet as an NFT they can hold, trade, sell back or ship. You never touch the money.
+    Your customers pay from their own crypto wallet. Each pull is minted to that wallet as an NFT, on Base, Solana or your own chain, that they can hold, trade, sell back or ship. You never touch the money.
   </Card>
   <Card title="Non-crypto model" icon="building-columns" href="#non-crypto-model">
     Your customers need no crypto. You buy packs for them and charge them your way; their items stay in a CatchBack vault, and everything settles on one statement between you and us.
@@ -25,6 +25,7 @@ The model is your program's `payment_mode`: `wallet` for the Crypto Wallet model
 | **A customer is** | A wallet address (`recipient`) | Your own id for them (`customer`) |
 | **Who pays CatchBack for a pack** | The customer, in USDC on Base or Solana, through our hosted payment screen | You, on your statement, within a credit limit. You charge your customer your way |
 | **Where the item goes** | An NFT minted to the customer's wallet, backed by the real item in our vault | The customer's vault at CatchBack. You show it in your app |
+| **Chain** | Your choice: Base, Solana, or your own EVM-compatible chain | None |
 | **Selling back** | The holder signs a quote; we burn the NFT and send USDC to their wallet | One API call; the payout is credited to your statement and you credit your customer |
 | **Shipping** | The holder pays the postage and the NFT is burned, often with a single signature | One API call; the postage goes on your statement |
 | **Your revenue share** | Paid monthly to your USDC address | Credited to your statement when each month closes |
@@ -55,6 +56,18 @@ flowchart LR
   API -->|"USDC payout"| W
   V[("CatchBack vault: the real item")] -.->|backs| N
 ```
+
+### Any chain: Base, Solana or yours
+
+The Crypto Wallet model is chain agnostic. Your program mints on the chain your users already use, set when you join:
+
+| Mint chain | Chain key | What your customers hold |
+|---|---|---|
+| **Base** | `evm:8453` | A standard ERC-721 NFT |
+| **Solana** | `solana:mainnet` | A Metaplex Core asset |
+| **Your own chain** (any EVM-compatible chain) | `evm:<chainId>`, for example `evm:196` for X Layer | A standard ERC-721 NFT, from our contract deployed on your chain |
+
+Whatever your mint chain, the rest stays the same: customers pay in USDC on Base or Solana ([Payments](/partner-api/v2/payments)), we pay the network fee for every mint (and on EVM chains can pay it for sell-back and shipping burns too: the holder signs and we send the burn), and sell-back payouts and refunds go out in USDC. On EVM chains one address is the same everywhere, so a customer who pays from Base receives the NFT at that same address on your chain. Details: [Chains, tokens and metadata](/partner-api/v2/chains-and-metadata).
 
 1. **Buy.** Your app creates an order for the customer's wallet: [`POST /orders`](/partner-api/v2/endpoints/create-order) with `recipient`. The response carries a payment for the customer to pay within 24 hours ([Payments](/partner-api/v2/payments)).
 2. **Receive.** Once paid, the pack opens and the NFT is minted to `recipient` (`paid` → `rolled` → `minted`, [Orders](/partner-api/v2/orders)).
