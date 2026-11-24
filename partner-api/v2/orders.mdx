@@ -47,7 +47,7 @@ These orders also carry `custody: "vault"` and `customer`, and never a `token`, 
 
 Once paid and opened, the order carries:
 
-- `pull`: the item pulled (`card_id`, `category`, `name`, `value`, `pulled_at`). `pull.value` is the item's value when it was pulled; it anchors the [sell-back offer](/partner-api/v2/sell-back).
+- `pull`: the item pulled (`card_id`, `category`, `name`, `value`, `pulled_at`). `category` is the pack's, or `singles` for a raw single. `pull.value` is the item's value when it was pulled; it anchors the [sell-back offer](/partner-api/v2/sell-back).
 - `token` (Crypto Wallet model only): the NFT. On EVM it has `chain`, `contract`, `token_id`, `status` and `tx`; on a Solana program it has `collection` and `asset` instead of `contract`.
 
 `token.status`: `pending` (reserved, not sent), `submitted`, `confirmed`, `failed` (being retried), or `burned` once the token has been sold back or shipped.

@@ -8,7 +8,7 @@ Scope: `nft:orders`
 
 What one pack can pull at one [odds choice](/partner-api/v2/odds): the value bands with their chances, whether those odds are selling right now, and every item a pull can produce. This is the same information as the odds panel in our app, so show it to your customers before they buy.
 
-The pool is live stock. Each item in it is one physical item, so an item that is pulled leaves the pool, though other copies of the same card can stay in it. Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them so they answer fast however often you call them. Stock is checked again when you create the order, so a pack that sold out in that minute is refused there (`409 PACK_UNAVAILABLE`, with its `reason`).
+The pool is live stock. Each item in it is one physical item, so an item that is pulled leaves the pool, though other copies of the same card can stay in it. Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them for a minute, so repeat reads are fast however often you call them (the first read after a quiet spell or a deploy can take several seconds). Stock is checked again when you create the order, so a pack that sold out in that minute is refused there: `409 ODDS_UNAVAILABLE` (with `odds`) on a pack that sells the odds choice, `409 PACK_UNAVAILABLE` (with its `reason`) on one that sells only its own odds.
 
 <ParamField query="pack_type" type="string" required>
   A `pack_type` from [List packs](/partner-api/v2/endpoints/list-packs).
@@ -40,7 +40,7 @@ The pool is live stock. Each item in it is one physical item, so an item that is
 </ResponseField>
 <ResponseField name="total_cards" type="integer" />
 <ResponseField name="cards" type="object[]">
-  Every item a pull can produce at these odds, highest value first, each with the `band` it sits in. Each item carries its catalog fields (name, set, year, grade, cert, images, `market_value`).
+  Every item a pull can produce at these odds, highest value first, each with the `band` it sits in. Each item carries its catalog fields (name, set, year, grade, cert, images, `market_value`, `market_value_last_updated`, and `price`, its listed price in our shop, which sell-backs don't use).
 </ResponseField>
 
 ### Packs that sell only their own odds
@@ -64,7 +64,7 @@ A pack that sells only its own odds answers `odds: "classic"` with its own band 
 
 <RequestExample>
 ```bash cURL
-curl "https://catchbackcards.com/api/partner/v2/catalog/packs/pool?pack_type=bronze&category=pokemon&odds=hot" \
+curl "https://sandbox.catchbackcards.com/api/partner/v2/catalog/packs/pool?pack_type=bronze&category=pokemon&odds=hot" \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 </RequestExample>

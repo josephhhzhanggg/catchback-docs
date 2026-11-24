@@ -30,7 +30,7 @@ Whether a particular odds choice is selling right now is on the pool endpoint.
 [`GET /catalog/packs/pool`](/partner-api/v2/endpoints/get-pack-pool) returns what one pack can pull at one odds choice: the value bands with their chances, whether those odds are selling right now, and every item a pull can produce. This is the same information as the odds panel in our app, so show it to your customers before they buy.
 
 ```bash
-curl "https://catchbackcards.com/api/partner/v2/catalog/packs/pool?pack_type=bronze&category=pokemon&odds=hot" \
+curl "https://sandbox.catchbackcards.com/api/partner/v2/catalog/packs/pool?pack_type=bronze&category=pokemon&odds=hot" \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 

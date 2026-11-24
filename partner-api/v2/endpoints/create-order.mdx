@@ -8,10 +8,12 @@ Scope: `nft:orders` · Rate limit: 30 a minute, shared with [Sell back a custome
 
 One order buys 1-10 packs of one kind for one wallet, paid with one payment. The response has the order and how to pay it ([Payments](/partner-api/v2/payments)). The pack opens and the NFT mints once the payment settles. Follow it with [Get an order](/partner-api/v2/endpoints/get-order) or the `nft_order.updated` [webhook](/partner-api/v2/webhooks).
 
-A refused order creates nothing. There is no limit on how much a wallet buys.
+A refused order creates nothing. There is no limit on how much a wallet buys and pays for; only unpaid packs are capped ([Unpaid packs](/partner-api/v2/limits-and-compliance#unpaid-packs)).
+
+The examples order `bronze`. Use a pack that is selling: pick one with `available: true` from [List packs](/partner-api/v2/endpoints/list-packs) (and, for a pack that sells the odds choice, odds whose `available` is true on [Get a pack's odds and pool](/partner-api/v2/endpoints/get-pack-pool)). Not every pack is stocked in the sandbox.
 
 <Note>
-  **non-crypto programs** ([Non-crypto model](/partner-api/v2/settlement)): send `customer`, your own id for the customer, and no wallet fields. There is no payment step: the order is charged to your statement when it is accepted, its packs open at once, and the response has no `payment`. The order has `custody: "vault"` and `customer`, `recipient` and `mint_chain` are null, and each pack ends `in_vault` instead of `minted` (or `refunded`, with the price taken back off your statement, if it can't open). The first order for a new `customer` creates that customer. Your credit limit and daily limits apply.
+  **non-crypto programs** ([Non-crypto model](/partner-api/v2/settlement)): send `customer`, your own id for the customer, and no wallet fields: `recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address` is refused with `WALLET_FIELDS_NOT_ACCEPTED`. There is no payment step: the order is charged to your statement when it is accepted, its packs open at once, and the response has no `payment`. The order has `custody: "vault"` and `customer`, `recipient` and `mint_chain` are null, and each pack ends `in_vault` instead of `minted` (or `refunded`, with the price taken back off your statement, if it can't open). The first order for a new `customer` creates that customer. Your credit limit and daily limits apply.
 </Note>
 
 <Warning>
@@ -40,10 +42,10 @@ A refused order creates nothing. There is no limit on how much a wallet buys.
   Crypto Wallet model only. An EVM wallet that can receive USDC on Base, for refunds. Defaults to `recipient` on an EVM program. **Required when you mint on Solana.**
 </ParamField>
 <ParamField body="partner_user_ref" type="string">
-  Crypto Wallet model: your opaque user id (`A-Z a-z 0-9 _ . : -`, up to 128). Never put personal data here. Not used on a non-crypto program, where `customer` names the customer.
+  Crypto Wallet model: your opaque user id (`A-Z a-z 0-9 _ . : -`, up to 128). Never put personal data here. Refused on a non-crypto program (`WALLET_FIELDS_NOT_ACCEPTED`), where `customer` names the customer.
 </ParamField>
 <ParamField body="customer" type="string">
-  **non-crypto programs only, and required there.** Your own id for the customer: 1-128 characters of `A-Z a-z 0-9 _ . : -`. Use something stable that is not personal data (your internal user id, never an email address or phone number). The same `Idempotency-Key` with a different `customer` is `422`.
+  **non-crypto programs only, and required there.** Your own id for the customer: 1-128 characters of `A-Z a-z 0-9 _ . : -`. Use something stable that is not personal data (your internal user id, never an email address or phone number). Leading and trailing spaces are trimmed; ids are case-sensitive. The same `Idempotency-Key` with a different `customer` is `422`.
 </ParamField>
 
 ## Response
@@ -90,16 +92,17 @@ If the chosen odds stop selling before the payment settles, the pack isn't opene
 | `400` | `BAD_ODDS` | `odds` isn't a known choice, or the pack doesn't sell it (`odds` lists the choices) |
 | `400` | `BAD_QUANTITY` | `quantity` isn't a whole number from 1 to 10 |
 | `400` | `BAD_REFUND_ADDRESS` | No usable EVM `refund_address` (required when you mint on Solana) |
-| `400` | `WALLET_FIELDS_NOT_ACCEPTED` | Non-crypto model: `recipient` or `refund_address` was sent. Send `customer` only |
+| `400` | `WALLET_FIELDS_NOT_ACCEPTED` | Non-crypto model: a wallet field (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address`) was sent. Send `customer` only |
 | `400` | `BAD_CUSTOMER` | Non-crypto model: `customer` is missing, or not 1-128 characters of `A-Z a-z 0-9 _ . : -` |
 | `402` | `CREDIT_LIMIT` | Non-crypto model: the order would take what you owe past your credit limit. The body has `owed`, `credit_limit` and `order_total`. Nothing is charged |
 | `403` | `WALLET_REFUSED` | A wallet in the request failed sanctions screening |
 | `403` | `WALLET_BLOCKED` | This wallet may not buy from CatchBack |
 | `403` | `CUSTOMER_BLOCKED` | Non-crypto model: we can't sell to this customer. Don't retry |
 | `404` | `PACK_NOT_OFFERED` | That pack isn't sold through your program |
-| `409` | `ODDS_UNAVAILABLE` | Those odds aren't selling right now. Nothing is created |
+| `409` | `ODDS_UNAVAILABLE` | Those odds aren't selling right now (on a pack that sells the odds choice, this is also how a sold-out pack answers); `odds` echoes the choice. Nothing is created |
 | `409` | `PACK_UNAVAILABLE` | A pack that sells only its own odds can't open right now; `reason` says why. Nothing is created |
 | `422` | `IDEMPOTENCY_KEY_REUSED` | The key was already used for a different order |
+| `429` | `TOO_MANY_UNPAID_ORDERS` | Crypto Wallet model: this wallet has too many unpaid packs in your program. The body has `unpaid_packs`, `limit` and `retry_after_seconds`. Have it pay one, or wait |
 | `429` | `CUSTOMER_DAILY_LIMIT` | Non-crypto model: this customer has spent their limit for the UTC day. The body has `spent_today`, `limit`, `order_total` and `retry_after_seconds` |
 | `429` | `DAILY_LIMIT` | Non-crypto model: your program has spent its daily limit, if it has one. Same fields |
 | `503` | `SCREENING_UNAVAILABLE` | Wallet screening is briefly unavailable; retry shortly |
@@ -107,7 +110,7 @@ If the chosen odds stop selling before the payment settles, the pack isn't opene
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/orders \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/orders \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Idempotency-Key: okx-ord-7f3a9c21" \
   -H "Content-Type: application/json" \
@@ -123,7 +126,7 @@ curl -X POST https://catchbackcards.com/api/partner/v2/orders \
 ```
 
 ```bash Non-crypto model
-curl -X POST https://catchbackcards.com/api/partner/v2/orders \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/orders \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Idempotency-Key: acme-ord-7f3a91" \
   -H "Content-Type: application/json" \

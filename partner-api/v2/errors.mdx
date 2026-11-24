@@ -44,9 +44,10 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `ODDS_UNAVAILABLE` | `409` | orders, pool | Those odds aren't selling right now; try another choice or later. Nothing is created |
 | `BAD_REFUND_ADDRESS` | `400` | orders | No usable EVM `refund_address` (required when you mint on Solana) |
 | `PACK_NOT_OFFERED` | `404` | orders, pool | That pack isn't sold through your program |
-| `PACK_UNAVAILABLE` | `409` | orders | A pack that sells only its own odds can't open right now; `reason` says why. Nothing is created |
+| `PACK_UNAVAILABLE` | `409` | orders | A pack that sells only its own odds (`classic`) can't open right now; `reason` says why. Nothing is created. A pack that sells the odds choice answers `ODDS_UNAVAILABLE` instead |
 | `WALLET_REFUSED` | `403` | orders, quote, shipments | A wallet in the request failed sanctions screening |
 | `WALLET_BLOCKED` | `403` | orders | This wallet may not buy from CatchBack |
+| `TOO_MANY_UNPAID_ORDERS` | `429` | orders | This wallet has too many unpaid packs in your program ([Limits](/partner-api/v2/limits-and-compliance#unpaid-packs)); the body has `unpaid_packs`, `limit` and `retry_after_seconds`. Have it pay one, or wait. Nothing is created |
 | `SCREENING_UNAVAILABLE` | `503` | orders, quote, shipments | Wallet screening is briefly unavailable; retry shortly |
 | `UNKNOWN_ORDER` | `404` | order GET, verification | No such order in your program (by id or `Idempotency-Key`) |
 | `NOT_PULLED` | `409` | verification | The order's pack hasn't been opened yet; the body has its `status` |
@@ -65,7 +66,7 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `TOKEN_NOT_LIVE` | `409` | shipments, estimates, renew | The token isn't minted yet, or was already burned; on the multi-token endpoints `token_ids` lists them |
 | `NO_OFFER` | `409` | quote | The item has no sell-back offer right now |
 | `PAYOUT_CHAIN_NOT_SUPPORTED` | `400` | quote | `payout_chain` is not one we pay on (`evm:8453` or `solana:mainnet`) |
-| `PAYOUT_CHAIN_NOT_ENABLED` | `400` | quote | Payouts on that chain aren't switched on yet (today: `solana:mainnet`); send `payout_chain: "evm:8453"` with a Base `payout_address` |
+| `PAYOUT_CHAIN_NOT_ENABLED` | `400` | quote | Production only: payouts on that chain aren't switched on yet (today: `solana:mainnet`); send `payout_chain: "evm:8453"` with a Base `payout_address`. The sandbox pays Solana (simulated) |
 | `BAD_PAYOUT_ADDRESS` | `400` | quote | No usable `payout_address` for the payout chain (required when it isn't your mint chain's family) |
 | `USE_SHIPMENT_ENDPOINT` | `400` | quote | `kind: "shipment"` sent to the quote endpoint; shipments start at `POST /shipments` |
 | `BAD_TOKEN_IDS` | `400` | shipments, estimate | `token_ids` isn't a list of 1-25 distinct decimal token ids |
@@ -75,7 +76,7 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `BAD_PERMIT_SIGNATURE` | `400` | burn | `permit_signature` isn't the holder's signature over the shipment's `payment.sign`, or the quote isn't a one-tap shipment |
 | `INSUFFICIENT_FUNDS` | `402` | burn | The holder's wallet doesn't hold the postage in the stablecoin |
 | `PERMIT2_NOT_APPROVED` | `409` | burn | The holder's wallet hasn't approved Permit2 for the stablecoin yet (once per token) |
-| `TOKEN_IN_SHIPMENT` | `409` | shipments | A token already has a paid shipment waiting for its burn; the body's `token_ids` lists them (and `quote_id` on the one-token endpoint). Burn or renew that shipment instead |
+| `TOKEN_IN_SHIPMENT` | `409` | shipments, quote, burn | A token already has a paid shipment waiting for its burn; the body's `token_ids` lists them (and `quote_id` names the shipment on the one-token endpoints). Burn or renew that shipment instead. Until it ships, the token can't be sold back either |
 | `BAD_COVER` | `400` | shipments, estimates | `cover_amount` isn't a positive dollar amount with at most two decimals |
 | `COVER_NOT_ALLOWED` | `400` | shipments, estimates | `cover_amount` is outside what the items can be insured for; the body has `order_value`, `min_cover` and `max_cover` (`max_cover` is null when they can't be insured) |
 | `COVER_UNAVAILABLE` | `409` | shipments | The chosen service has no cover option; choose another rate or leave `cover_amount` out |
@@ -84,25 +85,34 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `PARTNER_GOODS` | `400` | shipments, estimates | The item is held by its brand partner and can't ship through CatchBack; it can still be sold back |
 | `COUNTRY_NOT_SUPPORTED` | `400` | shipments, estimates | We don't ship to that country |
 | `OVER_CUSTOMS_CAP` | `400` | shipments, estimates | The items are worth more than we can ship internationally |
+| `SHIPMENT_REFUSED` | the refusal's | shipments, estimates | A shipment refused for a reason that has no code of its own; the message says why |
 | `RATE_UNAVAILABLE` | `409` | shipments | The carrier no longer offers that rate; estimate again |
 | `PRICE_CHANGED` | `409` | shipments, customer sell-back | The shipping cost is now above `max_cost` (the body has the current `amount`), or a customer card's offer is below `min_payout` |
-| `NOT_PARTNER_SETTLED` | `400` | customer tools, settlement | Your program pays through customer wallets; use the token endpoints |
-| `WALLET_FIELDS_NOT_ACCEPTED` | `400` | orders | Non-crypto model: `recipient` or `refund_address` sent; send `customer` only |
+| `NOT_PARTNER_SETTLED` | `400` | customer tools, settlement, orders | Your program pays through customer wallets; use the token endpoints, and send `recipient` (not `customer`) on an order |
+| `NOT_WALLET_PROGRAM` | `400` | token, wallet, quote and token-shipment endpoints | Non-crypto model: your program has no wallets or tokens; the message names the customer endpoint to use |
+| `WALLET_FIELDS_NOT_ACCEPTED` | `400` | orders | Non-crypto model: a wallet field (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address`) was sent; send `customer` only |
 | `BAD_CUSTOMER` | `400` | orders, customer tools | `customer` missing, or not 1-128 characters of `A-Z a-z 0-9 _ . : -` |
 | `CUSTOMER_NOT_FOUND` | `404` | customer tools | No customer with that id has bought from your program |
 | `CUSTOMER_BLOCKED` | `403` | orders, customer shipments | We can't sell to, or ship for, this customer. Don't retry |
 | `CUSTOMER_UNAVAILABLE` | `403` | customer shipments | This customer's account is unavailable |
+| `CUSTOMER_CHECK_UNAVAILABLE` | `503` | orders | Non-crypto model: we couldn't check the customer just now. Nothing is charged; retry shortly with the same `Idempotency-Key` |
 | `CREDIT_LIMIT` | `402` | orders, customer shipments | It would take what you owe past your credit limit; the body has `owed` and `credit_limit`, plus `order_total` on orders and `shipment_total` on shipments. Nothing is charged |
 | `CUSTOMER_DAILY_LIMIT` | `429` | orders | This customer hit their daily limit (UTC day); the body has `spent_today`, `limit` and `retry_after_seconds` |
 | `DAILY_LIMIT` | `429` | orders | Your program hit its daily limit; same fields |
+| `BAD_CARD` | `400` | customer sell-back | `card_id` isn't a card id |
 | `CARD_NOT_IN_VAULT` | `404` | customer sell-back | Your program didn't pull that card into this customer's vault |
-| `CARDS_NOT_IN_VAULT` | `409` | customer shipments | A card isn't in this customer's vault; `card_ids` lists them |
-| `CARDS_NOT_SHIPPABLE` | `409` | customer shipments | A card left the vault meanwhile. Nothing is charged |
+| `SELLBACK_REFUSED` | the refusal's, usually `400` | customer sell-back | The sale itself was refused, for example the card was shipped or is on its way out; the message says why. Nothing is sold |
+| `CARDS_NOT_IN_VAULT` | `409` | customer shipments | Your program never pulled a card into this customer's vault (another customer's card, or a wrong id); `card_ids` lists them |
+| `CARDS_NOT_SHIPPABLE` | `409` | customer shipments | A card was pulled into this vault but can't ship now: sold back, already shipping, listed or on hold. On estimate and create, `cards` gives each one's `reason`; at the last step it means a card left the vault meanwhile. Nothing is charged |
 | `BAD_MIN_PAYOUT` | `400` | customer sell-back | `min_payout` isn't a non-negative number |
 | `BAD_CARD_IDS` | `400` | customer shipments | `card_ids` isn't 1-10 distinct card ids from the vault |
 | `BAD_RATE` | `400` | customer shipments | `rate` isn't the `carrier` and `token` of a rate from the estimate |
+| `DAILY_SHIPMENT_LIMIT_REACHED` | `429` | customer shipments | This key made 50 shipments this UTC day |
+| `IDEMPOTENCY_IN_PROGRESS` | `409` | customer shipments | A shipment with this `Idempotency-Key` is still being created; retry it shortly |
+| `IDEMPOTENCY_RETRY` | `409` | customer shipments | A shipment with this `Idempotency-Key` just failed; retry with the same key |
 | `BAD_PERIOD` | `400` | settlement | `period` isn't a `YYYY-MM` month |
 | `SHIPMENT_OUTCOME_UNKNOWN` | `500` | customer shipments | We couldn't confirm it went through; it's with our team. Retrying with the same `Idempotency-Key` is safe and never charges twice |
+| `SHIPMENT_NOT_CREATED` | `503` | customer shipments | It didn't go through, and its postage is being taken off your statement; retry |
 | `UNKNOWN_SHIPMENT` | `404` | shipment GET, renew, sandbox shipments | No such shipment in your program |
 | `NOT_PAID` | `409` | renew, burn | The shipping isn't paid yet |
 | `ALREADY_REDEEMED` | `409` | renew | The token (every token, on a multi-token shipment) was already burned and the box is shipping |
@@ -128,10 +138,28 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `NO_PREVIOUS_KEY` | `409` | keys revoke-previous | This key didn't replace another key |
 | `ALREADY_ROTATED` | `409` | keys rotate | This key was already rotated with a different `Idempotency-Key`; the body has `successor` (`id`, `name`) and `expires_at` |
 | `UNKNOWN_PAYMENT` | `404` | sandbox payments | No such payment in your program |
+| `BAD_AMOUNT` | `400` | sandbox payments | `amount` isn't a positive number |
 | `NOT_BURNED` | `409` | sandbox shipments | The shipment has no shipping order yet: burn it, then tick |
+| `NOT_CREATED` | `409` | sandbox shipments | Non-crypto model: that customer shipment was never created |
+| `BAD_TRANSITION` | `409` | sandbox shipments | A shipment moves only `processing` → `shipped` → `delivered`; `current_status` says where it is. Sending its current status again is a no-op |
+
+## MCP server codes
+
+The [MCP server](/partner-api/v2/mcp) returns these as a tool result with `isError: true`, never as an HTTP status. Every other code reaches the assistant unchanged from the endpoint the tool calls.
+
+| `code` | When |
+|---|---|
+| `UNKNOWN_TOOL` | No tool by that name |
+| `MISSING_SCOPE` | Your key lacks `nft:orders`; `next_step` says what to do. `whoami` reports the same in `access.code` |
+| `MISSING_ARGUMENT` | A required argument (`token_id`, `customer`, `shipment_id`, ...) is missing, null or empty; `argument` names it |
+| `UNKNOWN_ARGUMENT` | The tool doesn't take that argument; `argument` names it and the message lists what it takes |
+| `BAD_ARGUMENT` | An argument has the wrong type (a string where a number goes, an object as an id); `argument` names it |
+| `BAD_PATH` | `read_doc` was given something that isn't a docs page path from `search_docs` |
+| `DOC_NOT_FOUND` | `read_doc` was given a path with no page; find it with `search_docs` |
+| `DOCS_UNAVAILABLE` | The docs couldn't be reached; try again shortly |
 
 ## Errors without a code
 
 A `400` without a `code` is a malformed request (an unknown `category` on the catalog, a `kind` other than `sellback` on a quote, a `status` other than `shipped` or `delivered` on the sandbox shipment endpoint). Every unknown order, token, quote, shipment, payment or webhook id answers `404` with its `UNKNOWN_*` code.
 
-A `500` body says `Something went wrong; retry with the same Idempotency-Key.` Retry with backoff.
+A `500` body says `Something went wrong; retry with the same Idempotency-Key.` on an endpoint that takes one, and `Something went wrong; try again shortly.` elsewhere. Retry with backoff.

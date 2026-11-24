@@ -10,7 +10,7 @@ We tell your server when an order, a sell-back payout or a shipment changes, so 
 Your key registers its own webhook:
 
 ```bash
-curl -X POST https://catchbackcards.com/api/partner/v2/webhooks \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/webhooks \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "url": "https://partner.example.com/catchback/webhooks" }'
@@ -44,13 +44,13 @@ Every event is a JSON `POST` with this envelope:
 | | **Non-crypto model:** the same three types, with the customer by your id instead of a wallet | |
 | `nft_order.updated` | The order opens into the vault (`in_vault`) or is `refunded` | `{ "order": ... }`, with `custody: "vault"` and `customer` |
 | `sellback.updated` | A sell-back is credited to your statement | `{ "sellback": { "id", "status": "credited", "customer", "card_id", "amount", "statement_entry_id", "created_at" } }` |
-| `nft_shipment.updated` | A customer shipment moves: `processing`, `shipped`, `delivered` | `{ "shipment": ... }` as [`GET /customers/{customer}/shipments`](/partner-api/v2/settlement) lists it, plus `customer` |
+| `nft_shipment.updated` | A customer shipment is created (`processing`, its first event) or moves: `shipped`, `delivered`, `cancelled` | `{ "shipment": ... }` as [`GET /customers/{customer}/shipments`](/partner-api/v2/settlement) lists it, plus `customer` |
 | `ping` | You called [`POST /webhooks/{id}/test`](/partner-api/v2/endpoints/test-webhook) | `{ "webhook_id": "<id>" }` |
 
 - `created_at` is when the change happened.
 - **The payload is the current state, not a diff.** It is built when we pick the change up (every two minutes), so several quick changes can arrive as one event carrying the latest status, and an intermediate status may never be sent on its own. Act on the status in the payload.
 - **Multi-pack orders:** `nft_order.updated` fires for each unit, carrying the order's `order_id`, its `batch_id` and the `unit` number.
-- **Shipments:** `data.shipment` has the fields of the one-token shape: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `burn` and `fulfilment`. In a multi-token shipment each event is about one token (its `quote_id`); `GET /shipments/{quote_id}` returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction.
+- **Shipments:** `data.shipment` has the fields of the one-token shape: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `burn` and `fulfilment`, plus `shipment_id`: the box's id on a multi-token shipment, else the token's `quote_id`. Each event is about one token (its `quote_id`). When a multi-token box moves (`fulfilment` changes), every token burned into it gets its own event, with the same `shipment_id`, and `shipping_cost` is the whole box's postage. `GET /shipments/{shipment_id}` (or any token's `quote_id`) returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction.
 - **A burn window lapsing sends no event.** Watch `expires_at` and [renew](/partner-api/v2/endpoints/renew-shipment).
 - **Test events:** your manager (`catchback.com/<slug>/admin/api`, Webhooks) can send any of these types as a test: signed like a real event, sent once, with `"test": true` in `data` and `test_` ids. Ignore them in production. The same tab shows each delivery's payload, retries a failed one and rotates the signing secret (the next delivery is signed with the new one).
 
@@ -59,7 +59,7 @@ Every event is a JSON `POST` with this envelope:
 - **A 2xx response is delivered.** Anything else is a failure: another status, a redirect (we never follow one), no answer within **5 seconds**, or a connection error. Answer fast and do the work afterwards.
 - **Retries:** after a failure we try again **1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours and 24 hours** later: **8 attempts** in all, over about 45 hours. After the eighth failure the event is dropped; poll to catch up.
 - **At least once.** The same event can arrive more than once (and events can arrive out of order). **Dedupe on `id`**: a retry carries the same `id` and the same body.
-- We send events every two minutes or so, so an event usually arrives within a few minutes of the change.
+- We send events every two minutes or so, so an event usually arrives within a few minutes of the change. In the [sandbox](/partner-api/v2/quickstart) the same schedule runs, and `POST /sandbox/tick`, `POST /sandbox/payments/{intentId}` and `POST /sandbox/shipments/{id}` also send any events waiting, at once.
 
 Headers on every delivery:
 

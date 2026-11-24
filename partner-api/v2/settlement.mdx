@@ -14,13 +14,13 @@ This is one of the two [integration models](/partner-api/v2/integration-models),
 | Shipping | Paid by the holder | On your statement |
 | Revenue share | Paid to your USDC address | Netted on your statement |
 
-The endpoints for catalog, odds, orders, webhooks and keys are the same. Wallet fields (`recipient`, `refund_address`, token ids, quotes and burns) are not used, and an order that sends one is refused with `WALLET_FIELDS_NOT_ACCEPTED`.
+The endpoints for catalog, odds, orders, webhooks and keys are the same. Wallet fields (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain`, `payout_address`) are refused: an order that sends any of them answers `400 WALLET_FIELDS_NOT_ACCEPTED`. Token ids, quotes and burns aren't used, and the wallet endpoints aren't for these programs.
 
 ## Your customers
 
 Every call names a customer by `customer`: your id for them, 1-128 characters of `A-Z a-z 0-9 _ . : -`. Use something stable that is not personal data (your internal user id, never an email address or phone number).
 
-The first order for a new id creates that customer's CatchBack account; later orders with the same id reach the same account. Ids are yours alone: the same id in another partner's program is a different customer. You never see or send our account ids.
+Ids are trimmed of leading and trailing spaces, and are case-sensitive: `User-1842` and `user-1842` are two customers. The first order for a new id creates that customer's CatchBack account (one refused for your credit limit or a daily limit creates none); later orders with the same id reach the same account. Ids are yours alone: the same id in another partner's program is a different customer. You never see or send our account ids.
 
 ## Buy a pack: `POST /orders`
 
@@ -32,7 +32,9 @@ curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/orders" \
   -d '{"pack_type":"bronze","category":"pokemon","odds":"standard","quantity":2,"customer":"user-1842"}'
 ```
 
-There is no payment step: the order is charged to your statement when it is accepted, and its packs open right away. The response is the [order](/partner-api/v2/orders) with `custody: "vault"` and `customer`, and each pack's status ends at `in_vault` instead of `minted`. A retry with the same `Idempotency-Key` returns the same order and is never charged twice.
+Use a pack that is selling: one with `available: true` from [List packs](/partner-api/v2/endpoints/list-packs), and for a pack that sells the odds choice, odds that are `available` on its [pool](/partner-api/v2/endpoints/get-pack-pool).
+
+There is no payment step: the order is charged to your statement when it is accepted, and its packs open right away. The response is the [order](/partner-api/v2/orders) with `custody: "vault"` and `customer`, and each pack's status ends at `in_vault` instead of `minted`. A retry with the same `Idempotency-Key` returns the same order and is never charged twice. Order keys are per program: one key is one order, whichever customer it names (the same key with a different `customer` is `422 IDEMPOTENCY_KEY_REUSED`).
 
 An order is refused, and nothing is charged, when:
 
@@ -43,6 +45,9 @@ An order is refused, and nothing is charged, when:
 | `429` | `DAILY_LIMIT` | Your program has spent its daily limit, if it has one. Same fields. |
 | `403` | `CUSTOMER_BLOCKED` | We can't sell to this customer. Don't retry. |
 | `400` | `BAD_CUSTOMER` | `customer` is missing or not 1-128 of the allowed characters. |
+| `400` | `WALLET_FIELDS_NOT_ACCEPTED` | A wallet field was sent. Send `customer` only. |
+
+The daily limits count every order accepted that UTC day. A pack that was accepted but couldn't open still counts, even though its price comes back off your statement as an `order_refund`.
 
 ## Their vault: `GET /customers/{customer}/vault`
 
@@ -64,7 +69,7 @@ The cards the customer holds now, newest first, each with what it sells back for
 }
 ```
 
-`sellback.fresh` is true while the card is in its fresh window after the pull, at the higher rate. For 7 days after a card is acquired its sell-back is based on its value when acquired (`locked_until`), so a price change in that time doesn't move the offer. A sold or shipped card leaves the vault. `truncated: true` means the customer has more pulls than one read covers.
+`sellback.fresh` is true while the card is in its fresh window after the pull, at the higher rate. For 7 days after a card is acquired its sell-back is based on its value when acquired (`locked_until`), so a price change in that time doesn't move the offer. A sold or shipped card leaves the vault. `truncated: true` means the customer has more pulls than one read covers. A customer id you have never sold to returns an empty vault (`200`), not a `404`; the shipment endpoints answer `404 CUSTOMER_NOT_FOUND` for one.
 
 ## Sell back: `POST /customers/{customer}/cards/{card_id}/sellback`
 
@@ -73,7 +78,7 @@ curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/customers/user-1842/cards/838a5
   -H "Authorization: Bearer $CATCHBACK_KEY" -H "Content-Type: application/json" -d '{"min_payout": 30}'
 ```
 
-Sells the card at its current offer and credits the payout to your statement; nothing is paid out to the customer, so you credit them your way. `min_payout` (optional) refuses an offer below it. A card sells once: a retry returns the first sale with `status: "already_sold"`.
+Sells the card at its current offer and credits the payout to your statement; nothing is paid out to the customer, so you credit them your way. `min_payout` (optional) refuses an offer below it (`409 PRICE_CHANGED`). A card sells once: a retry, even one sent at the same moment as the first, returns the first sale with `status: "already_sold"`, so no `Idempotency-Key` is needed. A card id that is a UUID matches in any case. A card your program didn't pull into this vault is `404 CARD_NOT_IN_VAULT`; a card that was shipped or is on its way out is refused with `SELLBACK_REFUSED` (usually `400`), and the message says why.
 
 ```json
 { "sellback": { "status": "sold", "transaction_id": "…", "payout_amount": 31, "payout_rate": 1, "on_statement": true } }
@@ -82,10 +87,15 @@ Sells the card at its current offer and credits the payout to your statement; no
 ## Ship: estimate, then create
 
 1. [`POST /customers/{customer}/shipments/estimate`](#ship-estimate-then-create) with 1-10 `card_ids` (from the vault, one box) and an `address` returns `rates`, each with a `carrier`, `service`, `token` and `amount`. Add `cover_amount` to price shipping insurance: each rate then also has a `total`, the postage plus the cover's premium.
-2. `POST /customers/{customer}/shipments` with the same `card_ids` and `address`, the chosen `rate: { carrier, token }`, and `max_cost` (that rate's `total` if you sent `cover_amount`, else its `amount`), plus an `Idempotency-Key`. The postage (and any cover) goes on your statement; past your credit limit it is refused with `402 CREDIT_LIMIT` (with `owed`, `credit_limit` and `shipment_total`). Each key can create up to 50 shipments a UTC day. The response is the shipment, with its `id`.
-3. Follow it with [`nft_shipment.updated`](/partner-api/v2/webhooks#events) or `GET /customers/{customer}/shipments` (the customer's latest 100, newest first). `status` moves `processing` → `shipped` (with `carrier` and `tracking_number`) → `delivered`.
+2. `POST /customers/{customer}/shipments` with the same `card_ids` and `address`, the chosen `rate: { carrier, token }`, and `max_cost` (that rate's `total` if you sent `cover_amount`, else its `amount`), plus an `Idempotency-Key` (shipment keys are per customer: the same key for two customers is two shipments). The postage (and any cover) goes on your statement; past your credit limit it is refused with `402 CREDIT_LIMIT` (with `owed`, `credit_limit` and `shipment_total`). Each key can create up to 50 shipments a UTC day. The response is the shipment, with its `id`.
+3. Follow it with [`nft_shipment.updated`](/partner-api/v2/webhooks#events) or `GET /customers/{customer}/shipments` (the customer's latest 100, newest first). `status` moves `processing` → `shipped` (with `carrier` and `tracking_number`) → `delivered`. The first webhook, at `processing`, comes when the shipment is created.
 
-A rate that rose above `max_cost` since the estimate is refused with `PRICE_CHANGED`, and a card that left the vault meanwhile with `CARDS_NOT_SHIPPABLE`. A shipment that doesn't go through is taken off your statement.
+A rate that rose above `max_cost` since the estimate is refused with `PRICE_CHANGED`. A card refusal has one of two codes:
+
+- `CARDS_NOT_IN_VAULT`: your program never pulled that card into this customer's vault (another customer's card, or a wrong id). `card_ids` lists them.
+- `CARDS_NOT_SHIPPABLE`: the card was in this vault but can't ship now: sold back, already shipping, listed or on hold. `cards` gives each one's `reason`, except when a card left the vault while the shipment was being created.
+
+A shipment that doesn't go through is taken off your statement.
 
 ## Your statement: `GET /settlement`
 
@@ -120,8 +130,10 @@ The events are the same as the Crypto Wallet model's, with `customer` instead of
 
 - `nft_order.updated` as an order's packs open into the vault.
 - `sellback.updated` when a sell-back is credited (`status: "credited"`, `amount`, `card_id`, `statement_entry_id`).
-- `nft_shipment.updated` as a shipment moves.
+- `nft_shipment.updated` when a shipment is created (`processing`) and as it moves.
+
+They're picked up every two minutes or so. In the sandbox, `POST /sandbox/tick` sends them at once.
 
 ## In the sandbox
 
-Get started's guide for this model runs every step against the sandbox: an order for a test customer, the vault, a sell-back, the statement, and a shipment. In the sandbox you play our shipping team with `POST /sandbox/shipments/{id}` and `{"status":"shipped"}` or `{"status":"delivered"}`, using the shipment's `id`.
+Get started's guide for this model runs every step against the sandbox: an order for a test customer, the vault, a sell-back, the statement, and a shipment. In the sandbox you play our shipping team with `POST /sandbox/shipments/{id}` and `{"status":"shipped"}` or `{"status":"delivered"}`, using the shipment's `id`. The sandbox's one shipping rate has no insurance, so leave `cover_amount` out there.

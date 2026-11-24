@@ -20,7 +20,7 @@ Live carrier rates to ship 1-10 of a customer's vault cards to an address in one
   `name`, `address1`, `city` and `country` (ISO 3166 alpha-2) are required; `address2` is optional; `state` and `zip` where the country uses them; `phone` is required outside the US. `name`, `address1`, `address2`, `city` and `state` take up to 100 characters, `zip` and `phone` up to 20.
 </ParamField>
 <ParamField body="cover_amount" type="number | null">
-  Shipping insurance cover in dollars, with at most two decimals, within the range the cards allow (the response's `max_cover`; a `400 COVER_NOT_ALLOWED` gives the range).
+  Shipping insurance cover in dollars, with at most two decimals, within the range the cards allow (the response's `max_cover`; a `400 COVER_NOT_ALLOWED` gives the range). The sandbox's one rate offers no cover.
 </ParamField>
 
 ## Response
@@ -60,14 +60,14 @@ Live carrier rates to ship 1-10 of a customer's vault cards to an address in one
 | `403` | `CUSTOMER_BLOCKED` | This customer may not ship cards (`capability` says which block applies) |
 | `403` | `CUSTOMER_UNAVAILABLE` | This customer's account is unavailable |
 | `404` | `CUSTOMER_NOT_FOUND` | No customer with that id has bought from your program |
-| `409` | `CARDS_NOT_IN_VAULT` | A card isn't in this customer's vault from your program; `card_ids` lists them |
-| `409` | `CARDS_NOT_SHIPPABLE` | A card can't ship right now; `cards` lists each with its `reason` (`not_in_vault`, `listed`, `shipping`, `on_hold` or `not_a_card`) |
+| `409` | `CARDS_NOT_IN_VAULT` | Your program never pulled a card into this customer's vault (another customer's card, or a wrong id); `card_ids` lists them |
+| `409` | `CARDS_NOT_SHIPPABLE` | A card your program pulled into this vault can't ship right now (for example it was sold back: `not_in_vault`); `cards` lists each with its `reason` (`not_in_vault`, `listed`, `shipping`, `on_hold` or `not_a_card`) |
 | `502` | | The carrier didn't answer; retry |
 | `503` | | We couldn't check the customer or the cards just now; retry |
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/customers/user-1842/shipments/estimate \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/customers/user-1842/shipments/estimate \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
   -d '{

@@ -46,7 +46,7 @@ Your checkout either opens Unifold's checkout with `client_secret` and `publisha
 - **Tolerance:** an intent counts as paid once at least **99%** of the amount has arrived (swap slippage and wallet fees are absorbed).
 - **Underpayment:** a payment more than 1% short opens nothing: the order goes to `refund_due` with `failure_reason: "underpaid"` and everything that arrived is refunded.
 - **Overpayment** is not returned automatically. Send exactly `amount`.
-- **Payment window:** an order must be paid within **24 hours** of its creation, after which it becomes `expired`. A payment that lands after that is refunded in full (`paid_after_expiry`). An unpaid shipment never expires.
+- **Payment window:** an order must be paid within **24 hours** of its creation, after which it becomes `expired`. A payment that lands after that is refunded in full (`paid_after_expiry`). An unpaid shipment never expires. Its `expires_at` (24 hours from creation) doesn't apply until it is paid; paying it starts a fresh 24-hour burn window.
 - **Refunds** go out as USDC on Base to the order's `refund_address`, for the amount received (a multi-pack unit gets its share). A refund that fails to send is retried automatically.
 - **One payment per intent.** Never reuse a deposit address for another order.
 

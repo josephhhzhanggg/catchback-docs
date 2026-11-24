@@ -52,6 +52,7 @@ How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
 | `409` | `QUOTE_USED` | This quote was already burned with |
 | `409` | `QUOTE_EXPIRED` | Get a new quote, or [renew the shipment](/partner-api/v2/endpoints/renew-shipment) |
 | `409` | `NOT_PAID` | The shipment's shipping isn't paid yet |
+| `409` | `TOKEN_IN_SHIPMENT` | A sell-back quote, but the token now has a paid shipment waiting for its burn (`quote_id` names it). Nothing is burned |
 | `409` | `QUOTE_NOT_RELAYABLE` | The quote was issued before this endpoint existed; get a new one |
 | `409` | `RELAY_IN_PROGRESS` | The first send for this quote is still in flight; follow the quote |
 | `409` | | Your program has no contract yet |
@@ -60,7 +61,7 @@ How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/burn \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/burn \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "quote_id": "0x5e0c...91ab", "holder_signature": "0x9b2e...1c" }'

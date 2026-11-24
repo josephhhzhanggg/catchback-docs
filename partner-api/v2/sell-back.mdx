@@ -32,13 +32,13 @@ The offer is anchored to the **token**, not to whoever holds it:
 ## Get a quote
 
 ```bash
-curl -X POST "https://catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/quote" \
+curl -X POST "https://sandbox.catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/quote" \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "kind": "sellback", "holder": "0x8f3c...e21a", "payout_chain": "evm:8453", "payout_address": "0x8f3c...e21a" }'
 ```
 
-A quote fixes the amount, the payer and the payout destination, and **expires 10 minutes** after it is issued, or when the 5-minute fresh window ends if the quote is at the fresh rate (whichever is sooner). Every call issues a new quote; an unused quote just expires. Fields and errors: [Quote a sell-back](/partner-api/v2/endpoints/create-sellback-quote).
+A quote fixes the amount, the payer and the payout destination, and **expires 10 minutes** after it is issued, or when the 5-minute fresh window ends if the quote is at the fresh rate (whichever is sooner). Every call issues a new quote; an unused quote just expires. A token with a paid [shipment](/partner-api/v2/shipping) waiting for its burn can't be sold back: the quote, and a burn with an earlier quote, answer `409 TOKEN_IN_SHIPMENT`. Fields and errors: [Quote a sell-back](/partner-api/v2/endpoints/create-sellback-quote).
 
 ## EVM: burn with the signed quote
 
@@ -168,7 +168,7 @@ const holderSignature = await holderWallet.signTypedData({
   },
 });
 
-await fetch(`https://catchbackcards.com/api/partner/v2/tokens/${q.tokenId}/burn`, {
+await fetch(`https://sandbox.catchbackcards.com/api/partner/v2/tokens/${q.tokenId}/burn`, {
   method: 'POST',
   headers: { Authorization: `Bearer ${process.env.CATCHBACK_KEY}`, 'Content-Type': 'application/json' },
   body: JSON.stringify({ quote_id: q.quoteId, holder_signature: holderSignature }),

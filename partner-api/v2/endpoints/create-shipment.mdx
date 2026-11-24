@@ -44,7 +44,7 @@ One box for 1-25 tokens: we re-quote the chosen rate for all the tokens together
     <ResponseField name="status" type="string">`awaiting_payment`. See [Shipping statuses](/partner-api/v2/shipping#statuses).</ResponseField>
     <ResponseField name="shipping_cost" type="number" />
     <ResponseField name="holder" type="string" />
-    <ResponseField name="expires_at" type="string">The burn window's end, set to 24 hours from payment once paid.</ResponseField>
+    <ResponseField name="expires_at" type="string">The burn window's end, set to 24 hours from payment once paid. While unpaid it shows 24 hours from creation, which doesn't apply: the shipment stays payable.</ResponseField>
     <ResponseField name="paid_at" type="string | null" />
     <ResponseField name="tokens" type="object[]">
       Listed by token id: `token_id`, `quote_id` (what the token burns with), `status`, `burned_at`, `burn_tx` and `burn` (null until paid).
@@ -53,7 +53,7 @@ One box for 1-25 tokens: we re-quote the chosen rate for all the tokens together
   </Expandable>
 </ResponseField>
 <ResponseField name="payment" type="object | null">
-  Pay it exactly like an order ([Payments](/partner-api/v2/payments)). A replay with the same key returns `payment` again while the shipment is unpaid (`null` once paid). An unpaid shipment never expires: it stays `awaiting_payment` and can be paid at any time.
+  Pay it exactly like an order ([Payments](/partner-api/v2/payments)). A replay with the same key returns `payment` again while the shipment is unpaid (`null` once paid). An unpaid shipment never expires: it stays `awaiting_payment` and can be paid at any time. Its `expires_at` (24 hours from creation) doesn't apply until it is paid; paying it starts a fresh 24-hour burn window.
 </ResponseField>
 <ResponseField name="idempotent_replay" type="boolean">Present and `true` on a replay.</ResponseField>
 
@@ -89,7 +89,7 @@ A refusal about particular tokens lists them in `token_ids`.
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/shipments \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/shipments \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Idempotency-Key: okx-ship-1c9e04" \
   -H "Content-Type: application/json" \

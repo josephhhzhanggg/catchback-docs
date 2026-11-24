@@ -18,7 +18,7 @@ Returns `{ "order": { ... } }`. After a lost response, this is how you find out 
   <Expandable title="order">
     <ResponseField name="order_id" type="string">Your `Idempotency-Key`.</ResponseField>
     <ResponseField name="id" type="string">Our id.</ResponseField>
-    <ResponseField name="status" type="string">See [Orders and statuses](/partner-api/v2/orders#order-statuses). A multi-pack order adds `processing` and `completed`.</ResponseField>
+    <ResponseField name="status" type="string">See order statuses on the [Crypto Wallet model](/partner-api/v2/orders#order-statuses-crypto-wallet-model) and the [Non-crypto model](/partner-api/v2/orders#order-statuses-non-crypto-model). A multi-pack order adds `processing` and `completed`.</ResponseField>
     <ResponseField name="pack_type" type="string" />
     <ResponseField name="category" type="string" />
     <ResponseField name="odds" type="string">The odds the pack is opened at.</ResponseField>
@@ -29,7 +29,7 @@ Returns `{ "order": { ... } }`. After a lost response, this is how you find out 
     <ResponseField name="custody" type="string">`wallet` (the item mints as an NFT to `recipient`) or `vault` (Non-crypto model: the card stays in the `customer`'s CatchBack vault, and the order ends `in_vault` instead of `minted`). On a multi-pack order, on each unit.</ResponseField>
     <ResponseField name="customer" type="string">Only when `custody` is `vault`: the customer, by your own id.</ResponseField>
     <ResponseField name="pull" type="object | null">
-      Set once the pack opens: `card_id`, `category`, `name`, `value` (the item's value when it was pulled; it anchors the [sell-back offer](/partner-api/v2/sell-back)) and `pulled_at`.
+      Set once the pack opens: `card_id`, `category` (the pack's category, or `singles` for a raw single), `name`, `value` (the item's value when it was pulled; it anchors the [sell-back offer](/partner-api/v2/sell-back)) and `pulled_at`.
     </ResponseField>
     <ResponseField name="token" type="object | null">
       Always null when `custody` is `vault`. Set once the mint is reserved: `chain`, `contract` (on a Solana program, `collection` and `asset` instead), `token_id`, `status` and `tx`. `status` is `pending` (reserved, not sent), `submitted`, `confirmed`, `failed` (being retried), or `burned` once the token has been sold back or shipped.
@@ -54,7 +54,7 @@ This response never includes the `payment` object: replay [Create an order](/par
 
 <RequestExample>
 ```bash cURL
-curl https://catchbackcards.com/api/partner/v2/orders/okx-ord-7f3a9c21 \
+curl https://sandbox.catchbackcards.com/api/partner/v2/orders/okx-ord-7f3a9c21 \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 </RequestExample>

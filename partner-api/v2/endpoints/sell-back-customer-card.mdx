@@ -10,13 +10,13 @@ For [Non-crypto model](/partner-api/v2/settlement) programs only; a Crypto Walle
 
 Sells the card at its current offer (the `sellback.amount` [Get a customer's vault](/partner-api/v2/endpoints/get-customer-vault) shows) and credits the payout to your statement. Nothing is paid out to the customer: you credit them your way.
 
-A card sells once: a retry returns the first sale with `status: "already_sold"` and never sells or credits again, so this endpoint needs no `Idempotency-Key`.
+A card sells once: a retry returns the first sale with `status: "already_sold"` and never sells or credits again, so this endpoint needs no `Idempotency-Key`. Retries sent at the same moment get the same answer: one sells, the rest return `already_sold`.
 
 <ParamField path="customer" type="string" required>
   Your own id for the customer.
 </ParamField>
 <ParamField path="card_id" type="string" required>
-  A `card.id` from the customer's vault.
+  A `card.id` from the customer's vault. A UUID matches in any case.
 </ParamField>
 <ParamField body="min_payout" type="number">
   The least to accept, in dollars. A lower current offer is refused with `409 PRICE_CHANGED` and nothing is sold. Send what you showed your customer.
@@ -49,10 +49,11 @@ A card sells once: a retry returns the first sale with `status: "already_sold"` 
 | `404` | `CUSTOMER_NOT_FOUND` | No customer with that id has bought from your program |
 | `404` | `CARD_NOT_IN_VAULT` | Your program didn't pull that card into this customer's vault |
 | `409` | `PRICE_CHANGED` | The current offer is below `min_payout`; the body has `payout_amount` and `payout_rate`. Nothing is sold |
+| the refusal's, usually `400` | `SELLBACK_REFUSED` | The sale itself was refused, for example the card was shipped or is on its way out; the message says why. Nothing is sold |
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/customers/user-1842/cards/838a5e7f-dc62-4618-ad4a-cf015de20536/sellback \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/customers/user-1842/cards/838a5e7f-dc62-4618-ad4a-cf015de20536/sellback \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "min_payout": 30 }'

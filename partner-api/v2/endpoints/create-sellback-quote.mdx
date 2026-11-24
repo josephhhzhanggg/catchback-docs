@@ -20,7 +20,7 @@ What the holder does with it: [Sell-back](/partner-api/v2/sell-back).
   The wallet that holds the token now. Checked on chain.
 </ParamField>
 <ParamField body="payout_chain" type="string">
-  `evm:8453` (Base) or `solana:mainnet`. Default: the token's family, Base for an EVM program and Solana for a Solana program. Solana payouts answer `PAYOUT_CHAIN_NOT_ENABLED` until they are switched on.
+  `evm:8453` (Base) or `solana:mainnet`. Default: the token's family, Base for an EVM program and Solana for a Solana program. In production, Solana payouts answer `PAYOUT_CHAIN_NOT_ENABLED` until they are switched on; the sandbox pays Solana (simulated).
 </ParamField>
 <ParamField body="payout_address" type="string">
   Where the USDC goes. Defaults to `holder` when the payout chain is the same family as your mint chain. **Required when the payout chain isn't your mint chain's family**, so today a Solana program sends `payout_chain: "evm:8453"` with a Base `payout_address`.
@@ -62,7 +62,7 @@ On a **Solana** program:
 | `400` | | `kind` is something other than `sellback` |
 | `400` | `BAD_HOLDER` | `holder` is not a wallet address on your mint chain |
 | `400` | `PAYOUT_CHAIN_NOT_SUPPORTED` | `payout_chain` is not `evm:8453` or `solana:mainnet` |
-| `400` | `PAYOUT_CHAIN_NOT_ENABLED` | Payouts on that chain aren't switched on yet (today: `solana:mainnet`) |
+| `400` | `PAYOUT_CHAIN_NOT_ENABLED` | Production only: payouts on that chain aren't switched on yet (today: `solana:mainnet`) |
 | `400` | `BAD_PAYOUT_ADDRESS` | No usable `payout_address` for the payout chain |
 | `403` | `NOT_HOLDER` | That wallet does not hold the token on chain right now |
 | `403` | `WALLET_REFUSED` | The holder or payout address failed sanctions screening |
@@ -70,13 +70,14 @@ On a **Solana** program:
 | `409` | `TOKEN_NOT_MINTED` | The token's mint hasn't confirmed yet |
 | `409` | `TOKEN_BURNED` | The token was already sold back or shipped |
 | `409` | `NO_OFFER` | The item has no sell-back offer right now |
+| `409` | `TOKEN_IN_SHIPMENT` | The token has a paid shipment waiting for its burn (`quote_id` names it): burn or renew that shipment. It can't be sold back meanwhile |
 | `409` | | Your program has no contract yet |
 | `503` | `CHAIN_UNAVAILABLE` | We couldn't read the token's owner from the chain; retry shortly |
 | `503` | `SCREENING_UNAVAILABLE` | Wallet screening is briefly unavailable; retry shortly |
 
 <RequestExample>
 ```bash cURL
-curl -X POST https://catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/quote \
+curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/tokens/81264573985362058461377125337283195667/quote \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "kind": "sellback", "holder": "0x8f3c...e21a", "payout_chain": "evm:8453", "payout_address": "0x8f3c...e21a" }'

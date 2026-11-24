@@ -1,21 +1,25 @@
 openapi: 3.1.0
 info:
-  title: CatchBack Partner API v2 (wallets & NFTs)
+  title: CatchBack Partner API v2
   version: 2.0.0
-  summary: Sell CatchBack packs to your users' own web3 wallets, and let the NFT holder sell back or ship.
+  summary: Sell CatchBack packs to your users, on the Crypto Wallet model (NFTs in their own wallets) or the Non-crypto model (a CatchBack vault per customer, settled on your statement).
   description: |-
     The official contract for Partner API v2. Generate clients from this file.
 
-    Each customer pays for their own pack (USDC on Base or Solana, through a Unifold Payment
-    Intent), and each pulled item is minted as an NFT to the customer's wallet. Whoever holds the
-    NFT can trade it, sell it back for USDC, or have the physical item shipped. Selling back and
-    shipping both burn the NFT. Guides: [Overview](/partner-api/v2/overview).
+    Every program runs one of two models, shown as `payment_mode` on Get your key. Guides: [Overview](/partner-api/v2/overview), [Integration models](/partner-api/v2/integration-models).
 
-    A program can instead be **Non-crypto model** (`payment_mode: partner` on Get your key): you buy
-    for your customer, named by your own id for them (`customer`), each card stays in that customer's
-    CatchBack vault, and orders, sell-backs and shipping go on your statement with a credit limit. Those
-    programs use the operations tagged `Customers` and `Settlement` instead of the wallet, token, quote
-    and burn ones. [Non-crypto model](/partner-api/v2/settlement).
+    - **Crypto Wallet model** (`payment_mode: wallet`): each customer pays for their own pack (USDC on
+      Base or Solana, through a Unifold Payment Intent), and each pulled item is minted as an NFT to
+      the customer's wallet. Whoever holds the NFT can trade it, sell it back for USDC, or have the
+      physical item shipped. Selling back and shipping both burn the NFT. These programs use the
+      wallet, token, quote, shipment and burn operations.
+    - **Non-crypto model** (`payment_mode: partner`, also called partner settlement): you buy for your
+      customer, named by your own id for them (`customer`), each card stays in that customer's
+      CatchBack vault, and orders, sell-backs and shipping go on your statement with a credit limit.
+      These programs use the operations tagged `Customers` and `Settlement` instead of the wallet,
+      token, quote and burn ones. [Non-crypto model](/partner-api/v2/settlement).
+
+    Catalog, odds, orders, webhooks, keys and the sandbox are shared by both.
 
     - **Auth:** every `/api/partner/v2` request sends your key as a bearer token, and every key
       needs the scope `nft:orders`. The public token metadata needs no key.
@@ -41,10 +45,10 @@ info:
     name: CatchBack support
     email: support@catchbackcards.com
 servers:
+  - url: https://sandbox.catchbackcards.com
+    description: Sandbox. Simulated payments, real NFTs on Base Sepolia. Set it up from Get started in your manager. Build and test here first.
   - url: https://catchbackcards.com
     description: Production. Every payment is real money.
-  - url: https://sandbox.catchbackcards.com
-    description: Sandbox. Simulated payments, real NFTs on Base Sepolia. Set it up from Get started in your manager.
 tags:
   - name: Packs
     description: The packs you can sell, their odds and every item they can pull.
@@ -85,7 +89,7 @@ paths:
       description: |-
         The packs you can sell in one category, with price, the odds choices each sells, art and the chase item on offer. A pack that isn't on sale right now stays listed with `available: false` and a `reason`. Whether a particular odds choice is selling right now is on [Get a pack's pool](#operation/getPackPool).
 
-        Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them so they answer fast however often you call them. Stock is checked again when you create the order, so a pack that sold out in that minute is refused there (`409 PACK_UNAVAILABLE`, with its `reason`).
+        Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them for a minute, so repeat reads are fast however often you call them (the first read after a quiet spell or a deploy can take several seconds). Stock is checked again when you create the order, so a pack that sold out in that minute is refused there: `409 ODDS_UNAVAILABLE` (with `odds`) on a pack that sells the odds choice, `409 PACK_UNAVAILABLE` (with its `reason`) on one that sells only its own odds.
       parameters:
         - $ref: '#/components/parameters/PackCategory'
       responses:
@@ -157,7 +161,7 @@ paths:
       description: |-
         What one pack can pull at one odds choice: the value bands with their chances, whether those odds are selling right now, and every item a pull can produce, highest value first. This is the same information as the odds panel in our app; show it to your customers before they buy.
 
-        Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them so they answer fast however often you call them. Stock is checked again when you create the order, so a pack that sold out in that minute is refused there (`409 PACK_UNAVAILABLE`, with its `reason`).
+        Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them for a minute, so repeat reads are fast however often you call them (the first read after a quiet spell or a deploy can take several seconds). Stock is checked again when you create the order, so a pack that sold out in that minute is refused there: `409 ODDS_UNAVAILABLE` (with `odds`) on a pack that sells the odds choice, `409 PACK_UNAVAILABLE` (with its `reason`) on one that sells only its own odds.
 
         A pack that sells only its own odds answers `odds: "classic"` with its own band shape (`ClassicPackPool`). Every other pack answers `ModePackPool`.
       parameters:
@@ -248,7 +252,7 @@ paths:
 
         If the odds stop selling before the payment settles, the pack isn't opened at other odds: the order goes to `refund_due` and the customer is refunded.
 
-        **non-crypto programs:** send `customer` (your id for the customer) and no wallet fields (`recipient`, `refund_address`). There is no payment step: the order is charged to your statement when it is accepted, its packs open at once, and the response has no `payment`. The order has `custody: vault` and `customer`, `recipient` and `mint_chain` are null, and each pack ends `in_vault` (or `refunded`, with the price taken back off your statement, if it can't open). The first order for a new `customer` creates that customer. [Non-crypto model](/partner-api/v2/settlement).
+        **non-crypto programs:** send `customer` (your id for the customer) and no wallet fields (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain`, `payout_address`): sending any of them is `400 WALLET_FIELDS_NOT_ACCEPTED`. There is no payment step: the order is charged to your statement when it is accepted, its packs open at once, and the response has no `payment`. The order has `custody: vault` and `customer`, `recipient` and `mint_chain` are null, and each pack ends `in_vault` (or `refunded`, with the price taken back off your statement, if it can't open). The first order for a new `customer` creates that customer. [Non-crypto model](/partner-api/v2/settlement).
       parameters:
         - $ref: '#/components/parameters/OrderIdempotencyKey'
       requestBody:
@@ -373,7 +377,7 @@ paths:
             - `BAD_ODDS`: `odds` isn't `standard`, `hot`, `chill` or `classic`, or not one the pack sells (then `odds` lists the choices it sells).
             - `BAD_QUANTITY`: `quantity` isn't a whole number from 1 to 10.
             - `BAD_REFUND_ADDRESS`: no usable EVM `refund_address` (required when you mint on Solana).
-            - `WALLET_FIELDS_NOT_ACCEPTED`: non-crypto program: `recipient` or `refund_address` was sent. Send `customer` only.
+            - `WALLET_FIELDS_NOT_ACCEPTED`: non-crypto program: a wallet field (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain`, `payout_address`) was sent. Send `customer` only.
             - `BAD_CUSTOMER`: non-crypto program: `customer` is missing, or not 1-128 characters of `A-Za-z0-9_.:-`.
           content:
             application/json:
@@ -423,6 +427,7 @@ paths:
             - `RATE_LIMITED`: too many requests from this key; wait `retry_after_seconds`.
             - `CUSTOMER_DAILY_LIMIT`: non-crypto program: the order would take this customer past their daily limit (a UTC day). The body has `spent_today`, `limit`, `order_total` and `retry_after_seconds` (until UTC midnight).
             - `DAILY_LIMIT`: non-crypto program: the order would take your program past its daily limit, if it has one. Same fields.
+            - `TOO_MANY_UNPAID_ORDERS`: Crypto Wallet program: this wallet already has too many unpaid packs in your program (30 ordered in the last 10 minutes, or 100 open). The body has `unpaid_packs`, `limit` and `retry_after_seconds`. Have it pay one, or wait.
           headers:
             Retry-After: { $ref: '#/components/headers/RetryAfter' }
           content:
@@ -802,7 +807,7 @@ paths:
             - `BAD_JSON`: the body isn't JSON.
             - `BAD_HOLDER`: `holder` is not a wallet address on your mint chain.
             - `PAYOUT_CHAIN_NOT_SUPPORTED`: `payout_chain` is not `evm:8453` or `solana:mainnet`.
-            - `PAYOUT_CHAIN_NOT_ENABLED`: payouts on that chain aren't switched on yet (today: `solana:mainnet`); send `payout_chain: "evm:8453"` with a Base `payout_address`.
+            - `PAYOUT_CHAIN_NOT_ENABLED`: production only: payouts on that chain aren't switched on yet (today: `solana:mainnet`); send `payout_chain: "evm:8453"` with a Base `payout_address`. The sandbox pays Solana (simulated).
             - `BAD_PAYOUT_ADDRESS`: no usable `payout_address` for the payout chain (required when it isn't your mint chain's family).
             - `USE_SHIPMENT_ENDPOINT`: `kind: "shipment"`; shipments start at Create a shipment.
             - No code: `kind` other than `sellback`.
@@ -831,6 +836,7 @@ paths:
             - `TOKEN_NOT_MINTED`: the token's mint hasn't confirmed yet.
             - `TOKEN_BURNED`: the token was already sold back or shipped.
             - `NO_OFFER`: the item has no sell-back offer right now.
+            - `TOKEN_IN_SHIPMENT`: the token has a paid shipment waiting for its burn (`quote_id` names it). Burn or renew that shipment; it can't be sold back meanwhile.
             - No code: your program has no contract yet.
           content:
             application/json:
@@ -917,6 +923,7 @@ paths:
             - `QUOTE_USED`: this quote was already burned with.
             - `QUOTE_EXPIRED`: get a new quote, or renew the shipment.
             - `NOT_PAID`: the shipment's shipping isn't paid yet.
+            - `TOKEN_IN_SHIPMENT`: a sell-back quote, but the token now has a paid shipment waiting for its burn (`quote_id` names it). Nothing is burned.
             - `QUOTE_NOT_RELAYABLE`: the quote was issued before this endpoint existed; get a new one.
             - `RELAY_IN_PROGRESS`: the first send for this quote is still in flight; follow the quote.
             - No code: your program has no contract yet.
@@ -1081,7 +1088,7 @@ paths:
       description: |-
         Creates and opens one payment for a shipment of 1-25 tokens held by one wallet, in one box. We re-quote the chosen rate for all the tokens together. Pay it exactly like an order. Once paid, Get a shipment returns a `burn` per token; the box ships once every token is burned, within 24 hours of payment (renew a lapsed window).
 
-        `shipment_id` names the whole box; each token has its own `quote_id`, which it burns with. An unpaid shipment never expires. A replay with the same `Idempotency-Key` returns `payment` again while the shipment is unpaid (`null` once paid). [Shipping](/partner-api/v2/shipping).
+        `shipment_id` names the whole box; each token has its own `quote_id`, which it burns with. An unpaid shipment stays payable: its `expires_at` (24 hours from creation) doesn't apply until it is paid, and paying it starts a fresh 24-hour burn window. A replay with the same `Idempotency-Key` returns `payment` again while the shipment is unpaid (`null` once paid). [Shipping](/partner-api/v2/shipping).
       parameters:
         - $ref: '#/components/parameters/ShipmentIdempotencyKey'
       requestBody:
@@ -1403,7 +1410,7 @@ paths:
       description: |-
         **non-crypto programs only.** [Non-crypto model](/partner-api/v2/settlement).
 
-        The cards your orders pulled into this customer's vault that they still hold, newest first, each with what it sells back for right now. A sold or shipped card leaves the vault. A customer you have never sold to has an empty vault (not a `404`). `truncated` is true when the customer has more pulls than one read covers (200).
+        The cards your orders pulled into this customer's vault that they still hold, newest first, each with what it sells back for right now. A sold or shipped card leaves the vault. A customer you have never sold to has an empty vault (not a `404`); the customer shipment operations answer `404 CUSTOMER_NOT_FOUND` for one. `truncated` is true when the customer has more pulls than one read covers (200).
       parameters:
         - $ref: '#/components/parameters/Customer'
       responses:
@@ -1438,13 +1445,13 @@ paths:
 
         Sells one vault card back at its current offer (the `sellback.amount` Get a customer's vault shows) and credits the payout to your statement. Nothing is paid out to the customer: you credit them your way. `min_payout` refuses an offer below it, so the customer is never paid less than you showed them.
 
-        A card sells once: a retry returns the first sale (`200`, `status: already_sold`) and never sells again, so no `Idempotency-Key` is needed. [Non-crypto model](/partner-api/v2/settlement).
+        A card sells once: a retry returns the first sale (`200`, `status: already_sold`) and never sells again, so no `Idempotency-Key` is needed. Retries sent at the same time get the same answer: one sells, the rest return `already_sold`. [Non-crypto model](/partner-api/v2/settlement).
       parameters:
         - $ref: '#/components/parameters/Customer'
         - name: card_id
           in: path
           required: true
-          description: A `card.id` from Get a customer's vault.
+          description: A `card.id` from Get a customer's vault. A UUID matches in any case.
           schema: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$' }
           example: 838a5e7f-dc62-4618-ad4a-cf015de20536
       requestBody:
@@ -1475,6 +1482,7 @@ paths:
             - `BAD_CARD`: `card_id` isn't a card id.
             - `BAD_JSON`: the body isn't JSON.
             - `BAD_MIN_PAYOUT`: `min_payout` isn't a non-negative number.
+            - `SELLBACK_REFUSED`: the sale itself was refused, for example a card that was shipped or is on its way out. The message says why. Nothing is sold.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1490,7 +1498,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: That card was not pulled into this customer's vault by this program., code: CARD_NOT_IN_VAULT }
         '409':
-          description: '`PRICE_CHANGED`: the current offer is below `min_payout`; the body has the current `payout_amount` and `payout_rate`. Nothing is sold. Other refusals of the sale itself (for example a card that is no longer in the vault) answer with their own status and `code`.'
+          description: '`PRICE_CHANGED`: the current offer is below `min_payout`; the body has the current `payout_amount` and `payout_rate`. Nothing is sold. Other refusals of the sale itself answer with their own status and `code`, or `SELLBACK_REFUSED` when they have none.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2121,6 +2129,8 @@ paths:
         **Sandbox only: `404` in production.**
 
         Pays an order's, a multi-pack order's, a shipment's or a multi-token shipment's sandbox Payment Intent, exactly as a settled payment would, then delivers any webhooks it produced. Paying twice changes nothing.
+
+        The response's `status` is the order's or shipment's status after the payment (with the same value as `order_status` or `shipment_status`), and `webhooks` counts the deliveries this call made. An order's pack opens as its payment settles, so an order usually answers `rolled`, not `paid` (or `refund_due` if the pack couldn't open or `amount` was more than 1% short); then call Run the background work until it is `minted`. A shipment answers `ready`, or stays `awaiting_payment` if `amount` was short.
       parameters:
         - name: intentId
           in: path
@@ -2146,10 +2156,16 @@ paths:
               examples:
                 order:
                   summary: An order
-                  value: { paid: true, kind: order, status: paid, order_status: paid, webhooks: { delivered: 1, retrying: 0 } }
+                  value: { paid: true, kind: order, status: rolled, order_status: rolled, webhooks: { delivered: 1, retrying: 0 } }
                 shipment:
                   summary: A shipment
                   value: { paid: true, kind: shipment, status: ready, shipment_status: ready, webhooks: { delivered: 1, retrying: 0 } }
+        '400':
+          description: '`BAD_AMOUNT`: `amount` is not a positive number.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: amount must be a positive number of USD, code: BAD_AMOUNT }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
@@ -2251,6 +2267,7 @@ paths:
           description: |-
             - `NOT_BURNED`: the shipment has no shipping order yet: burn every token, then tick.
             - `NOT_CREATED`: non-crypto program: that customer shipment was never created (it was refused, or is still being created).
+            - `BAD_TRANSITION`: a shipment only moves `processing` → `shipped` → `delivered`; `current_status` says where it is. Sending the status it already has changes nothing and answers `200`.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2419,9 +2436,9 @@ webhooks:
       description: |-
         **We send this to your webhook URL.** A shipment was paid (`ready`), a token was burned (`redeemed`), or the box moved: `fulfilment.status` `pending`, `processing`, `shipped`, `delivered`, `cancelled`, `needs_review`.
 
-        Non-crypto model: a customer shipment moved (`processing`, `shipped`, `delivered`, `cancelled`); `data.shipment` is the shipment as List a customer's shipments returns it, plus `customer`.
+        Non-crypto model: a customer shipment was created (`processing`, its first event) or moved (`shipped`, `delivered`, `cancelled`); `data.shipment` is the shipment as List a customer's shipments returns it, plus `customer`.
 
-        Crypto Wallet model: `data.shipment` has the fields of the one-token shape: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `burn` and `fulfilment`. In a multi-token shipment each event is about one token (its `quote_id`); Get a shipment with that `quote_id` returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction. A burn window lapsing sends no event. Setup, signatures and retries: [Webhooks](/partner-api/v2/webhooks).
+        Crypto Wallet model: `data.shipment` has the fields of the one-token shape: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `burn` and `fulfilment`, plus `shipment_id`: the box's id on a multi-token shipment, else the token's `quote_id`. Each event is about one token (its `quote_id`). When a multi-token box moves (`fulfilment` changes), every token burned into it gets its own event, with the same `shipment_id`, and `shipping_cost` is the whole box's postage. Get a shipment with `shipment_id` or any `quote_id` returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction. A burn window lapsing sends no event. Setup, signatures and retries: [Webhooks](/partner-api/v2/webhooks).
       security:
         - {}
       parameters:
@@ -2445,7 +2462,13 @@ webhooks:
                       properties:
                         shipment:
                           oneOf:
-                            - $ref: '#/components/schemas/TokenShipment'
+                            - allOf:
+                                - $ref: '#/components/schemas/TokenShipment'
+                                - type: object
+                                  description: Crypto Wallet model.
+                                  required: [shipment_id]
+                                  properties:
+                                    shipment_id: { type: string, description: 'The box''s `shipment_id` on a multi-token shipment, else the token''s `quote_id`.' }
                             - allOf:
                                 - $ref: '#/components/schemas/CustomerShipment'
                                 - type: object
@@ -2460,6 +2483,7 @@ webhooks:
               data:
                 shipment:
                   quote_id: 0xa93f...0c2d
+                  shipment_id: 0xa93f...0c2d
                   status: redeemed
                   shipping_cost: 9.85
                   holder: 0x8f3c...e21a
@@ -2554,7 +2578,7 @@ components:
       name: customer
       in: path
       required: true
-      description: Your own id for the customer, as you sent it as `customer` on Create an order. 1-128 characters of `A-Za-z0-9_.:-`; never personal data.
+      description: Your own id for the customer, as you sent it as `customer` on Create an order. 1-128 characters of `A-Za-z0-9_.:-`; never personal data. Case-sensitive.
       schema: { $ref: '#/components/schemas/CustomerId' }
       example: user-1842
     PackCategory:
@@ -2963,7 +2987,7 @@ components:
       description: Pass it back unchanged as `cursor` for the next page. Opaque. Null on the last page.
     ErrorCode:
       type: string
-      description: Every `code` v2 returns. Branch on these, never on the message text.
+      description: Every `code` v2 returns. Branch on these, never on the message text. `UNKNOWN_TOOL`, `MISSING_ARGUMENT`, `UNKNOWN_ARGUMENT`, `BAD_ARGUMENT`, `MISSING_SCOPE`, `BAD_PATH`, `DOC_NOT_FOUND` and `DOCS_UNAVAILABLE` come only from the MCP server, as a tool result; `UNKNOWN_PROGRAM` only from the public feeds.
       enum:
         - BAD_PAYMENT_METHOD
         - SIGNATURE_PAYMENT_UNAVAILABLE
@@ -3062,6 +3086,30 @@ components:
         - SHIPMENT_OUTCOME_UNKNOWN
         - SHIPMENT_NOT_CREATED
         - NOT_CREATED
+        - TOO_MANY_UNPAID_ORDERS
+        - SELLBACK_REFUSED
+        - SHIPMENT_REFUSED
+        - BAD_QUOTE_ID
+        - BAD_HOLDER_SIGNATURE
+        - RELAY_NOT_SUPPORTED
+        - QUOTE_USED
+        - QUOTE_EXPIRED
+        - QUOTE_NOT_RELAYABLE
+        - RELAY_IN_PROGRESS
+        - CHAIN_REFUSED
+        - CONTRACT_PAUSED
+        - BAD_AMOUNT
+        - UNKNOWN_PROGRAM
+        - UNKNOWN_TOOL
+        - MISSING_ARGUMENT
+        - MISSING_SCOPE
+        - BAD_PATH
+        - DOCS_UNAVAILABLE
+        - DOC_NOT_FOUND
+        - UNKNOWN_ARGUMENT
+        - BAD_ARGUMENT
+        - NOT_WALLET_PROGRAM
+        - BAD_TRANSITION
     ChainKey:
       type: string
       description: 'A chain as `<family>:<id>`: `evm:8453` is Base, `evm:<chainId>` any other EVM chain (e.g. `evm:196`, X Layer), `solana:mainnet` Solana. The sandbox uses a public testnet.'
@@ -3122,6 +3170,8 @@ components:
         render_image: { type: [string, 'null'] }
         image_url: { type: [string, 'null'] }
         market_value: { type: [number, 'null'], description: 'The item''s current market value in dollars.' }
+        market_value_last_updated: { type: [string, 'null'], format: date-time, description: 'When `market_value` was last updated.' }
+        price: { type: [number, 'null'], description: 'The item''s listed price in our shop, in dollars. Sell-backs don''t use it: they are priced from the value at pull and `market_value`.' }
     Chase:
       type: object
       description: The hand-picked chase item (bounty) a pack is offering right now.
@@ -3264,7 +3314,7 @@ components:
         hittable_cards: { type: integer }
     CreateOrderRequest:
       type: object
-      description: '`recipient` is required on a Crypto Wallet program. On a non-crypto program send `customer` instead, and no `recipient` or `refund_address` (`WALLET_FIELDS_NOT_ACCEPTED`).'
+      description: '`recipient` is required on a Crypto Wallet program. On a non-crypto program send `customer` instead, and no wallet field: `recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address` is `WALLET_FIELDS_NOT_ACCEPTED`.'
       required: [pack_type]
       properties:
         pack_type: { type: string, description: 'A `pack_type` from List packs.' }
@@ -3276,7 +3326,7 @@ components:
         quantity: { type: integer, minimum: 1, maximum: 10, default: 1, description: '2 or more makes a multi-pack order.' }
         recipient: { type: string, description: 'Crypto Wallet model only, and required there: the customer''s self-custody wallet on your mint chain. Never an exchange deposit address: the NFTs are minted to it.' }
         refund_address: { type: string, description: 'Crypto Wallet model only. An EVM wallet that can receive USDC on Base, for refunds. Required on a Solana program; defaults to `recipient` on an EVM program.' }
-        partner_user_ref: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$', description: 'Crypto Wallet model: your opaque user id. Never put personal data here. Not compared on an idempotent replay. Not used on a non-crypto program, where `customer` names the customer.' }
+        partner_user_ref: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$', description: 'Crypto Wallet model: your opaque user id. Never put personal data here. Not compared on an idempotent replay. Refused on a non-crypto program (`WALLET_FIELDS_NOT_ACCEPTED`), where `customer` names the customer.' }
         customer:
           allOf:
             - $ref: '#/components/schemas/CustomerId'
@@ -3572,7 +3622,7 @@ components:
         payout_chain:
           type: string
           enum: ['evm:8453', 'solana:mainnet', 'evm:84532', 'solana:devnet']
-          description: 'Default: the token''s family (Base for an EVM program, Solana for a Solana program). Solana payouts answer `PAYOUT_CHAIN_NOT_ENABLED` until they are switched on. Production pays on `evm:8453` or `solana:mainnet`. The sandbox pays on the test networks, `evm:84532` and `solana:devnet`, and reads the production names as those.'
+          description: 'Default: the token''s family (Base for an EVM program, Solana for a Solana program). In production, Solana payouts answer `PAYOUT_CHAIN_NOT_ENABLED` until they are switched on; the sandbox pays Solana (simulated). Production pays on `evm:8453` or `solana:mainnet`. The sandbox pays on the test networks, `evm:84532` and `solana:devnet`, and reads the production names as those.'
         payout_address: { type: string, description: 'Where the USDC goes. Required when the payout chain isn''t your mint chain''s family; otherwise defaults to `holder`.' }
     PayoutDestination:
       type: object
@@ -3793,8 +3843,15 @@ components:
         payment_method: { type: string, enum: [signature, checkout], description: '`signature`: one tap, paid in its burn. `checkout`: paid first, then burned.' }
         shipping_cost: { type: [number, 'null'] }
         holder: { type: string }
-        expires_at: { type: string, format: date-time, description: 'Pay first: the end of the burn window once paid (an unpaid one never expires). One tap: the end of the 30-minute window to sign.' }
+        expires_at: { type: string, format: date-time, description: 'Pay first: once paid, the end of the 24-hour burn window. While unpaid it shows 24 hours from creation but doesn''t apply: an unpaid shipment stays payable, and paying it sets a fresh window. One tap: the end of the 30-minute window to sign.' }
         paid_at: { type: [string, 'null'], format: date-time }
+        underpaid:
+          type: object
+          description: 'Present only while a payment that arrived short of `shipping_cost` (by more than 1%) holds the shipment in `awaiting_payment`. The short amount is refunded by us; pay the shipment again in full.'
+          required: [received, due]
+          properties:
+            received: { type: number }
+            due: { type: number }
         burn: { $ref: '#/components/schemas/ShipmentBurn' }
         fulfilment:
           oneOf:
@@ -3998,7 +4055,7 @@ components:
     CustomerId:
       type: string
       pattern: '^[A-Za-z0-9_.:-]{1,128}$'
-      description: Your own id for a customer on a non-crypto program, 1-128 characters of `A-Za-z0-9_.:-`. Use something stable that is not personal data (your internal user id, never an email address or phone number). Ids are yours alone.
+      description: Your own id for a customer on a non-crypto program, 1-128 characters of `A-Za-z0-9_.:-`. Use something stable that is not personal data (your internal user id, never an email address or phone number). Ids are yours alone. Leading and trailing spaces are trimmed, and ids are case-sensitive (`User-1` and `user-1` are two customers).
       examples: [user-1842]
     VaultCard:
       type: object

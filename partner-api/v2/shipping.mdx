@@ -46,7 +46,7 @@ One shipment carries **1 to 25 tokens** held by one wallet, in one box, for one 
     [`POST /shipments/estimate`](/partner-api/v2/endpoints/estimate-shipment) with `token_ids`, `holder`, `address` and an optional `cover_amount` returns carrier `rates`. It charges nothing and stores nothing. `amount` is the carrier rate; `total` is what the holder pays (the rate plus any cover premium).
   </Step>
   <Step title="Create and pay">
-    [`POST /shipments`](/partner-api/v2/endpoints/create-shipment) with the chosen `rate` and `max_cost` (pass the estimate's `total`). We re-quote the rate for all the tokens together and return the `shipment` and its `payment`. Pay it exactly like an order ([Payments](/partner-api/v2/payments)). An unpaid shipment never expires: it stays `awaiting_payment` and can be paid at any time.
+    [`POST /shipments`](/partner-api/v2/endpoints/create-shipment) with the chosen `rate` and `max_cost` (pass the estimate's `total`). We re-quote the rate for all the tokens together and return the `shipment` and its `payment`. Pay it exactly like an order ([Payments](/partner-api/v2/payments)). An unpaid shipment never expires: it stays `awaiting_payment` and can be paid at any time. Its `expires_at` (24 hours from creation) doesn't apply until it is paid; paying it starts a fresh 24-hour burn window.
   </Step>
   <Step title="Burn">
     Once the shipping payment settles, `status` becomes `ready` and each token's `burn` in [`GET /shipments/{id}`](/partner-api/v2/endpoints/get-shipment) holds what the holder burns it with. The burn window is **24 hours from payment** (`expires_at`), shared by every token in the shipment.
@@ -65,7 +65,7 @@ One shipment carries **1 to 25 tokens** held by one wallet, in one box, for one 
 
 ## Insurance
 
-`cover_amount` (optional) is shipping insurance cover in dollars, within the range the items allow. Outside it, `400 COVER_NOT_ALLOWED` gives `order_value`, `min_cover` and `max_cover` (`max_cover` is null when the items can't be insured). A service with no cover option answers `409 COVER_UNAVAILABLE` on create: choose another rate or leave `cover_amount` out.
+`cover_amount` (optional) is shipping insurance cover in dollars, within the range the items allow. Outside it, `400 COVER_NOT_ALLOWED` gives `order_value`, `min_cover` and `max_cover` (`max_cover` is null when the items can't be insured). A service with no cover option answers `409 COVER_UNAVAILABLE` on create: choose another rate or leave `cover_amount` out. **The sandbox has no insurance:** its one rate has no cover option, so leave `cover_amount` out there.
 
 ## Burning
 
@@ -124,5 +124,7 @@ If not every token was burned within the 24 hours, the shipment shows `status: "
 | `COUNTRY_NOT_SUPPORTED` | We don't ship to that country |
 | `OVER_CUSTOMS_CAP` | The items are worth more than we can ship internationally |
 | `TOKEN_IN_SHIPMENT` | A token already has a paid shipment waiting for its burn: burn or renew that shipment instead |
+
+A token with a paid shipment waiting for its burn can't be sold back either: a sell-back quote, or a burn with a quote issued before the shipment was paid, is refused with `409 TOKEN_IN_SHIPMENT` (`quote_id` names the shipment).
 
 A refusal about particular tokens lists them in `token_ids`.
