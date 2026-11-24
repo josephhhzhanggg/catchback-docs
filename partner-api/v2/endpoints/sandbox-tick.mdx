@@ -22,6 +22,7 @@ Call it between the steps of a flow instead of waiting.
 |---|---|---|
 | `404` | | Not the sandbox |
 | `502` | | The pass didn't run; `ran` is false. Retry |
+| `503` | | The sandbox isn't set up to run it (`CRON_SECRET is not set on this sandbox`); tell us |
 
 <RequestExample>
 ```bash cURL

@@ -18,7 +18,7 @@ The customer's latest 100 shipments, newest first, each in the shape [Create a c
 
 <ResponseField name="customer" type="string">The id you asked for.</ResponseField>
 <ResponseField name="shipments" type="object[]">
-  Up to 100, newest first: `id`, `status` (`pending`, `processing`, `shipped`, `delivered`, `cancelled` or `needs_review`), `card_ids`, `carrier`, `service`, `service_token`, `cost`, `cover_amount`, `insurance_cost`, `destination_country`, `tracking_number`, `tracking_url`, `created_at`, `status_updated_at`, `shipped_at`, `expected_delivery` (a `YYYY-MM-DD` date) and `delivered_at`.
+  Up to 100, newest first: `id`, `status` (`pending`, `processing`, `shipped`, `delivered`, `cancelled` or `needs_review`), `card_ids`, `carrier`, `service`, `service_token`, `cost`, `cover_amount`, `insurance_cost`, `destination_country`, `tracking_number`, `tracking_url`, `created_at`, `status_updated_at`, `shipped_at`, `expected_delivery` (a `YYYY-MM-DD` date) and `delivered_at`, plus `needs_review: true` or `address_removed: true` when they apply.
 </ResponseField>
 
 ## Errors
@@ -26,7 +26,7 @@ The customer's latest 100 shipments, newest first, each in the shape [Create a c
 | Status | Code | When |
 |---|---|---|
 | `400` | `NOT_PARTNER_SETTLED` | Your program pays through customer wallets; use [List shipments](/partner-api/v2/endpoints/list-shipments) |
-| `400` | `BAD_CUSTOMER` | `customer` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `400` | `BAD_CUSTOMER` | `customer` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -`, or is only dots |
 | `404` | `CUSTOMER_NOT_FOUND` | No customer with that id has bought from your program |
 
 <RequestExample>

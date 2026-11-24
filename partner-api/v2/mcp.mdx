@@ -10,7 +10,8 @@ MCP (the [Model Context Protocol](https://modelcontextprotocol.io)) is the open 
 ## What an assistant can and can't do
 
 - **It can** search and read these docs, browse packs and odds, create orders, follow them until the item is delivered, check what a wallet holds, get sell-back quotes, estimate and create shipments, manage your webhook, read your revenue statement, and drive the sandbox.
-- **It can't move money or tokens.** Your customer pays for each order and shipment, and the person holding a token signs the transaction that sells it back or ships it. Nothing is ever charged to your key.
+- **On the Crypto Wallet model it can't move money or tokens.** Your customer pays for each order and shipment, and the person holding a token signs the transaction that sells it back or ships it. Nothing is charged to your key.
+- **On the Non-crypto model it can.** `create_order`, `sell_back_customer_card` and `create_customer_shipment` put an order, a sell-back credit or postage on your statement, in real money outside the sandbox.
 - **It can't rotate or revoke keys.** Do that through the API, so an assistant can never lock itself out.
 
 ## Connect
@@ -105,7 +106,7 @@ The `sandbox_` tools return `404` outside the sandbox.
 - **`order_id`:** `create_order`, `create_shipment`, `create_token_shipment` and `create_customer_shipment` take an `order_id`, which is sent as the `Idempotency-Key`. Have the assistant make a new one for each order and reuse it when retrying that order: a retry with the same `order_id` returns the same order, while a new `order_id` creates a second one. `get_order` and `get_order_verification` also take `order_id`, your id or ours.
 - **Ids in the path:** `token_id` (token, quote and one-token shipment tools), `quote_id` (`get_quote`), `shipment_id` (`get_shipment`, `renew_shipment`, `sandbox_ship`), `wallet` (`list_wallet_tokens`), `webhook_id` (`delete_webhook`, `test_webhook`), `intent_id` (`sandbox_pay`), and on a non-crypto program `customer` (the customer tools) and `card_id` (`sell_back_customer_card`).
 - **Everything else** is the endpoint's query parameter or body field of the same name.
-- **Errors** come back as a tool result with `isError: true`, the HTTP status and the error body, including its `code`, so the assistant can read it and react. A few codes come from the MCP server itself (`UNKNOWN_TOOL`, `MISSING_SCOPE`, `MISSING_ARGUMENT`, `BAD_PATH`, `DOCS_UNAVAILABLE`): see [Errors](/partner-api/v2/errors#mcp-server-codes).
+- **Errors** come back as a tool result with `isError: true`, the HTTP status and the error body, including its `code`, so the assistant can read it and react. A few codes come from the MCP server itself, with no HTTP status (`UNKNOWN_TOOL`, `MISSING_SCOPE`, `MISSING_ARGUMENT`, `UNKNOWN_ARGUMENT`, `BAD_ARGUMENT`, `BAD_PATH`, `DOC_NOT_FOUND`, `DOCS_UNAVAILABLE`): see [Errors](/partner-api/v2/errors#mcp-server-codes).
 
 <Warning>
   `register_webhook` returns your webhook's signing secret once, to the assistant. Store it where your webhook receiver can read it, and don't paste it anywhere else.

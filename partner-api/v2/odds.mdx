@@ -14,6 +14,7 @@ Customers choose the odds they buy at, exactly as in our app. The odds shown are
 
 - Standard, Hot and Chill share one band ladder and differ only in the chance of each band.
 - A pack that sells only its own odds lists just `classic`.
+- On other packs, `classic` is listed only where the pack's own bands are published. A pack can sell Classic in our app and still not list it here.
 - On packs that offer the choice, every one of them sells back at 100% for the first 5 minutes after the NFT is confirmed ([Sell-back](/partner-api/v2/sell-back)); the pool's `fresh_buyback_rate` gives the exact rate for each.
 
 ## Which odds a pack sells
@@ -35,7 +36,7 @@ curl "https://sandbox.catchbackcards.com/api/partner/v2/catalog/packs/pool?pack_
 ```
 
 - `bands[].odds` is the chance (0 to 1) of a pull landing in that band at these odds, and `cards` how many items sit in it. A band at 0 can't pull at these odds.
-- `available` says whether these odds are selling right now; `odds_choices` gives the same for every choice the pack sells.
+- `available` says whether these odds are selling right now; `odds_choices` gives the same for every choice the pack sells (a choice whose odds aren't published right now shows `available: false`).
 - `consolation_probability` is the chance of the pack's consolation prize, where it has one, else null.
 - `fresh_buyback_rate` is the sell-back rate in the fresh window, as a fraction (`1` = 100%).
 

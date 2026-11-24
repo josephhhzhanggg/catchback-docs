@@ -33,7 +33,8 @@ Chains are written `<family>:<id>`:
 - **Payment chains:** customers pay on **Base or Solana**, whatever your mint chain ([Payments](/partner-api/v2/payments)). On EVM one key is the same address on every EVM chain, so a customer paying from Base receives the NFT at that same address on your chain.
 - **Payout chain:** sell-backs pay **USDC**, by default on the token's own family: **Base** (`evm:8453`) for an EVM program, **Solana** (`solana:mainnet`) for a Solana program.
 - **Refunds** always go out as USDC on Base.
-- **Addresses:** EVM addresses are returned lowercase; Solana addresses as base58 (case-sensitive).
+- **Addresses:** EVM addresses are returned lowercase; Solana addresses as base58 (case-sensitive). Send an EVM address in one case, or mixed case with a valid EIP-55 checksum; a mixed-case address with a wrong checksum is refused. Only spaces, tabs and line breaks around an address are trimmed: any other invisible character makes it invalid.
+- **Dead-end addresses:** the zero address, your program's NFT contract, Permit2 and USDC can never pass on what they receive, so they are refused as a recipient, refund or payout address. Other contracts, such as smart-contract wallets, are allowed.
 
 <Warning>
   Solana payouts are not switched on yet (`PAYOUT_CHAIN_NOT_ENABLED`). Until they are, a Solana program sends `payout_chain: "evm:8453"` and a Base `payout_address` with every [sell-back quote](/partner-api/v2/endpoints/create-sellback-quote).
@@ -58,6 +59,7 @@ function transferFrom(address from, address to, uint256 tokenId);
 function tokenURI(uint256 tokenId) view returns (string);
 function burnWithQuote(Quote q, bytes signature);          // sell-back and shipping
 function burnWithQuoteFor(Quote q, bytes signature, bytes holderSignature); // the same, sent by us; the holder signs
+function shipWithPayment(Quote q, bytes signature, PermitTransferFrom permit, bytes permitSignature); // one-tap shipping, sent by us
 function usedQuote(bytes32 quoteId) view returns (bool);
 function hashQuote(Quote q) view returns (bytes32);         // the EIP-712 digest, for checking a signature
 

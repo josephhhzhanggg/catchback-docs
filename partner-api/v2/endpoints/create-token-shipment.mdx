@@ -20,7 +20,7 @@ The same as [Create a shipment](/partner-api/v2/endpoints/create-shipment), for 
   The token's decimal `token_id`.
 </ParamField>
 <ParamField header="Idempotency-Key" type="string" required>
-  8-128 characters of `A-Za-z0-9_-`. Shared key space with [Create a shipment](/partner-api/v2/endpoints/create-shipment).
+  8-128 characters of `A-Za-z0-9_-`, unique within your program. Shared key space with [Create a shipment](/partner-api/v2/endpoints/create-shipment). A replay must send the same `holder`, `address`, `rate` and `cover_amount`; `max_cost` and `payment_method` aren't compared.
 </ParamField>
 <ParamField body="holder" type="string" required>
   The wallet that holds the token now. Checked on chain.
@@ -46,16 +46,21 @@ The same as [Create a shipment](/partner-api/v2/endpoints/create-shipment), for 
 **201** (200 with `"idempotent_replay": true` on a replay).
 
 <ResponseField name="quote" type="object">
-  The shipment: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at` and `burn` (null until paid).
+  The shipment: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `payment_refund_due`, `payment_method` (`signature` or `checkout`) and `burn` (null until paid). On a one-tap shipment `expires_at` is the end of the 30 minutes to sign.
 </ResponseField>
 <ResponseField name="payment" type="object | null">
-  As for [Create a shipment](/partner-api/v2/endpoints/create-shipment): `null` once paid.
+  `method` says which. `"checkout"`: a Payment Intent, as for [Create a shipment](/partner-api/v2/endpoints/create-shipment). `"signature"`: `amount` (the postage), `token` (the stablecoin) and `sign` (the typed data the holder signs). `null` on a replay once paid, or once a one-tap shipment's 30 minutes to sign have passed.
 </ResponseField>
 <ResponseField name="idempotent_replay" type="boolean">Present and `true` on a replay.</ResponseField>
 
 ## Errors
 
-The same as [Create a shipment](/partner-api/v2/endpoints/create-shipment), except `BAD_TOKEN_IDS`, which doesn't apply. `TOKEN_IN_SHIPMENT` carries that shipment's `quote_id`.
+The same as [Create a shipment](/partner-api/v2/endpoints/create-shipment), except `BAD_TOKEN_IDS`, which doesn't apply. `TOKEN_IN_SHIPMENT` carries that shipment's `quote_id`. Also:
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_PAYMENT_METHOD` | `payment_method` isn't `signature` or `checkout` |
+| `409` | `SIGNATURE_PAYMENT_UNAVAILABLE` | `payment_method: "signature"` sent, but one-tap shipping isn't set up for this token's contract; send `checkout` |
 
 <RequestExample>
 ```bash cURL
@@ -67,7 +72,8 @@ curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/tokens/8126457398
     "holder": "0x8f3c...e21a",
     "address": { "name": "Alice Tester", "address1": "1 Market St", "city": "San Francisco", "state": "CA", "zip": "94105", "country": "US", "phone": "4155550100" },
     "rate": { "carrier": "USPS", "token": "usps_priority" },
-    "max_cost": 9.85
+    "max_cost": 9.85,
+    "payment_method": "checkout"
   }'
 ```
 </RequestExample>
@@ -82,9 +88,21 @@ curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/tokens/8126457398
     "holder": "0x8f3c...e21a",
     "expires_at": "2026-11-17T18:40:00.000Z",
     "paid_at": null,
+    "payment_refund_due": false,
+    "payment_method": "checkout",
     "burn": null
   },
-  "payment": { "intent_id": "pi_01JE...", "client_secret": "...", "publishable_key": "pk_live_...", "amount": 9.85, "deposit_addresses": ["..."] }
+  "payment": {
+    "method": "checkout",
+    "intent_id": "pi_01JE...",
+    "client_secret": "pi_01JE..._secret_...",
+    "publishable_key": "pk_live_...",
+    "amount": 9.85,
+    "deposit_addresses": [
+      { "chain": "evm:8453", "address": "0x..." },
+      { "chain": "solana:mainnet", "address": "..." }
+    ]
+  }
 }
 ```
 </ResponseExample>

@@ -6,13 +6,16 @@ description: "Your program's orders, newest first, paged."
 
 Scope: `nft:orders`
 
-Newest first, each order in the [Get an order](/partner-api/v2/endpoints/get-order) shape. The units of a multi-pack order are listed one by one, each with the order's `order_id`, its `batch_id` and its `unit` number, as `GET /orders/{id}` shows a unit.
+Newest first, each order in the [Get an order](/partner-api/v2/endpoints/get-order) shape. The units of a multi-pack order are listed one by one, in unit order, each with the order's `order_id`, its `batch_id` and its `unit` number, as `GET /orders/{id}` shows a unit.
 
 <ParamField query="wallet" type="string">
   A `recipient` address on your mint chain. Default: all.
 </ParamField>
 <ParamField query="partner_user_ref" type="string">
   A `partner_user_ref` you sent with an order. It matches the orders you sent with that ref, whichever wallet they went to. On a [Non-crypto model](/partner-api/v2/settlement) program, a `customer` id: it matches that customer's orders. Default: all.
+</ParamField>
+<ParamField query="customer" type="string">
+  The same filter under the Non-crypto model's name: a `customer` id. If you send both, `partner_user_ref` is used.
 </ParamField>
 <ParamField query="status" type="string">
   `awaiting_payment`, `paid`, `rolled`, `minted`, `in_vault` (Non-crypto model), `mint_failed`, `expired`, `refund_due` or `refunded`. Default: all.
@@ -37,7 +40,7 @@ Newest first, each order in the [Get an order](/partner-api/v2/endpoints/get-ord
 | `400` | `BAD_LIMIT` | `limit` isn't 1-100 |
 | `400` | `BAD_STATUS` | `status` isn't one the list filters on; the message lists them |
 | `400` | `BAD_ADDRESS` | `wallet` is not an address on your mint chain |
-| `400` | `BAD_PARTNER_USER_REF` | `partner_user_ref` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `400` | `BAD_PARTNER_USER_REF` | `partner_user_ref` (or `customer`) isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
 
 <RequestExample>
 ```bash cURL

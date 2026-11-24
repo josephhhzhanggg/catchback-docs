@@ -22,6 +22,7 @@ On a [Non-crypto model](/partner-api/v2/settlement) program, `{id}` is a custome
 
 <ResponseField name="ok" type="boolean">`true`.</ResponseField>
 <ResponseField name="status" type="string">The status you set.</ResponseField>
+<ResponseField name="replay" type="boolean">Present and `true` when the shipment already had that status; nothing changed.</ResponseField>
 <ResponseField name="webhooks" type="object">The webhook deliveries this call made.</ResponseField>
 
 ## Errors
@@ -33,6 +34,7 @@ On a [Non-crypto model](/partner-api/v2/settlement) program, `{id}` is a custome
 | `404` | | Not the sandbox |
 | `409` | `NOT_BURNED` | The shipment has no shipping order yet: burn every token, then [tick](/partner-api/v2/endpoints/sandbox-tick) |
 | `409` | `NOT_CREATED` | Non-crypto model: that customer shipment was never created (it was refused, or is still being created) |
+| `409` | `BAD_TRANSITION` | A shipment moves only `processing` → `shipped` → `delivered`, one step at a time; `status` says where it is |
 
 <RequestExample>
 ```bash cURL

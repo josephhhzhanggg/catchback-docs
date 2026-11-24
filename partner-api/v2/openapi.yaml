@@ -143,11 +143,11 @@ paths:
                     description: null
                     chase: null
         '400':
-          description: Unknown `category` (no `code`).
+          description: '`BAD_CATEGORY`: unknown `category`.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-              example: { error: 'Unknown category: pokemn' }
+              example: { error: 'Unknown category: pokemn', code: BAD_CATEGORY }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/RateLimited' }
@@ -371,14 +371,16 @@ paths:
           description: |-
             - `BAD_IDEMPOTENCY_KEY`: `Idempotency-Key` missing, or not 8-128 characters of `A-Za-z0-9_-`.
             - `BAD_JSON`: the body isn't JSON.
-            - `BAD_RECIPIENT`: `recipient` is not a wallet address on your mint chain.
+            - `BAD_RECIPIENT`: `recipient` is not a wallet address on your mint chain (a mixed-case EVM address needs a valid EIP-55 checksum), or it is the zero address, your program's NFT contract, Permit2 or USDC.
             - `BAD_PACK`: `pack_type` missing.
             - `BAD_CATEGORY`: unknown `category`.
             - `BAD_ODDS`: `odds` isn't `standard`, `hot`, `chill` or `classic`, or not one the pack sells (then `odds` lists the choices it sells).
             - `BAD_QUANTITY`: `quantity` isn't a whole number from 1 to 10.
-            - `BAD_REFUND_ADDRESS`: no usable EVM `refund_address` (required when you mint on Solana).
-            - `WALLET_FIELDS_NOT_ACCEPTED`: non-crypto program: a wallet field (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain`, `payout_address`) was sent. Send `customer` only.
-            - `BAD_CUSTOMER`: non-crypto program: `customer` is missing, or not 1-128 characters of `A-Za-z0-9_.:-`.
+            - `BAD_REFUND_ADDRESS`: no usable EVM `refund_address` (required when you mint on Solana), or one of the addresses refused for `recipient`.
+            - `BAD_PARTNER_USER_REF`: `partner_user_ref` isn't 1-128 characters of `A-Za-z0-9_.:-`.
+            - `NOT_PARTNER_SETTLED`: Crypto Wallet program: `customer` was sent. Send `recipient`.
+            - `WALLET_FIELDS_NOT_ACCEPTED`: non-crypto program: a wallet field (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain`, `payout_address`) was sent; `fields` lists them. Send `customer` only.
+            - `BAD_CUSTOMER`: non-crypto program: `customer` is missing, or not 1-128 characters of `A-Za-z0-9_.:-`, or only dots.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -449,12 +451,16 @@ paths:
       operationId: listOrders
       summary: List orders
       description: |-
-        Your orders, newest first, each in the Get an order shape. The units of a multi-pack order are listed one by one, each with the order's `order_id`, its `batch_id` and its `unit` number. `partner_user_ref` matches the orders you sent with that ref, whichever wallet they went to. On a non-crypto program, filter by a customer with `partner_user_ref` set to their `customer` id.
+        Your orders, newest first, each in the Get an order shape. The units of a multi-pack order are listed one by one, in unit order, each with the order's `order_id`, its `batch_id` and its `unit` number. `partner_user_ref` matches the orders you sent with that ref, whichever wallet they went to. On a non-crypto program, filter by a customer with `customer` (or `partner_user_ref`) set to their `customer` id.
       parameters:
         - $ref: '#/components/parameters/WalletFilter'
         - name: partner_user_ref
           in: query
           description: A `partner_user_ref` you sent with an order. On a non-crypto program, a `customer` id.
+          schema: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$' }
+        - name: customer
+          in: query
+          description: The same filter under the Non-crypto model's name. When both are sent, `partner_user_ref` wins.
           schema: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$' }
         - name: status
           in: query
@@ -501,7 +507,7 @@ paths:
             - `BAD_LIMIT`: `limit` isn't 1-100.
             - `BAD_STATUS`: `status` isn't one the list filters on.
             - `BAD_ADDRESS`: `wallet` is not an address on your mint chain.
-            - `BAD_PARTNER_USER_REF`: `partner_user_ref` isn't 1-128 characters of `A-Za-z0-9_.:-`.
+            - `BAD_PARTNER_USER_REF`: `partner_user_ref` (or `customer`) isn't 1-128 characters of `A-Za-z0-9_.:-`.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -638,7 +644,7 @@ paths:
         - name: address
           in: path
           required: true
-          description: A wallet address on your mint chain.
+          description: A wallet address on your mint chain. An EVM address may be any case, but a mixed-case one must carry a valid EIP-55 checksum.
           schema: { type: string }
           example: '0x8f3c0a1b2c3d4e5f60718293a4b5c6d7e8f9e21a'
       responses:
@@ -667,7 +673,9 @@ paths:
                     sellback: { amount: 330, rate: 0.8, fresh: false, locked_until: '2026-11-23T18:04:41.317Z' }
                 truncated: false
         '400':
-          description: '`BAD_ADDRESS`: `{address}` is not a wallet address on your mint chain.'
+          description: |-
+            - `BAD_ADDRESS`: `{address}` is not a wallet address on your mint chain.
+            - `CRYPTO_WALLET_MODEL_ONLY`: your program is on the Non-crypto model, so it has no tokens or wallets.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -730,6 +738,12 @@ paths:
                     schedule:
                       - { from: '2026-11-17T09:00:00.000Z', until: '2026-11-23T18:04:41.317Z', rate: 0.8, amount: 330, fixed: true }
                       - { from: '2026-11-23T18:04:41.317Z', until: null, rate: 0.8, amount: 332, fixed: false }
+        '400':
+          description: '`CRYPTO_WALLET_MODEL_ONLY`: your program is on the Non-crypto model, so it has no tokens or wallets. Use the customer endpoints.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'This program is on the Non-crypto model: its customers have no tokens or wallets. Use the /customers/{customer} endpoints.', code: CRYPTO_WALLET_MODEL_ONLY }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
@@ -808,8 +822,9 @@ paths:
             - `BAD_HOLDER`: `holder` is not a wallet address on your mint chain.
             - `PAYOUT_CHAIN_NOT_SUPPORTED`: `payout_chain` is not `evm:8453` or `solana:mainnet`.
             - `PAYOUT_CHAIN_NOT_ENABLED`: production only: payouts on that chain aren't switched on yet (today: `solana:mainnet`); send `payout_chain: "evm:8453"` with a Base `payout_address`. The sandbox pays Solana (simulated).
-            - `BAD_PAYOUT_ADDRESS`: no usable `payout_address` for the payout chain (required when it isn't your mint chain's family).
+            - `BAD_PAYOUT_ADDRESS`: no usable `payout_address` for the payout chain (required when it isn't your mint chain's family), or it is the zero address, your NFT contract, Permit2 or USDC.
             - `USE_SHIPMENT_ENDPOINT`: `kind: "shipment"`; shipments start at Create a shipment.
+            - `CRYPTO_WALLET_MODEL_ONLY`: your program is on the Non-crypto model, so it has no tokens or wallets. Use Sell back a customer's card.
             - No code: `kind` other than `sellback`.
           content:
             application/json:
@@ -834,7 +849,7 @@ paths:
         '409':
           description: |-
             - `TOKEN_NOT_MINTED`: the token's mint hasn't confirmed yet.
-            - `TOKEN_BURNED`: the token was already sold back or shipped.
+            - `TOKEN_BURNED`: the token was already sold back or shipped, or its burn is landing on chain now.
             - `NO_OFFER`: the item has no sell-back offer right now.
             - `TOKEN_IN_SHIPMENT`: the token has a paid shipment waiting for its burn (`quote_id` names it). Burn or renew that shipment; it can't be sold back meanwhile.
             - No code: your program has no contract yet.
@@ -862,7 +877,9 @@ paths:
       description: |-
         EVM only. The holder signs the quote (EIP-712, the same domain and `Quote` type the contract checks) instead of sending a transaction, and we send `burnWithQuoteFor(quote, signature, holderSignature)` and pay its gas. Works for a sell-back quote and for each token's `burn` in a paid shipment; the payout or shipment follows as for a burn the holder sent. ERC-1271 wallets can sign.
 
-        The signature authorizes only that quote, once, and is checked on chain. We simulate the burn before sending it, so a refusal sends nothing. A repeat call for the same quote returns the first `tx_hash` and sends nothing (`RELAY_IN_PROGRESS` while that send is in flight). [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
+        A one-tap shipment sends `permit_signature` instead, and we send `shipWithPayment`: the postage moves and the token burns together.
+
+        The signature authorizes only that quote, once, and is checked on chain. We simulate the burn before sending it, so a refusal sends nothing. A repeat call for the same quote returns the first `tx_hash` and sends nothing, also after the burn is final (`RELAY_IN_PROGRESS` while that send is in flight). While a burn with another of the token's quotes is in flight, or once it has landed, the call answers `TOKEN_BURNED`; a recorded burn expires the token's other unpaid quotes (outside a multi-token shipment). While the token has a paid shipment waiting, only that shipment's burn goes. [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
       parameters:
         - $ref: '#/components/parameters/TokenId'
       requestBody:
@@ -895,12 +912,20 @@ paths:
             - `BAD_JSON`: the body isn't JSON.
             - `BAD_QUOTE_ID`: `quote_id` is missing.
             - `BAD_HOLDER_SIGNATURE`: `holder_signature` isn't hex, or isn't the holder's signature over this quote.
+            - `BAD_PERMIT_SIGNATURE`: `permit_signature` isn't hex, isn't the holder's signature over the shipment's `payment.sign`, or the quote isn't a one-tap shipment.
             - `RELAY_NOT_SUPPORTED`: a Solana program; sign the quote's transaction instead.
+            - `CRYPTO_WALLET_MODEL_ONLY`: your program is on the Non-crypto model, so it has no tokens or wallets.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: "holder_signature is not the holder's signature over this quote.", code: BAD_HOLDER_SIGNATURE }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '402':
+          description: '`INSUFFICIENT_FUNDS`: one-tap only: the holder''s wallet doesn''t hold the postage in the stablecoin.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: "The holder's wallet doesn't hold enough of the postage token.", code: INSUFFICIENT_FUNDS }
         '403':
           description: |-
             - `NOT_HOLDER`: the token moved after the quote.
@@ -919,11 +944,14 @@ paths:
               example: { error: No such quote for this token., code: UNKNOWN_QUOTE }
         '409':
           description: |-
-            - `TOKEN_BURNED`: the token was already sold back or shipped.
-            - `QUOTE_USED`: this quote was already burned with.
-            - `QUOTE_EXPIRED`: get a new quote, or renew the shipment.
+            - `TOKEN_BURNED`: the token was already sold back or shipped, or a burn with another of its quotes is in flight.
+            - `QUOTE_USED`: this quote (or its permit) was already burned with.
+            - `QUOTE_EXPIRED`: get a new quote, or renew the shipment. On a one-tap shipment whose postage no longer matches: estimate and create it again.
             - `NOT_PAID`: the shipment's shipping isn't paid yet.
-            - `TOKEN_IN_SHIPMENT`: a sell-back quote, but the token now has a paid shipment waiting for its burn (`quote_id` names it). Nothing is burned.
+            - `POSTAGE_DUE`: a one-tap shipment was sent `holder_signature`; send `permit_signature`.
+            - `PERMIT2_NOT_APPROVED`: one-tap only: the holder's wallet hasn't approved Permit2 for the stablecoin yet.
+            - `SIGNATURE_PAYMENT_UNAVAILABLE`: one-tap shipping isn't set up for this contract; create the shipment with `payment_method: "checkout"`.
+            - `TOKEN_IN_SHIPMENT`: the token has a paid shipment waiting for its burn (`quote_id` names it), and this is a different quote. Nothing is burned.
             - `QUOTE_NOT_RELAYABLE`: the quote was issued before this endpoint existed; get a new one.
             - `RELAY_IN_PROGRESS`: the first send for this quote is still in flight; follow the quote.
             - No code: your program has no contract yet.
@@ -989,6 +1017,7 @@ paths:
             - `BAD_CURSOR`: `cursor` isn't a `next_cursor` from a previous page.
             - `BAD_LIMIT`: `limit` isn't 1-100.
             - `BAD_ADDRESS`: `wallet` is not an address on your mint chain.
+            - `CRYPTO_WALLET_MODEL_ONLY`: your program is on the Non-crypto model, so it has no tokens or wallets.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1032,6 +1061,12 @@ paths:
                   expires_at: '2026-11-16T18:30:00.000Z'
                   redeemed_at: '2026-11-16T18:21:13.000Z'
                   burn_tx: 0x3be1...
+        '400':
+          description: '`CRYPTO_WALLET_MODEL_ONLY`: your program is on the Non-crypto model, so it has no tokens or wallets. Use the customer endpoints.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'This program is on the Non-crypto model: its customers have no tokens or wallets. Use the /customers/{customer} endpoints.', code: CRYPTO_WALLET_MODEL_ONLY }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
@@ -1088,7 +1123,7 @@ paths:
       description: |-
         Creates and opens one payment for a shipment of 1-25 tokens held by one wallet, in one box. We re-quote the chosen rate for all the tokens together. Pay it exactly like an order. Once paid, Get a shipment returns a `burn` per token; the box ships once every token is burned, within 24 hours of payment (renew a lapsed window).
 
-        `shipment_id` names the whole box; each token has its own `quote_id`, which it burns with. An unpaid shipment stays payable: its `expires_at` (24 hours from creation) doesn't apply until it is paid, and paying it starts a fresh 24-hour burn window. A replay with the same `Idempotency-Key` returns `payment` again while the shipment is unpaid (`null` once paid). [Shipping](/partner-api/v2/shipping).
+        `shipment_id` names the whole box; each token has its own `quote_id`, which it burns with. An unpaid shipment stays payable: its `expires_at` (24 hours from creation) doesn't apply until it is paid, and paying it starts a fresh 24-hour burn window. A replay with the same `Idempotency-Key` returns `payment` again while the shipment is unpaid (`null` once paid). The key is scoped to your program and shared with Create a one-token shipment; a replay must send the same `token_ids` (in any order), `holder`, `address`, `rate` and `cover_amount`, or it is `422 IDEMPOTENCY_KEY_REUSED` (`max_cost` isn't compared). [Shipping](/partner-api/v2/shipping).
       parameters:
         - $ref: '#/components/parameters/ShipmentIdempotencyKey'
       requestBody:
@@ -1117,6 +1152,7 @@ paths:
                   holder: 0x8f3c...e21a
                   expires_at: '2026-11-17T18:40:00.000Z'
                   paid_at: null
+                  payment_refund_due: false
                   tokens:
                     - { token_id: '90311820476190023716442901288201455', quote_id: 0x1b7c...e4a0, status: awaiting_payment, burned_at: null, burn_tx: null, burn: null }
                     - { token_id: '81264573985362058461377125337283195667', quote_id: 0xa93f...0c2d, status: awaiting_payment, burned_at: null, burn_tx: null, burn: null }
@@ -1182,6 +1218,8 @@ paths:
                     holder: 0x8f3c...e21a
                     expires_at: '2026-11-17T18:41:02.000Z'
                     paid_at: '2026-11-16T18:41:02.000Z'
+                    payment_refund_due: false
+                    payment_method: checkout
                     burn:
                       quote: { tokenId: '81264573985362058461377125337283195667', kind: 2, quoteId: 0xc41d...77e2, holder: 0x8f3c...e21a, payoutHash: 0x9e04..., amount: '0', expiresAt: '1795458062' }
                       signature: 0x77ab...1c
@@ -1193,6 +1231,7 @@ paths:
             - `BAD_LIMIT`: `limit` isn't 1-100.
             - `BAD_STATUS`: `status` isn't one the list filters on.
             - `BAD_ADDRESS`: `wallet` is not an address on your mint chain.
+            - `CRYPTO_WALLET_MODEL_ONLY`: your program is on the Non-crypto model: it has no tokens or wallets. Use List a customer's shipments.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1245,7 +1284,7 @@ paths:
       x-moves-money: true
       summary: Create a one-token shipment
       description: |-
-        Creates and opens a payment for shipping one token, with the token in the path. Answers with the shipment as `quote` (no `shipment_id`, no `tokens`: the token's own `quote_id` names the shipment). It shares its `Idempotency-Key` space with Create a shipment. A token that already has a paid shipment waiting for its burn is refused with `TOKEN_IN_SHIPMENT` and that shipment's `quote_id`.
+        Creates and opens a payment for shipping one token, with the token in the path. Answers with the shipment as `quote` (no `shipment_id`, no `tokens`: the token's own `quote_id` names the shipment). Where the contract takes postage in the burn, the default is one tap: `payment.method` is `signature` and the holder signs `payment.sign` within 30 minutes; otherwise, or with `payment_method: "checkout"`, `payment` is a Payment Intent (`method: "checkout"`). It shares its `Idempotency-Key` space with Create a shipment, scoped to your program; a replay must send the same token, `holder`, `address`, `rate` and `cover_amount`, or it is `422 IDEMPOTENCY_KEY_REUSED` (`max_cost` and `payment_method` aren't compared). A token that already has a paid shipment waiting for its burn is refused with `TOKEN_IN_SHIPMENT` and that shipment's `quote_id`.
       parameters:
         - $ref: '#/components/parameters/TokenId'
         - $ref: '#/components/parameters/ShipmentIdempotencyKey'
@@ -1259,6 +1298,7 @@ paths:
               address: { name: Alice Tester, address1: 1 Market St, city: San Francisco, state: CA, zip: '94105', country: US, phone: '4155550100' }
               rate: { carrier: USPS, token: usps_priority }
               max_cost: 9.85
+              payment_method: checkout
       responses:
         '201':
           description: The shipment and how to pay for it.
@@ -1273,8 +1313,11 @@ paths:
                   holder: 0x8f3c...e21a
                   expires_at: '2026-11-17T18:40:00.000Z'
                   paid_at: null
+                  payment_refund_due: false
+                  payment_method: checkout
                   burn: null
                 payment:
+                  method: checkout
                   intent_id: pi_01JE...
                   client_secret: pi_01JE..._secret_...
                   publishable_key: pk_live_...
@@ -1325,6 +1368,7 @@ paths:
                   holder: 0x8f3c...e21a
                   expires_at: '2026-11-17T18:41:02.000Z'
                   paid_at: '2026-11-16T18:41:02.000Z'
+                  payment_refund_due: false
                   tokens:
                     - { token_id: '90311820476190023716442901288201455', quote_id: 0x1b7c...e4a0, status: redeemed, burned_at: '2026-11-16T19:02:10.000Z', burn_tx: 0x51c0..., burn: null }
                     - { token_id: '81264573985362058461377125337283195667', quote_id: 0xa93f...0c2d, status: redeemed, burned_at: '2026-11-16T19:04:55.000Z', burn_tx: 0x3be1..., burn: null }
@@ -1338,6 +1382,12 @@ paths:
                     expected_delivery: '2026-11-20'
                     delivered_at: null
                     created_at: '2026-11-16T19:05:30.000Z'
+        '400':
+          description: '`CRYPTO_WALLET_MODEL_ONLY`: your program is on the Non-crypto model: it has no tokens or wallets. Use the customer shipment operations.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'This program is on the Non-crypto model: its customers have no tokens or wallets. Use the /customers/{customer} endpoints.', code: CRYPTO_WALLET_MODEL_ONLY }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/UnknownShipment' }
@@ -1374,6 +1424,7 @@ paths:
                   holder: 0x8f3c...e21a
                   expires_at: '2026-11-19T09:12:40.000Z'
                   paid_at: '2026-11-16T18:41:02.000Z'
+                  payment_refund_due: false
                   tokens:
                     - { token_id: '90311820476190023716442901288201455', quote_id: 0x1b7c...e4a0, status: redeemed, burned_at: '2026-11-16T19:02:10.000Z', burn_tx: 0x51c0..., burn: null }
                     - token_id: '81264573985362058461377125337283195667'
@@ -1386,14 +1437,21 @@ paths:
                         signature: 0x2f9c...4b
                   fulfilment: null
                 renewed: true
+        '400':
+          description: '`CRYPTO_WALLET_MODEL_ONLY`: your program is on the Non-crypto model: it has no tokens or wallets. Use the customer shipment operations.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'This program is on the Non-crypto model: its customers have no tokens or wallets. Use the /customers/{customer} endpoints.', code: CRYPTO_WALLET_MODEL_ONLY }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/UnknownShipment' }
         '409':
           description: |-
-            - `NOT_PAID`: the shipping isn't paid yet.
-            - `ALREADY_REDEEMED`: the token (every token, on a multi-token shipment) was already burned and the box is shipping.
-            - `TOKEN_NOT_LIVE`: a token in the shipment was burned some other way (`token_ids` lists it).
+            - `NOT_PAID`: the shipping isn't paid yet (a one-tap shipment is paid in its burn: past its 30 minutes, estimate and create it again).
+            - `ALREADY_REDEEMED`: the token was already burned; on a multi-token shipment, the box is shipping (every token burned, or the grace period closed it).
+            - `TOKEN_NOT_LIVE`: a token in the shipment was burned some other way (`token_ids` lists it on a multi-token shipment). Checked even while the window is still open.
+            - `TOKEN_BURNED`: the chain shows a token burned before our record caught up.
             - `HOLDER_CHANGED`: a token still to be burned changed hands after the shipping was paid (`token_ids` lists them on a multi-token shipment). The shipment can't be renewed: contact CatchBack support with the `shipment_id` or `quote_id`. Tokens already burned still ship once the grace period ends.
           content:
             application/json:
@@ -1478,7 +1536,7 @@ paths:
         '400':
           description: |-
             - `NOT_PARTNER_SETTLED`: your program pays through customer wallets; sell back with a quote and a burn.
-            - `BAD_CUSTOMER`: `customer` isn't 1-128 characters of `A-Za-z0-9_.:-`.
+            - `BAD_CUSTOMER`: `customer` isn't 1-128 characters of `A-Za-z0-9_.:-`, or is only dots.
             - `BAD_CARD`: `card_id` isn't a card id.
             - `BAD_JSON`: the body isn't JSON.
             - `BAD_MIN_PAYOUT`: `min_payout` isn't a non-negative number.
@@ -1498,7 +1556,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: That card was not pulled into this customer's vault by this program., code: CARD_NOT_IN_VAULT }
         '409':
-          description: '`PRICE_CHANGED`: the current offer is below `min_payout`; the body has the current `payout_amount` and `payout_rate`. Nothing is sold. Other refusals of the sale itself answer with their own status and `code`, or `SELLBACK_REFUSED` when they have none.'
+          description: '`PRICE_CHANGED`: the current offer is below `min_payout`; the body has the current `payout_amount` and `payout_rate`. Nothing is sold. The sale''s own refusals keep their status and `code`: `409` `CARD_IN_BATTLE`, `CARD_LISTED_ON_MARKETPLACE`, `SHOP_PURCHASE_NOT_SELLABLE` or `GOODS_NOT_SELLABLE`, `403` `NO_PURCHASE_RECORD` (a sealed item with no purchase record), and `SELLBACK_REFUSED` (usually `400`) for any other.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1662,15 +1720,22 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: The rate is now above your max_cost., code: PRICE_CHANGED, amount: 7.95, max_cost: 7.5 }
-        '422': { $ref: '#/components/responses/ShipmentKeyReused' }
-        '429':
-          description: |-
-            - `RATE_LIMITED`: too many requests from this key; wait `retry_after_seconds`.
-            - `DAILY_SHIPMENT_LIMIT_REACHED`: this key has created 50 shipments this UTC day. The body has `limit` and `resets_at`.
+        '422':
+          description: '`IDEMPOTENCY_KEY_REUSED`: the key was already used in your program for a different shipment, including one for another customer.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-              example: { error: 'Daily shipment limit reached: 50 per key per UTC day.', code: DAILY_SHIPMENT_LIMIT_REACHED, limit: 50, resets_at: '2026-11-25T00:00:00.000Z' }
+              example: { error: This idempotency key was already used for a different shipment., code: IDEMPOTENCY_KEY_REUSED }
+        '429':
+          description: |-
+            - `RATE_LIMITED`: too many requests from this key; wait `retry_after_seconds`.
+            - `DAILY_SHIPMENT_LIMIT_REACHED`: this key has created 50 shipments this UTC day. The body has `limit`, `resets_at` and `retry_after_seconds`, and the response a `Retry-After` header.
+          headers:
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'Daily shipment limit reached: 50 per key per UTC day.', code: DAILY_SHIPMENT_LIMIT_REACHED, limit: 50, resets_at: '2026-11-25T00:00:00.000Z', retry_after_seconds: 21600 }
         '500':
           description: |-
             - `SHIPMENT_OUTCOME_UNKNOWN`: we couldn't confirm whether the shipment went through; it is with our team (`shipment_id`, `needs_review`). Retrying with the same `Idempotency-Key` is safe and never charges twice. Don't resend under a new key.
@@ -2128,9 +2193,9 @@ paths:
       description: |-
         **Sandbox only: `404` in production.**
 
-        Pays an order's, a multi-pack order's, a shipment's or a multi-token shipment's sandbox Payment Intent, exactly as a settled payment would, then delivers any webhooks it produced. Paying twice changes nothing.
+        Pays an order's, a multi-pack order's, a shipment's or a multi-token shipment's sandbox Payment Intent, exactly as a settled payment would, then delivers any webhooks it produced. An intent is paid once: one no longer awaiting payment answers `409 ALREADY_PAID`.
 
-        The response's `status` is the order's or shipment's status after the payment (with the same value as `order_status` or `shipment_status`), and `webhooks` counts the deliveries this call made. An order's pack opens as its payment settles, so an order usually answers `rolled`, not `paid` (or `refund_due` if the pack couldn't open or `amount` was more than 1% short); then call Run the background work until it is `minted`. A shipment answers `ready`, or stays `awaiting_payment` if `amount` was short.
+        The response's `status` is the order's or shipment's status after the payment (with the same value as `order_status` or `shipment_status`), and `webhooks` counts the deliveries this call made. An order's pack opens as its payment settles, so an order usually answers `rolled`, not `paid` (or `refund_due` if the pack couldn't open or `amount` was more than 1% short); then call Run the background work until it is `minted`. A shipment answers `ready`, or stays `awaiting_payment` with `payment_refund_due: true` if `amount` was more than 1% short.
       parameters:
         - name: intentId
           in: path
@@ -2145,7 +2210,7 @@ paths:
             schema:
               type: object
               properties:
-                amount: { type: number, exclusiveMinimum: 0, description: 'Dollars paid. Default: the full amount. Send less to test the 1% tolerance and an `underpaid` refund.' }
+                amount: { type: number, exclusiveMinimum: 0, description: 'Dollars paid, as a JSON number (a string is `BAD_AMOUNT`). Default: the full amount. Send less to test the 1% tolerance: an order more than 1% short goes to `refund_due` (`failure_reason: underpaid`); a shipment stays `awaiting_payment` with `payment_refund_due: true`.' }
             example: { amount: 25 }
       responses:
         '200':
@@ -2161,7 +2226,7 @@ paths:
                   summary: A shipment
                   value: { paid: true, kind: shipment, status: ready, shipment_status: ready, webhooks: { delivered: 1, retrying: 0 } }
         '400':
-          description: '`BAD_AMOUNT`: `amount` is not a positive number.'
+          description: '`BAD_AMOUNT`: `amount` is not a positive JSON number.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2176,6 +2241,12 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: Unknown payment, code: UNKNOWN_PAYMENT }
+        '409':
+          description: '`ALREADY_PAID`: the order or shipment is no longer awaiting payment; `status` says where it is.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: This payment is already settled (rolled)., code: ALREADY_PAID, status: rolled }
         '429': { $ref: '#/components/responses/RateLimited' }
         '500': { $ref: '#/components/responses/ServerError' }
         '503': { $ref: '#/components/responses/AuthUnavailable' }
@@ -2205,7 +2276,12 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/SandboxTickResult' }
               example: { ran: false, errors: 0, webhooks: { delivered: 0, retrying: 0 } }
-        '503': { $ref: '#/components/responses/AuthUnavailable' }
+        '503':
+          description: '`AUTH_UNAVAILABLE`, or (no `code`) the sandbox isn''t set up to run the pass (`CRON_SECRET is not set on this sandbox`).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: CRON_SECRET is not set on this sandbox }
   /api/partner/v2/sandbox/shipments/{id}:
     post:
       tags: [Sandbox]
@@ -2245,6 +2321,7 @@ paths:
                 properties:
                   ok: { type: boolean, const: true }
                   status: { type: string, enum: [shipped, delivered], description: 'The status you set.' }
+                  replay: { type: boolean, const: true, description: 'Present when the shipment already had that status; nothing changed.' }
                   webhooks: { $ref: '#/components/schemas/SandboxWebhookDeliveries' }
               example: { ok: true, status: shipped, webhooks: { delivered: 1, retrying: 0 } }
         '400':
@@ -2267,7 +2344,7 @@ paths:
           description: |-
             - `NOT_BURNED`: the shipment has no shipping order yet: burn every token, then tick.
             - `NOT_CREATED`: non-crypto program: that customer shipment was never created (it was refused, or is still being created).
-            - `BAD_TRANSITION`: a shipment only moves `processing` → `shipped` → `delivered`; `current_status` says where it is. Sending the status it already has changes nothing and answers `200`.
+            - `BAD_TRANSITION`: a shipment only moves `processing` → `shipped` → `delivered`, one step at a time; `status` says where it is. Sending the status it already has changes nothing and answers `200` with `replay: true`.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2328,7 +2405,7 @@ webhooks:
       operationId: nftOrderUpdatedEvent
       summary: Order updated
       description: |-
-        **We send this to your webhook URL.** An order changed status after you created it: `paid`, `rolled`, `minted`, `mint_failed`, `expired`, `refund_due`, `refunded`. `data.order` is the order as Get an order returns it. For a multi-pack order it fires for each unit, carrying the order's `order_id`, its `batch_id` and the `unit` number.
+        **We send this to your webhook URL.** An order changed status after you created it: `paid`, `rolled`, `minted`, `mint_failed`, `expired`, `refund_due`, `refunded`. `data.order` is the order as Get an order returns it. For a multi-pack order it fires for each unit, carrying the order's `order_id`, its `batch_id` and the `unit` number. Non-crypto model: the order opens into the vault (`in_vault`; `paid` or `rolled` can come first) or is `refunded`, with `custody: vault` and `customer`.
 
         The payload is the current state, not a diff: several quick changes can arrive as one event with the latest status, and an intermediate status may never be sent on its own. Setup, signatures and retries: [Webhooks](/partner-api/v2/webhooks).
       security:
@@ -2438,7 +2515,7 @@ webhooks:
 
         Non-crypto model: a customer shipment was created (`processing`, its first event) or moved (`shipped`, `delivered`, `cancelled`); `data.shipment` is the shipment as List a customer's shipments returns it, plus `customer`.
 
-        Crypto Wallet model: `data.shipment` has the fields of the one-token shape: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `burn` and `fulfilment`, plus `shipment_id`: the box's id on a multi-token shipment, else the token's `quote_id`. Each event is about one token (its `quote_id`). When a multi-token box moves (`fulfilment` changes), every token burned into it gets its own event, with the same `shipment_id`, and `shipping_cost` is the whole box's postage. Get a shipment with `shipment_id` or any `quote_id` returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction. A burn window lapsing sends no event. Setup, signatures and retries: [Webhooks](/partner-api/v2/webhooks).
+        Crypto Wallet model: `data.shipment` has the fields of the one-token shape: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `payment_refund_due`, `payment_method`, `burn` and `fulfilment`, plus `shipment_id`: the box's id on a multi-token shipment, else the token's `quote_id`. Each event is about one token (its `quote_id`). When a multi-token box moves (`fulfilment` changes), every token burned into it gets its own event, with the same `shipment_id`, and `shipping_cost` is the whole box's postage. Get a shipment with `shipment_id` or any `quote_id` returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction. A burn window lapsing sends no event. Setup, signatures and retries: [Webhooks](/partner-api/v2/webhooks).
       security:
         - {}
       parameters:
@@ -2489,6 +2566,8 @@ webhooks:
                   holder: 0x8f3c...e21a
                   expires_at: '2026-11-17T18:41:02.000Z'
                   paid_at: '2026-11-16T18:41:02.000Z'
+                  payment_refund_due: false
+                  payment_method: checkout
                   burn: null
                   fulfilment:
                     status: shipped
@@ -2571,14 +2650,14 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: Your own shipment id, 8-128 characters of `A-Za-z0-9_-`. Retry a timed-out or `5xx` call with the same key. The same key with a different request (`card_ids`, `address`, `rate`, `cover_amount`) is `422`.
+      description: Your own shipment id, 8-128 characters of `A-Za-z0-9_-`. Keys are per program, not per customer. Retry a timed-out or `5xx` call with the same key. The same key with a different request (another customer, `card_ids`, `address`, `rate`, `max_cost`, `cover_amount`) is `422`.
       schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
       example: acme-ship-1c9e04
     Customer:
       name: customer
       in: path
       required: true
-      description: Your own id for the customer, as you sent it as `customer` on Create an order. 1-128 characters of `A-Za-z0-9_.:-`; never personal data. Case-sensitive.
+      description: Your own id for the customer, as you sent it as `customer` on Create an order. 1-128 characters of `A-Za-z0-9_.:-`, not dots alone; never personal data. Case-sensitive.
       schema: { $ref: '#/components/schemas/CustomerId' }
       example: user-1842
     PackCategory:
@@ -2671,7 +2750,7 @@ components:
     InvalidKey:
       description: |-
         - `Missing or malformed API key`, or `Invalid API key`, as on every endpoint.
-        - `INVALID_KEY`: the key is disabled, or a rotated key past its 24 hours.
+        - `INVALID_KEY`: the key was disabled, or its 24 hours after a rotation ran out, while this request ran (a key already in that state gets the plain `Invalid API key`).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -2708,7 +2787,7 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
-          example: { error: Something went wrong; retry with the same Idempotency-Key. }
+          example: { error: 'Something went wrong. Retrying is safe: send the same Idempotency-Key if the request had one.' }
     NotSandbox:
       description: Not the sandbox. Every sandbox endpoint answers this in production.
       content:
@@ -2722,7 +2801,9 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: Unknown token, code: UNKNOWN_TOKEN, token_ids: ['90311820476190023716442901288201455'] }
     TokensNotLive:
-      description: '`TOKEN_NOT_LIVE`: the token isn''t minted yet, or was already burned. On the multi-token endpoints `token_ids` lists them.'
+      description: |-
+        - `TOKEN_NOT_LIVE`: the token isn't minted yet, or was already burned. On the multi-token endpoints `token_ids` lists them.
+        - `TOKEN_BURNED`: the chain shows the token burned before our record caught up.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -2754,6 +2835,7 @@ components:
           example: { error: This wallet cannot redeem right now., code: SCREENING_UNAVAILABLE }
     ShipmentEstimateBadRequest:
       description: |-
+        - `CRYPTO_WALLET_MODEL_ONLY`: your program is on the Non-crypto model: it has no tokens or wallets. Use Estimate a customer shipment.
         - `BAD_JSON`: the body isn't JSON.
         - `BAD_TOKEN_IDS`: `token_ids` isn't a list of 1-25 distinct decimal token id strings (Estimate a shipment only).
         - `BAD_HOLDER`: `holder` is not a wallet address on your mint chain.
@@ -2769,11 +2851,13 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
-          example: { error: Some address fields are invalid., code: BAD_ADDRESS, fields: { phone: phone is required outside the US } }
+          example: { error: Invalid address, code: BAD_ADDRESS, fields: { phone: Required for international shipments } }
     ShipmentCreateBadRequest:
       description: |-
+        - `CRYPTO_WALLET_MODEL_ONLY`: your program is on the Non-crypto model: it has no tokens or wallets. Use Create a customer shipment.
         - `BAD_IDEMPOTENCY_KEY`: `Idempotency-Key` missing, or not 8-128 characters of `A-Za-z0-9_-`.
         - `BAD_JSON`: the body isn't JSON.
+        - `BAD_PAYMENT_METHOD`: `payment_method` isn't `signature` or `checkout` (Create a one-token shipment only).
         - `BAD_TOKEN_IDS`: `token_ids` isn't a list of 1-25 distinct decimal token id strings (Create a shipment only).
         - `BAD_HOLDER`: `holder` is not a wallet address on your mint chain.
         - `BAD_ADDRESS`: the shipping address is invalid; `fields` maps each bad field to a message.
@@ -2799,7 +2883,9 @@ components:
     ShipmentCreateConflict:
       description: |-
         - `TOKEN_NOT_LIVE`: a token isn't minted yet, or was already burned (`token_ids` lists them on Create a shipment).
+        - `TOKEN_BURNED`: the chain shows a token burned before our record caught up.
         - `TOKEN_IN_SHIPMENT`: a token already has a paid shipment waiting for its burn; `token_ids` lists them (and `quote_id` on the one-token endpoint). Burn or renew that shipment instead.
+        - `SIGNATURE_PAYMENT_UNAVAILABLE`: `payment_method: "signature"` sent, but one-tap shipping isn't set up for this token's contract; send `checkout` (Create a one-token shipment only).
         - `RATE_UNAVAILABLE`: the carrier no longer offers that rate; estimate again.
         - `COVER_UNAVAILABLE`: the chosen service has no cover option; choose another rate or leave `cover_amount` out.
         - `PRICE_CHANGED`: the shipping cost is now above `max_cost`; the body has the current `amount`.
@@ -2816,7 +2902,7 @@ components:
     CustomerBadRequest:
       description: |-
         - `NOT_PARTNER_SETTLED`: your program pays through customer wallets; use the wallet, token and shipment operations.
-        - `BAD_CUSTOMER`: `customer` isn't 1-128 characters of `A-Za-z0-9_.:-`.
+        - `BAD_CUSTOMER`: `customer` isn't 1-128 characters of `A-Za-z0-9_.:-`, or is only dots.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -2831,9 +2917,10 @@ components:
       description: |-
         - `NOT_PARTNER_SETTLED`: your program pays through customer wallets; ship with the token shipment operations.
         - `BAD_JSON`: the body isn't JSON.
-        - `BAD_CUSTOMER`: `customer` isn't 1-128 characters of `A-Za-z0-9_.:-`.
+        - `WALLET_FIELDS_NOT_ACCEPTED`: a Crypto Wallet field (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address`) was sent; `fields` lists them.
+        - `BAD_CUSTOMER`: `customer` isn't 1-128 characters of `A-Za-z0-9_.:-`, or is only dots.
         - `BAD_CARD_IDS`: `card_ids` isn't a list of 1-10 distinct card ids from the vault.
-        - `BAD_ADDRESS`: the address is invalid; `fields` maps each bad field to a message.
+        - `BAD_ADDRESS`: the address is invalid (control or invisible characters, or a US `state` that isn't a state or territory, included); `fields` maps each bad field to a message.
         - `BAD_COVER`: `cover_amount` isn't a positive dollar amount with at most two decimals.
         - `COVER_NOT_ALLOWED`: `cover_amount` is outside what the cards can be insured for; the body has `order_value`, `min_cover` and `max_cover` (`max_cover` is null when they can't be insured).
         - `PARTNER_GOODS`: an item is held by its brand partner and can't ship through CatchBack; it can still be sold back.
@@ -2924,7 +3011,7 @@ components:
           anyOf:
             - $ref: '#/components/schemas/ErrorCode'
             - type: string
-        retry_after_seconds: { type: integer, description: 'On `RATE_LIMITED`.' }
+        retry_after_seconds: { type: integer, description: 'Seconds to wait, on `RATE_LIMITED`, `TOO_MANY_UNPAID_ORDERS`, `CUSTOMER_DAILY_LIMIT`, `DAILY_LIMIT` and `DAILY_SHIPMENT_LIMIT_REACHED` (with a `Retry-After` header).' }
         odds:
           description: 'On `BAD_ODDS` when the pack sells other odds: the choices it sells. On `ODDS_UNAVAILABLE` from Create an order: the choice asked for.'
           oneOf:
@@ -2932,7 +3019,9 @@ components:
               items: { $ref: '#/components/schemas/Odds' }
             - $ref: '#/components/schemas/Odds'
         reason: { type: [string, 'null'], description: 'On `PACK_UNAVAILABLE`, why the pack can''t open.' }
-        status: { type: string, description: 'On `NOT_PULLED`, the order''s status.' }
+        status: { type: string, description: 'On `NOT_PULLED`, the order''s status; on `ALREADY_PAID`, the payment''s; on `BAD_TRANSITION`, the shipment''s.' }
+        unpaid_packs: { type: integer, description: 'On `TOO_MANY_UNPAID_ORDERS`, the wallet''s unpaid packs.' }
+        argument: { type: string, description: 'On `MISSING_ARGUMENT`, `UNKNOWN_ARGUMENT` and `BAD_ARGUMENT` from the MCP server, the argument.' }
         token_ids:
           type: array
           items: { type: string }
@@ -2958,7 +3047,7 @@ components:
         order_total: { type: number, description: 'On `CREDIT_LIMIT`, `CUSTOMER_DAILY_LIMIT` and `DAILY_LIMIT` from Create an order, the order''s total.' }
         shipment_total: { type: number, description: 'On `CREDIT_LIMIT` from Create a customer shipment, the postage (with any cover).' }
         spent_today: { type: number, description: 'On `CUSTOMER_DAILY_LIMIT` and `DAILY_LIMIT`, what was spent this UTC day.' }
-        limit: { type: number, description: 'On `CUSTOMER_DAILY_LIMIT` and `DAILY_LIMIT`, the daily limit in dollars; on `DAILY_SHIPMENT_LIMIT_REACHED`, the shipments allowed a day.' }
+        limit: { type: number, description: 'On `CUSTOMER_DAILY_LIMIT` and `DAILY_LIMIT`, the daily limit in dollars; on `DAILY_SHIPMENT_LIMIT_REACHED`, the shipments allowed a day; on `TOO_MANY_UNPAID_ORDERS`, the unpaid packs allowed.' }
         resets_at: { type: string, format: date-time, description: 'On `DAILY_SHIPMENT_LIMIT_REACHED`, the next UTC midnight.' }
         card_ids:
           type: array
@@ -3108,8 +3197,16 @@ components:
         - DOC_NOT_FOUND
         - UNKNOWN_ARGUMENT
         - BAD_ARGUMENT
-        - NOT_WALLET_PROGRAM
+        - CRYPTO_WALLET_MODEL_ONLY
         - BAD_TRANSITION
+        - ALREADY_PAID
+        - SANDBOX_KEY
+        - NOT_FOUND
+        - CARD_IN_BATTLE
+        - CARD_LISTED_ON_MARKETPLACE
+        - SHOP_PURCHASE_NOT_SELLABLE
+        - GOODS_NOT_SELLABLE
+        - NO_PURCHASE_RECORD
     ChainKey:
       type: string
       description: 'A chain as `<family>:<id>`: `evm:8453` is Base, `evm:<chainId>` any other EVM chain (e.g. `evm:196`, X Layer), `solana:mainnet` Solana. The sandbox uses a public testnet.'
@@ -3128,7 +3225,7 @@ components:
       type: string
       enum: [standard, hot, chill, classic]
       description: |-
-        The odds a pack is opened at, as in our app's picker. Standard, Hot and Chill share one value-band ladder and differ only in the chance of each band; Classic is the pack's own bands and chances. A pack that sells only its own odds sells just `classic`. [Odds](/partner-api/v2/odds).
+        The odds a pack is opened at, as in our app's picker. Standard, Hot and Chill share one value-band ladder and differ only in the chance of each band; Classic is the pack's own bands and chances, sold only where those bands are published. A pack that sells only its own odds sells just `classic`. [Odds](/partner-api/v2/odds).
     Item:
       type: object
       description: An item's catalog fields. Which fields an item has depends on its category; every one can be absent or null.
@@ -3195,7 +3292,7 @@ components:
           enum: [Out of stock, Odds maintenance in progress, Restocking, Not available right now]
         odds:
           type: array
-          description: The odds choices the pack sells, in the order our app's picker shows them.
+          description: The odds choices the pack sells, in the order our app's picker shows them. `classic` is listed only where its bands are published.
           items: { $ref: '#/components/schemas/Odds' }
         default_odds: { $ref: '#/components/schemas/Odds' }
         image_url: { type: [string, 'null'], description: 'Pack art, absolute and resized for display.' }
@@ -3211,7 +3308,7 @@ components:
       properties:
         odds: { $ref: '#/components/schemas/Odds' }
         label: { type: string }
-        available: { type: boolean, description: 'Whether these odds are selling right now.' }
+        available: { type: boolean, description: 'Whether these odds are selling right now. A choice the pack sells whose odds aren''t published right now is listed with `available: false`.' }
     PackPool:
       description: '`ModePackPool` for a pack that sells the odds choice, `ClassicPackPool` (`odds: "classic"`, with `bucket_id` bands) for a pack that sells only its own odds.'
       anyOf:
@@ -3314,7 +3411,7 @@ components:
         hittable_cards: { type: integer }
     CreateOrderRequest:
       type: object
-      description: '`recipient` is required on a Crypto Wallet program. On a non-crypto program send `customer` instead, and no wallet field: `recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address` is `WALLET_FIELDS_NOT_ACCEPTED`.'
+      description: '`recipient` is required on a Crypto Wallet program, and `customer` there is `NOT_PARTNER_SETTLED`. On a non-crypto program send `customer` instead, and no wallet field: `recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address` is `WALLET_FIELDS_NOT_ACCEPTED`, with `fields` listing them.'
       required: [pack_type]
       properties:
         pack_type: { type: string, description: 'A `pack_type` from List packs.' }
@@ -3324,9 +3421,9 @@ components:
             - $ref: '#/components/schemas/Odds'
           description: 'One the pack sells. Default: the pack''s `default_odds`.'
         quantity: { type: integer, minimum: 1, maximum: 10, default: 1, description: '2 or more makes a multi-pack order.' }
-        recipient: { type: string, description: 'Crypto Wallet model only, and required there: the customer''s self-custody wallet on your mint chain. Never an exchange deposit address: the NFTs are minted to it.' }
-        refund_address: { type: string, description: 'Crypto Wallet model only. An EVM wallet that can receive USDC on Base, for refunds. Required on a Solana program; defaults to `recipient` on an EVM program.' }
-        partner_user_ref: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$', description: 'Crypto Wallet model: your opaque user id. Never put personal data here. Not compared on an idempotent replay. Refused on a non-crypto program (`WALLET_FIELDS_NOT_ACCEPTED`), where `customer` names the customer.' }
+        recipient: { type: string, description: 'Crypto Wallet model only, and required there: the customer''s self-custody wallet on your mint chain. Never an exchange deposit address: the NFTs are minted to it. A mixed-case EVM address needs a valid EIP-55 checksum. The zero address, your program''s NFT contract, Permit2 and USDC are refused; smart-contract wallets are fine.' }
+        refund_address: { type: string, description: 'Crypto Wallet model only. An EVM wallet that can receive USDC on Base, for refunds. Required on a Solana program; defaults to `recipient` on an EVM program. The same addresses are refused as for `recipient`.' }
+        partner_user_ref: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$', description: 'Crypto Wallet model: your opaque user id. A malformed one is `BAD_PARTNER_USER_REF`. Never put personal data here. Not compared on an idempotent replay. Refused on a non-crypto program (`WALLET_FIELDS_NOT_ACCEPTED`), where `customer` names the customer.' }
         customer:
           allOf:
             - $ref: '#/components/schemas/CustomerId'
@@ -3609,7 +3706,7 @@ components:
                 - type: 'null'
             item: { $ref: '#/components/schemas/Item' }
             sellback:
-              description: Null for a burned token or one not yet confirmed.
+              description: Null for a burned token, one not yet confirmed, or one whose item can't be read right now.
               oneOf:
                 - $ref: '#/components/schemas/SellbackOffer'
                 - type: 'null'
@@ -3618,12 +3715,12 @@ components:
       required: [holder]
       properties:
         kind: { type: string, enum: [sellback], default: sellback }
-        holder: { type: string, description: 'The wallet that holds the token now. Checked on chain.' }
+        holder: { type: string, description: 'The wallet that holds the token now. Checked on chain. A mixed-case EVM address must carry a valid EIP-55 checksum.' }
         payout_chain:
           type: string
           enum: ['evm:8453', 'solana:mainnet', 'evm:84532', 'solana:devnet']
           description: 'Default: the token''s family (Base for an EVM program, Solana for a Solana program). In production, Solana payouts answer `PAYOUT_CHAIN_NOT_ENABLED` until they are switched on; the sandbox pays Solana (simulated). Production pays on `evm:8453` or `solana:mainnet`. The sandbox pays on the test networks, `evm:84532` and `solana:devnet`, and reads the production names as those.'
-        payout_address: { type: string, description: 'Where the USDC goes. Required when the payout chain isn''t your mint chain''s family; otherwise defaults to `holder`.' }
+        payout_address: { type: string, description: 'Where the USDC goes. Required when the payout chain isn''t your mint chain''s family; otherwise defaults to `holder`. On EVM it can''t be the zero address, your NFT contract, Permit2 or USDC; smart-contract wallets are fine.' }
     PayoutDestination:
       type: object
       required: [chain, address]
@@ -3706,11 +3803,12 @@ components:
               description: '`null`: no burn seen yet. `pending`: queued. `sending`: sent to the network. `sent`: paid, `tx_hash` is the USDC transfer. `held`: under review by our team, then released. `failed`: retried automatically.'
             tx_hash: { type: [string, 'null'] }
             held: { type: boolean }
-        expires_at: { type: string, format: date-time }
-        redeemed_at: { type: [string, 'null'], format: date-time }
+        expires_at: { type: string, format: date-time, description: 'UTC, ending in `Z`.' }
+        redeemed_at: { type: [string, 'null'], format: date-time, description: 'UTC, ending in `Z`.' }
         burn_tx: { type: [string, 'null'] }
     ShipmentAddress:
       type: object
+      description: No field may hold a control character or an invisible formatting character (zero-width, direction overrides). A US `state` must be a state or territory, as its code (`CA`) or name.
       required: [name, address1, city, country]
       properties:
         name: { type: string, maxLength: 100 }
@@ -3833,25 +3931,19 @@ components:
     TokenShipment:
       type: object
       description: A one-token shipment, named by the token's `quote_id`. `fulfilment` is present on reads and webhook events, not on the create response.
-      required: [quote_id, status, shipping_cost, holder, expires_at, paid_at, burn]
+      required: [quote_id, status, shipping_cost, holder, expires_at, paid_at, payment_refund_due, payment_method, burn]
       properties:
         quote_id: { type: string }
         status:
           type: string
           enum: [awaiting_payment, ready, expired, redeemed]
-          description: '`awaiting_payment` (pay it, or for a one-tap shipment sign it), `ready` (paid; burn it), `expired` (the paid burn window lapsed: renew it; or a one-tap shipment nobody signed in time: create it again), `redeemed` (the burn was seen).'
-        payment_method: { type: string, enum: [signature, checkout], description: '`signature`: one tap, paid in its burn. `checkout`: paid first, then burned.' }
+          description: '`awaiting_payment` (pay it, or for a one-tap shipment sign it), `ready` (paid; burn it), `expired` (the paid burn window lapsed: renew it; a one-tap shipment nobody signed in time: create it again; or the token was burned with another quote), `redeemed` (the burn was seen).'
         shipping_cost: { type: [number, 'null'] }
         holder: { type: string }
         expires_at: { type: string, format: date-time, description: 'Pay first: once paid, the end of the 24-hour burn window. While unpaid it shows 24 hours from creation but doesn''t apply: an unpaid shipment stays payable, and paying it sets a fresh window. One tap: the end of the 30-minute window to sign.' }
         paid_at: { type: [string, 'null'], format: date-time }
-        underpaid:
-          type: object
-          description: 'Present only while a payment that arrived short of `shipping_cost` (by more than 1%) holds the shipment in `awaiting_payment`. The short amount is refunded by us; pay the shipment again in full.'
-          required: [received, due]
-          properties:
-            received: { type: number }
-            due: { type: number }
+        payment_refund_due: { type: boolean, description: 'True when a payment arrived but opened no burn: more than 1% short, the token already had another paid shipment, or the token was burned another way first. CatchBack refunds it; nothing ships on it.' }
+        payment_method: { type: string, enum: [signature, checkout], description: '`signature`: one tap, paid in its burn. `checkout`: paid first, then burned.' }
         burn: { $ref: '#/components/schemas/ShipmentBurn' }
         fulfilment:
           oneOf:
@@ -3873,7 +3965,7 @@ components:
     ShipmentGroup:
       type: object
       description: A shipment of 1-25 tokens in one box, named by `shipment_id`. Tokens are listed by token id.
-      required: [shipment_id, status, shipping_cost, holder, expires_at, paid_at, tokens, fulfilment]
+      required: [shipment_id, status, shipping_cost, holder, expires_at, paid_at, payment_refund_due, tokens, fulfilment]
       properties:
         shipment_id: { type: string, format: uuid }
         status:
@@ -3884,6 +3976,7 @@ components:
         holder: { type: string }
         expires_at: { type: string, format: date-time }
         paid_at: { type: [string, 'null'], format: date-time }
+        payment_refund_due: { type: boolean, description: 'True when a payment arrived but opened no burns because a token already had another paid shipment. CatchBack refunds it; nothing ships on it.' }
         tokens:
           type: array
           items: { $ref: '#/components/schemas/ShipmentToken' }
@@ -3913,8 +4006,14 @@ components:
       properties:
         quote: { $ref: '#/components/schemas/TokenShipment' }
         payment:
+          description: Null on a replay once the shipping is paid, and on a one-tap shipment past its 30 minutes to sign.
           oneOf:
-            - $ref: '#/components/schemas/Payment'
+            - allOf:
+                - type: object
+                  required: [method]
+                  properties:
+                    method: { type: string, const: checkout }
+                - $ref: '#/components/schemas/Payment'
             - $ref: '#/components/schemas/OneTapPayment'
             - type: 'null'
         idempotent_replay: { type: boolean, const: true }
@@ -4054,8 +4153,8 @@ components:
           items: { $ref: '#/components/schemas/RevenueMonth' }
     CustomerId:
       type: string
-      pattern: '^[A-Za-z0-9_.:-]{1,128}$'
-      description: Your own id for a customer on a non-crypto program, 1-128 characters of `A-Za-z0-9_.:-`. Use something stable that is not personal data (your internal user id, never an email address or phone number). Ids are yours alone. Leading and trailing spaces are trimmed, and ids are case-sensitive (`User-1` and `user-1` are two customers).
+      pattern: '^(?!\.+$)[A-Za-z0-9_.:-]{1,128}$'
+      description: Your own id for a customer on a non-crypto program, 1-128 characters of `A-Za-z0-9_.:-`, not dots alone. Use something stable that is not personal data (your internal user id, never an email address or phone number). Ids are yours alone. Leading and trailing spaces are trimmed, and ids are case-sensitive (`User-1` and `user-1` are two customers).
       examples: [user-1842]
     VaultCard:
       type: object
@@ -4227,6 +4326,7 @@ components:
         sellback_id: { type: string, description: 'On `sellback`: the sale''s `transaction_id`.' }
         shipment_id: { type: string, description: 'On `shipping` and `shipping_refund`: the customer shipment''s `id`.' }
         reason: { type: [string, 'null'], description: 'On `order_refund` and `shipping_refund`: why.' }
+        period: { type: [string, 'null'], description: 'On `revenue_share`: the month it is for.' }
         note: { type: [string, 'null'], description: 'On `payment` and `adjustment`.' }
     SettlementStatement:
       type: object

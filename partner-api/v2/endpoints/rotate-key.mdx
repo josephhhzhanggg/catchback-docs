@@ -35,7 +35,7 @@ Issues a new key for the same program, with the same scopes. No body; an `Idempo
 | Status | Code | When |
 |---|---|---|
 | `400` | `BAD_IDEMPOTENCY_KEY` | `Idempotency-Key` missing or malformed |
-| `401` | `INVALID_KEY` | The key is disabled, or a rotated key past its 24 hours |
+| `401` | `INVALID_KEY` | The key was disabled, or its 24 hours after a rotation ran out, while this request ran. A key already in that state is refused first with a plain `401 Invalid API key` |
 | `409` | `ALREADY_ROTATED` | This key was already rotated with a different `Idempotency-Key`, or the replay window has passed; the body has `successor` (`id`, `name`) and `expires_at` |
 
 <RequestExample>

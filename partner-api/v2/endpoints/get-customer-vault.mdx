@@ -11,7 +11,7 @@ For [Non-crypto model](/partner-api/v2/settlement) programs only; a Crypto Walle
 The cards your orders pulled into this customer's vault that they still hold, newest first, each with what a sell-back pays right now. A sold or shipped card leaves the vault. A customer you have never sold to has an empty vault, not a `404` (the customer shipment endpoints do answer `404 CUSTOMER_NOT_FOUND` for one).
 
 <ParamField path="customer" type="string" required>
-  Your own id for the customer, as you sent it as `customer` on [Create an order](/partner-api/v2/endpoints/create-order). 1-128 characters of `A-Z a-z 0-9 _ . : -`.
+  Your own id for the customer, as you sent it as `customer` on [Create an order](/partner-api/v2/endpoints/create-order). 1-128 characters of `A-Z a-z 0-9 _ . : -`, not dots alone.
 </ParamField>
 
 ## Response
@@ -36,7 +36,7 @@ The cards your orders pulled into this customer's vault that they still hold, ne
 | Status | Code | When |
 |---|---|---|
 | `400` | `NOT_PARTNER_SETTLED` | Your program pays through customer wallets; read [a wallet's tokens](/partner-api/v2/endpoints/list-wallet-tokens) instead |
-| `400` | `BAD_CUSTOMER` | `customer` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `400` | `BAD_CUSTOMER` | `customer` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -`, or is only dots |
 
 <RequestExample>
 ```bash cURL

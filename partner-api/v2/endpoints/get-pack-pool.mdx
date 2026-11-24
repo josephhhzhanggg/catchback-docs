@@ -36,7 +36,7 @@ The pool is live stock. Each item in it is one physical item, so an item that is
   `band` (its key, e.g. `7.5-15`), `min_value`, `max_value`, `odds` (the chance, 0 to 1, of a pull landing in that band at these odds) and `cards` (how many items sit in it). A band at 0 can't pull at these odds.
 </ResponseField>
 <ResponseField name="odds_choices" type="object[]">
-  Every odds choice the pack sells: `odds`, `label` and `available`.
+  Every odds choice the pack sells: `odds`, `label` and `available`. A choice whose odds aren't published right now is still listed, with `available: false`.
 </ResponseField>
 <ResponseField name="total_cards" type="integer" />
 <ResponseField name="cards" type="object[]">

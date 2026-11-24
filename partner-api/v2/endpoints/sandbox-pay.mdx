@@ -6,13 +6,13 @@ description: "Sandbox only: pay an order's or a shipment's sandbox Payment Inten
 
 Scope: `nft:orders` · **Sandbox only:** `404` outside the [sandbox](/partner-api/v2/quickstart)
 
-Pays an order's, a multi-pack order's, a shipment's or a multi-token shipment's sandbox intent, exactly as a settled payment would. Paying twice changes nothing. It also delivers any webhooks the payment produced.
+Pays an order's, a multi-pack order's, a shipment's or a multi-token shipment's sandbox intent, exactly as a settled payment would. An intent is paid once: paying one that is no longer awaiting payment is `409 ALREADY_PAID`. It also delivers any webhooks the payment produced.
 
 <ParamField path="intentId" type="string" required>
   The `payment.intent_id` from the create response. Sandbox intent ids start `sbx_pi_`.
 </ParamField>
 <ParamField body="amount" type="number">
-  Dollars paid. Default: the full amount. Send less to test the [1% tolerance](/partner-api/v2/payments#rules) and an `underpaid` refund.
+  Dollars paid, as a JSON number (not a string). Default: the full amount. Send less to test the [1% tolerance](/partner-api/v2/payments#rules): an order more than 1% short goes to `refund_due` (`failure_reason: "underpaid"`); a shipment stays `awaiting_payment` with `payment_refund_due: true`.
 </ParamField>
 
 ## Response
@@ -28,9 +28,10 @@ Pays an order's, a multi-pack order's, a shipment's or a multi-token shipment's 
 
 | Status | Code | When |
 |---|---|---|
-| `400` | `BAD_AMOUNT` | `amount` isn't a positive number |
+| `400` | `BAD_AMOUNT` | `amount` isn't a positive JSON number |
 | `404` | `UNKNOWN_PAYMENT` | No such payment in your program |
 | `404` | | Not the sandbox |
+| `409` | `ALREADY_PAID` | The order or shipment is no longer awaiting payment; `status` says where it is |
 
 <RequestExample>
 ```bash cURL

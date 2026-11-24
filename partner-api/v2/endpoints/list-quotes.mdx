@@ -31,6 +31,7 @@ Newest first, each in the [Get a quote](/partner-api/v2/endpoints/get-quote) sha
 | `400` | `BAD_CURSOR` | `cursor` isn't a `next_cursor` from a previous page |
 | `400` | `BAD_LIMIT` | `limit` isn't 1-100 |
 | `400` | `BAD_ADDRESS` | `wallet` is not an address on your mint chain |
+| `400` | `CRYPTO_WALLET_MODEL_ONLY` | Your program is on the Non-crypto model: it has no tokens or wallets. Use the [customer endpoints](/partner-api/v2/settlement) |
 
 <RequestExample>
 ```bash cURL

@@ -42,14 +42,21 @@ A card sells once: a retry returns the first sale with `status: "already_sold"` 
 | Status | Code | When |
 |---|---|---|
 | `400` | `NOT_PARTNER_SETTLED` | Your program pays through customer wallets |
-| `400` | `BAD_CUSTOMER` | `customer` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `400` | `BAD_CUSTOMER` | `customer` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -`, or is only dots |
 | `400` | `BAD_CARD` | `card_id` isn't a card id |
 | `400` | `BAD_JSON` | The body isn't JSON |
 | `400` | `BAD_MIN_PAYOUT` | `min_payout` isn't a non-negative number |
 | `404` | `CUSTOMER_NOT_FOUND` | No customer with that id has bought from your program |
 | `404` | `CARD_NOT_IN_VAULT` | Your program didn't pull that card into this customer's vault |
 | `409` | `PRICE_CHANGED` | The current offer is below `min_payout`; the body has `payout_amount` and `payout_rate`. Nothing is sold |
-| the refusal's, usually `400` | `SELLBACK_REFUSED` | The sale itself was refused, for example the card was shipped or is on its way out; the message says why. Nothing is sold |
+| `409` | `CARD_IN_BATTLE` | The card is held by a battle that hasn't finished |
+| `409` | `CARD_LISTED_ON_MARKETPLACE` | The card is listed on the marketplace |
+| `409` | `SHOP_PURCHASE_NOT_SELLABLE` | The item was bought from a partner shop: it can ship, not sell back |
+| `409` | `GOODS_NOT_SELLABLE` | The item can't be sold back; it can still ship |
+| `403` | `NO_PURCHASE_RECORD` | A sealed item with no purchase record can't be sold back |
+| the refusal's, usually `400` | `SELLBACK_REFUSED` | Any other refusal of the sale, for example the card was shipped or is on its way out; the message says why. A `500` means it didn't go through: retry |
+
+Nothing is sold on any refusal.
 
 <RequestExample>
 ```bash cURL

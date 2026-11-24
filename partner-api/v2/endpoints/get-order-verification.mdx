@@ -30,7 +30,7 @@ Every pack is opened provably fairly. This returns the proof for an order's pull
 
 ### Multi-pack orders
 
-A multi-pack order's own `id` or `Idempotency-Key` returns `{ order_id, batch_id, verified, units: [...] }`: one proof per unit, each with its `unit` number. A unit not yet opened has `"verified": null, "pending": true`, and the order's `verified` is true only when every unit's is.
+A multi-pack order's own `id` or `Idempotency-Key` returns `{ order_id, batch_id, verified, units: [...] }`: one proof per unit, each with its `unit` number. A unit not yet opened has its `status`, `"verified": null` and `"pending": true`, and the order's `verified` is true only when every unit's is.
 
 ## Errors
 

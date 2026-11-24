@@ -9,7 +9,7 @@ Scope: `nft:orders`
 A sell-back quote and its payout. We count a burn after a few block confirmations (EVM) or finalization (Solana), then pay within minutes. The amount paid is always exactly `amount_usd`. Every payout status change is also sent as a `sellback.updated` [webhook](/partner-api/v2/webhooks).
 
 <ParamField path="quoteId" type="string" required>
-  The `quote_id` from [Quote a sell-back](/partner-api/v2/endpoints/create-sellback-quote).
+  The `quote_id` from [Quote a sell-back](/partner-api/v2/endpoints/create-sellback-quote), as returned (lowercase).
 </ParamField>
 
 ## Response
@@ -23,7 +23,7 @@ A sell-back quote and its payout. We count a burn after a few block confirmation
     <ResponseField name="payout" type="object">
       `chain`, `address`, `status`, `tx_hash` and `held`. `status`: `null` (no burn seen yet), `pending` (queued to send), `sending` (sent to the network, waiting to settle), `sent` (paid: `tx_hash` is the USDC transfer on `payout.chain`), `held` (under review by our team, `held: true`; see [Held payouts](/partner-api/v2/limits-and-compliance#held-payouts)) or `failed` (a send failed; it is retried automatically).
     </ResponseField>
-    <ResponseField name="expires_at" type="string" />
+    <ResponseField name="expires_at" type="string">UTC, ending in `Z`.</ResponseField>
     <ResponseField name="redeemed_at" type="string | null" />
     <ResponseField name="burn_tx" type="string | null" />
   </Expandable>
@@ -33,7 +33,8 @@ A sell-back quote and its payout. We count a burn after a few block confirmation
 
 | Status | Code | When |
 |---|---|---|
-| `404` | `UNKNOWN_QUOTE` | No such sell-back quote in your program |
+| `400` | `CRYPTO_WALLET_MODEL_ONLY` | Your program is on the Non-crypto model: it has no tokens or wallets. Use the [customer endpoints](/partner-api/v2/settlement) |
+| `404` | `UNKNOWN_QUOTE` | No such sell-back quote in your program (or not `0x` + 64 lowercase hex) |
 
 <RequestExample>
 ```bash cURL

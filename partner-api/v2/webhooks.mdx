@@ -42,7 +42,7 @@ Every event is a JSON `POST` with this envelope:
 | `sellback.updated` | A sell-back payout changes status: `pending` (the burn was seen), `sending`, `sent`, `held`, `failed` | `{ "quote": ... }`, as [`GET /quotes/{quoteId}`](/partner-api/v2/endpoints/get-quote) returns it |
 | `nft_shipment.updated` | A shipment is paid (`ready`), a token is burned (`redeemed`), or the box moves: `fulfilment.status` `pending`, `processing`, `shipped`, `delivered`, `cancelled`, `needs_review` | `{ "shipment": ... }`: the token's shipment with its `fulfilment` (below) |
 | | **Non-crypto model:** the same three types, with the customer by your id instead of a wallet | |
-| `nft_order.updated` | The order opens into the vault (`in_vault`) or is `refunded` | `{ "order": ... }`, with `custody: "vault"` and `customer` |
+| `nft_order.updated` | The order opens into the vault (`in_vault`; `paid` or `rolled` can come first) or is `refunded` | `{ "order": ... }`, with `custody: "vault"` and `customer` |
 | `sellback.updated` | A sell-back is credited to your statement | `{ "sellback": { "id", "status": "credited", "customer", "card_id", "amount", "statement_entry_id", "created_at" } }` |
 | `nft_shipment.updated` | A customer shipment is created (`processing`, its first event) or moves: `shipped`, `delivered`, `cancelled` | `{ "shipment": ... }` as [`GET /customers/{customer}/shipments`](/partner-api/v2/settlement) lists it, plus `customer` |
 | `ping` | You called [`POST /webhooks/{id}/test`](/partner-api/v2/endpoints/test-webhook) | `{ "webhook_id": "<id>" }` |

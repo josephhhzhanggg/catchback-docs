@@ -27,9 +27,9 @@ Any token of your program, live or burned: who holds it, the item behind it, and
     <ResponseField name="end" type="object | null">
       A burned token has `end`: `{ "at": "...", "reason": "sellback" | "shipment" | "admin", "tx": "0x..." }`. `admin` means CatchBack burned it (a stuck or fraud case); contact us about it. Null for a live token.
     </ResponseField>
-    <ResponseField name="item" type="object">The item's catalog fields (name, set, year, number, grade, cert, brand, size, condition, images, whichever it has) and its current `market_value`.</ResponseField>
+    <ResponseField name="item" type="object">The item's catalog fields (name, set, year, number, grade, cert, brand, size, condition, images, whichever it has) and its current `market_value`. If the item can't be read right now, only `id`, `category`, `name` and `market_value: null`.</ResponseField>
     <ResponseField name="sellback" type="object | null">
-      Null for a burned token, or one not yet confirmed. Otherwise:
+      Null for a burned token, one not yet confirmed, or one whose item can't be read right now. Otherwise:
       <Expandable title="sellback">
         <ResponseField name="amount" type="number">What a sell-back pays right now, in dollars. Indicative: only a quote fixes it.</ResponseField>
         <ResponseField name="rate" type="number">As a fraction, e.g. `0.8`.</ResponseField>
@@ -49,6 +49,7 @@ Any token of your program, live or burned: who holds it, the item behind it, and
 
 | Status | Code | When |
 |---|---|---|
+| `400` | `CRYPTO_WALLET_MODEL_ONLY` | Your program is on the Non-crypto model: it has no tokens or wallets. Use the [customer endpoints](/partner-api/v2/settlement) |
 | `404` | `UNKNOWN_TOKEN` | No such token on your program's contract |
 
 <RequestExample>

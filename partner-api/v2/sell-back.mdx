@@ -4,7 +4,7 @@ description: "What a sell-back pays and when, getting a quote, burning on EVM wi
 ---
 
 <Info>
-  This page is for the **Crypto Wallet** model. On [Non-crypto model](/partner-api/v2/settlement) a card sells back with one call and the payout is credited to your statement: no quote, signature or burn.
+  This page is for the **Crypto Wallet** model. On [Non-crypto model](/partner-api/v2/settlement) a card sells back with one call and the payout is credited to your statement: no quote, signature or burn. The token and quote endpoints answer `400 CRYPTO_WALLET_MODEL_ONLY` there.
 </Info>
 
 Any holder can sell a token back to us for USDC. The flow:
@@ -38,7 +38,7 @@ curl -X POST "https://sandbox.catchbackcards.com/api/partner/v2/tokens/812645739
   -d '{ "kind": "sellback", "holder": "0x8f3c...e21a", "payout_chain": "evm:8453", "payout_address": "0x8f3c...e21a" }'
 ```
 
-A quote fixes the amount, the payer and the payout destination, and **expires 10 minutes** after it is issued, or when the 5-minute fresh window ends if the quote is at the fresh rate (whichever is sooner). Every call issues a new quote; an unused quote just expires. A token with a paid [shipment](/partner-api/v2/shipping) waiting for its burn can't be sold back: the quote, and a burn with an earlier quote, answer `409 TOKEN_IN_SHIPMENT`. Fields and errors: [Quote a sell-back](/partner-api/v2/endpoints/create-sellback-quote).
+A quote fixes the amount, the payer and the payout destination, and **expires 10 minutes** after it is issued, or when the 5-minute fresh window ends if the quote is at the fresh rate (whichever is sooner). Every call issues a new quote; an unused quote just expires. A token with a paid [shipment](/partner-api/v2/shipping) waiting for its burn can't be sold back: the quote, and a burn with any other quote, answer `409 TOKEN_IN_SHIPMENT`. A `payout_address` that could never pass the USDC on (the zero address, your NFT contract, Permit2, USDC itself) is refused with `BAD_PAYOUT_ADDRESS`; smart-contract wallets are fine. Fields and errors: [Quote a sell-back](/partner-api/v2/endpoints/create-sellback-quote).
 
 ## EVM: burn with the signed quote
 
@@ -141,13 +141,14 @@ The contract checks, in order, and reverts with:
 
 | Revert | Cause | What to do |
 |---|---|---|
-| `QuoteExpired(quoteId, expiresAt)` | The block is past `expiresAt` | Get a new quote (a shipment: [renew it](/partner-api/v2/endpoints/renew-shipment)) |
+| `EnforcedPause()` | Burns are paused by CatchBack | Retry later |
 | `NotQuoteHolder(caller, holder)` | `burnWithQuote` was not sent by `holder` | Send from the holder's own wallet, or [burn without gas](#evm-without-gas) |
-| `HolderNotOwner(tokenId, holder, owner)` | The token moved after the quote | Quote again for the new holder |
+| `PostageDue(quoteId)` | A one-tap shipment quote, whose postage is paid in its burn | Burn it with `permit_signature` ([One tap](/partner-api/v2/shipping#one-tap-pay-and-burn-together)) |
+| `QuoteExpired(quoteId, expiresAt)` | The block is past `expiresAt` | Get a new quote (a shipment: [renew it](/partner-api/v2/endpoints/renew-shipment)) |
 | `ERC721NonexistentToken(tokenId)` | The token was already burned | Nothing to sell |
+| `HolderNotOwner(tokenId, holder, owner)` | The token moved after the quote | Quote again for the new holder |
 | `QuoteAlreadyUsed(quoteId)` | This quote was already burned with | Nothing to do: the first burn counts |
 | `InvalidQuoteKind(kind)`, `InvalidQuoteSigner(recovered)` | The quote was altered | Pass the quote exactly as returned |
-| `EnforcedPause()` | Burns are paused by CatchBack | Retry later |
 
 ## EVM without gas
 

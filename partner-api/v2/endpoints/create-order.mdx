@@ -36,16 +36,16 @@ The examples order `bronze`. Use a pack that is selling: pick one with `availabl
   1-10 packs. 2 or more makes a [multi-pack order](/partner-api/v2/orders#multi-pack-orders).
 </ParamField>
 <ParamField body="recipient" type="string">
-  **Crypto Wallet model only, and required there.** The customer's self-custody wallet on your mint chain. Never an exchange deposit address: the NFTs are minted to it.
+  **Crypto Wallet model only, and required there.** The customer's self-custody wallet on your mint chain. Never an exchange deposit address: the NFTs are minted to it. A mixed-case EVM address must have a valid EIP-55 checksum (one case throughout is fine). The zero address, your program's NFT contract, Permit2 and USDC are refused. Smart-contract wallets are fine.
 </ParamField>
 <ParamField body="refund_address" type="string">
-  Crypto Wallet model only. An EVM wallet that can receive USDC on Base, for refunds. Defaults to `recipient` on an EVM program. **Required when you mint on Solana.**
+  Crypto Wallet model only. An EVM wallet that can receive USDC on Base, for refunds. Defaults to `recipient` on an EVM program. **Required when you mint on Solana.** The same addresses are refused as for `recipient`.
 </ParamField>
 <ParamField body="partner_user_ref" type="string">
-  Crypto Wallet model: your opaque user id (`A-Z a-z 0-9 _ . : -`, up to 128). Never put personal data here. Refused on a non-crypto program (`WALLET_FIELDS_NOT_ACCEPTED`), where `customer` names the customer.
+  Crypto Wallet model: your opaque user id (1-128 characters of `A-Z a-z 0-9 _ . : -`). A malformed one is refused (`BAD_PARTNER_USER_REF`), never dropped. Never put personal data here. Refused on a non-crypto program (`WALLET_FIELDS_NOT_ACCEPTED`), where `customer` names the customer.
 </ParamField>
 <ParamField body="customer" type="string">
-  **non-crypto programs only, and required there.** Your own id for the customer: 1-128 characters of `A-Z a-z 0-9 _ . : -`. Use something stable that is not personal data (your internal user id, never an email address or phone number). Leading and trailing spaces are trimmed; ids are case-sensitive. The same `Idempotency-Key` with a different `customer` is `422`.
+  **non-crypto programs only, and required there.** Your own id for the customer: 1-128 characters of `A-Z a-z 0-9 _ . : -`, not dots alone. Use something stable that is not personal data (your internal user id, never an email address or phone number). Leading and trailing spaces are trimmed; ids are case-sensitive. The same `Idempotency-Key` with a different `customer` is `422`. Sent to a Crypto Wallet program, it is refused with `NOT_PARTNER_SETTLED`.
 </ParamField>
 
 ## Response
@@ -86,14 +86,16 @@ If the chosen odds stop selling before the payment settles, the pack isn't opene
 |---|---|---|
 | `400` | `BAD_IDEMPOTENCY_KEY` | `Idempotency-Key` missing or malformed |
 | `400` | `BAD_JSON` | The body isn't JSON |
-| `400` | `BAD_RECIPIENT` | `recipient` is not a wallet address on your mint chain |
+| `400` | `BAD_RECIPIENT` | `recipient` is not a wallet address on your mint chain (or a mixed-case EVM address with a bad checksum), or it is the zero address, your program's NFT contract, Permit2 or USDC |
 | `400` | `BAD_PACK` | `pack_type` missing |
 | `400` | `BAD_CATEGORY` | Unknown `category` |
 | `400` | `BAD_ODDS` | `odds` isn't a known choice, or the pack doesn't sell it (`odds` lists the choices) |
 | `400` | `BAD_QUANTITY` | `quantity` isn't a whole number from 1 to 10 |
-| `400` | `BAD_REFUND_ADDRESS` | No usable EVM `refund_address` (required when you mint on Solana) |
-| `400` | `WALLET_FIELDS_NOT_ACCEPTED` | Non-crypto model: a wallet field (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address`) was sent. Send `customer` only |
-| `400` | `BAD_CUSTOMER` | Non-crypto model: `customer` is missing, or not 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `400` | `BAD_REFUND_ADDRESS` | No usable EVM `refund_address` (required when you mint on Solana), or it is one of the addresses refused for `recipient` |
+| `400` | `BAD_PARTNER_USER_REF` | `partner_user_ref` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `400` | `NOT_PARTNER_SETTLED` | Crypto Wallet model: `customer` was sent. Send `recipient` |
+| `400` | `WALLET_FIELDS_NOT_ACCEPTED` | Non-crypto model: a wallet field (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address`) was sent; `fields` lists them. Send `customer` only |
+| `400` | `BAD_CUSTOMER` | Non-crypto model: `customer` is missing, or not 1-128 characters of `A-Z a-z 0-9 _ . : -`, or only dots |
 | `402` | `CREDIT_LIMIT` | Non-crypto model: the order would take what you owe past your credit limit. The body has `owed`, `credit_limit` and `order_total`. Nothing is charged |
 | `403` | `WALLET_REFUSED` | A wallet in the request failed sanctions screening |
 | `403` | `WALLET_BLOCKED` | This wallet may not buy from CatchBack |

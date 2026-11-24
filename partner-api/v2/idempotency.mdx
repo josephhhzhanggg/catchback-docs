@@ -11,7 +11,7 @@ Orders, shipments and key rotations are separate key spaces; the two Crypto Wall
 |---|---|---|
 | Orders (both models) | Your program | One key is one order, across all your keys and customers |
 | Crypto Wallet shipments (`POST /shipments`, `POST /tokens/{tokenId}/shipment`) | Your program | One key is one shipment |
-| Non-crypto shipments (`POST /customers/{customer}/shipments`) | The customer | The same key for two customers makes two shipments; use a new key per shipment anyway |
+| Non-crypto shipments (`POST /customers/{customer}/shipments`) | Your program | One key is one shipment, whichever customer it names: the same key for another customer is `422` |
 | Key rotations | The key being rotated | |
 
 A missing or malformed key is `400 BAD_IDEMPOTENCY_KEY`.
@@ -27,7 +27,7 @@ A missing or malformed key is `400 BAD_IDEMPOTENCY_KEY`.
 ## What counts as the same request
 
 - **An order** is the same request when `pack_type`, `category`, `odds`, `quantity`, `recipient` and `refund_address` match (on the Non-crypto model, `customer` in place of the wallet fields). `partner_user_ref` is not compared. `odds` is compared as resolved, so leaving it out and naming the pack's default are the same request (and so are `quantity: 1` and no `quantity`).
-- **A shipment** is the same request when the token (or the set of `token_ids`, in any order), `holder`, `address`, `rate` and `cover_amount` all match. A customer shipment compares `card_ids`, `address`, `rate`, `max_cost` and `cover_amount`.
+- **A shipment** is the same request when the token (or the set of `token_ids`, in any order), `holder`, `address`, `rate` and `cover_amount` all match. A customer shipment compares the customer, `card_ids`, `address`, `rate`, `max_cost` and `cover_amount`.
 
 ## Getting a lost response back
 

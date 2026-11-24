@@ -14,11 +14,11 @@ This is one of the two [integration models](/partner-api/v2/integration-models),
 | Shipping | Paid by the holder | On your statement |
 | Revenue share | Paid to your USDC address | Netted on your statement |
 
-The endpoints for catalog, odds, orders, webhooks and keys are the same. Wallet fields (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain`, `payout_address`) are refused: an order that sends any of them answers `400 WALLET_FIELDS_NOT_ACCEPTED`. Token ids, quotes and burns aren't used, and the wallet endpoints aren't for these programs.
+The endpoints for catalog, odds, orders, webhooks and keys are the same. Wallet fields (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain`, `payout_address`) are refused: an order, a shipment estimate or a shipment that sends any of them answers `400 WALLET_FIELDS_NOT_ACCEPTED`, with `fields` naming them. Token ids, quotes and burns aren't used: the wallet, token, quote and shipment endpoints answer `400 CRYPTO_WALLET_MODEL_ONLY`.
 
 ## Your customers
 
-Every call names a customer by `customer`: your id for them, 1-128 characters of `A-Z a-z 0-9 _ . : -`. Use something stable that is not personal data (your internal user id, never an email address or phone number).
+Every call names a customer by `customer`: your id for them, 1-128 characters of `A-Z a-z 0-9 _ . : -`, not dots alone. Use something stable that is not personal data (your internal user id, never an email address or phone number).
 
 Ids are trimmed of leading and trailing spaces, and are case-sensitive: `User-1842` and `user-1842` are two customers. The first order for a new id creates that customer's CatchBack account (one refused for your credit limit or a daily limit creates none); later orders with the same id reach the same account. Ids are yours alone: the same id in another partner's program is a different customer. You never see or send our account ids.
 
@@ -78,7 +78,7 @@ curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/customers/user-1842/cards/838a5
   -H "Authorization: Bearer $CATCHBACK_KEY" -H "Content-Type: application/json" -d '{"min_payout": 30}'
 ```
 
-Sells the card at its current offer and credits the payout to your statement; nothing is paid out to the customer, so you credit them your way. `min_payout` (optional) refuses an offer below it (`409 PRICE_CHANGED`). A card sells once: a retry, even one sent at the same moment as the first, returns the first sale with `status: "already_sold"`, so no `Idempotency-Key` is needed. A card id that is a UUID matches in any case. A card your program didn't pull into this vault is `404 CARD_NOT_IN_VAULT`; a card that was shipped or is on its way out is refused with `SELLBACK_REFUSED` (usually `400`), and the message says why.
+Sells the card at its current offer and credits the payout to your statement; nothing is paid out to the customer, so you credit them your way. `min_payout` (optional) refuses an offer below it (`409 PRICE_CHANGED`). A card sells once: a retry, even one sent at the same moment as the first, returns the first sale with `status: "already_sold"`, so no `Idempotency-Key` is needed. A card id that is a UUID matches in any case. A card your program didn't pull into this vault is `404 CARD_NOT_IN_VAULT`. The sale's own refusals keep their code (`CARD_IN_BATTLE`, `CARD_LISTED_ON_MARKETPLACE`, `SHOP_PURCHASE_NOT_SELLABLE`, `GOODS_NOT_SELLABLE`, `NO_PURCHASE_RECORD`); any other, such as a card that was shipped or is on its way out, is `SELLBACK_REFUSED` (usually `400`), and the message says why.
 
 ```json
 { "sellback": { "status": "sold", "transaction_id": "…", "payout_amount": 31, "payout_rate": 1, "on_statement": true } }
@@ -87,7 +87,7 @@ Sells the card at its current offer and credits the payout to your statement; no
 ## Ship: estimate, then create
 
 1. [`POST /customers/{customer}/shipments/estimate`](#ship-estimate-then-create) with 1-10 `card_ids` (from the vault, one box) and an `address` returns `rates`, each with a `carrier`, `service`, `token` and `amount`. Add `cover_amount` to price shipping insurance: each rate then also has a `total`, the postage plus the cover's premium.
-2. `POST /customers/{customer}/shipments` with the same `card_ids` and `address`, the chosen `rate: { carrier, token }`, and `max_cost` (that rate's `total` if you sent `cover_amount`, else its `amount`), plus an `Idempotency-Key` (shipment keys are per customer: the same key for two customers is two shipments). The postage (and any cover) goes on your statement; past your credit limit it is refused with `402 CREDIT_LIMIT` (with `owed`, `credit_limit` and `shipment_total`). Each key can create up to 50 shipments a UTC day. The response is the shipment, with its `id`.
+2. `POST /customers/{customer}/shipments` with the same `card_ids` and `address`, the chosen `rate: { carrier, token }`, and `max_cost` (that rate's `total` if you sent `cover_amount`, else its `amount`), plus an `Idempotency-Key` (shipment keys are per program: the same key for another customer is `422 IDEMPOTENCY_KEY_REUSED`). The postage (and any cover) goes on your statement; past your credit limit it is refused with `402 CREDIT_LIMIT` (with `owed`, `credit_limit` and `shipment_total`). Each key can create up to 50 shipments a UTC day (then `429 DAILY_SHIPMENT_LIMIT_REACHED`, with `retry_after_seconds`). The response is the shipment, with its `id`.
 3. Follow it with [`nft_shipment.updated`](/partner-api/v2/webhooks#events) or `GET /customers/{customer}/shipments` (the customer's latest 100, newest first). `status` moves `processing` → `shipped` (with `carrier` and `tracking_number`) → `delivered`. The first webhook, at `processing`, comes when the shipment is created.
 
 A rate that rose above `max_cost` since the estimate is refused with `PRICE_CHANGED`. A card refusal has one of two codes:
@@ -128,7 +128,7 @@ Your revenue share is netted on the statement, and you settle the balance as agr
 
 The events are the same as the Crypto Wallet model's, with `customer` instead of a wallet:
 
-- `nft_order.updated` as an order's packs open into the vault.
+- `nft_order.updated` as an order's packs open into the vault (`in_vault`), or are `refunded`.
 - `sellback.updated` when a sell-back is credited (`status: "credited"`, `amount`, `card_id`, `statement_entry_id`).
 - `nft_shipment.updated` when a shipment is created (`processing`) and as it moves.
 
