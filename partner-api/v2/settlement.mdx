@@ -1,0 +1,127 @@
+---
+title: "Paying through you"
+description: "Partner settlement: buy packs for your customers by your own id for them, keep their cards in a CatchBack vault, and settle orders, sell-backs and shipping on one statement with a credit limit."
+---
+
+Choose **Paying through you** in Get started when your customers have no crypto wallet. You buy for them and charge them however you already do. We keep each card in a CatchBack vault for that customer, and everything they do (orders, sell-backs, shipping) goes on one statement between you and us.
+
+|  | Wallet model | Paying through you |
+|---|---|---|
+| Who pays CatchBack | Each customer, in USDC | You, on your statement |
+| A customer is | A wallet address | Your own id for them |
+| Their cards | NFTs in their wallet | In their CatchBack vault, read with the API |
+| Sell-backs | USDC to their wallet | Credited to your statement |
+| Shipping | Paid by the holder | On your statement |
+| Revenue share | Paid to your USDC address | Netted on your statement |
+
+The endpoints for catalog, odds, orders, webhooks and keys are the same. Wallet fields (`recipient`, `refund_address`, token ids, quotes and burns) are not used, and an order that sends one is refused with `WALLET_FIELDS_NOT_ACCEPTED`.
+
+## Your customers
+
+Every call names a customer by `customer`: your id for them, 1-128 characters of `A-Z a-z 0-9 _ . : -`. Use something stable that is not personal data (your internal user id, never an email address or phone number).
+
+The first order for a new id creates that customer's CatchBack account; later orders with the same id reach the same account. Ids are yours alone: the same id in another partner's program is a different customer. You never see or send our account ids.
+
+## Buy a pack: `POST /orders`
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/orders" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Idempotency-Key: order-7f3a91" \
+  -H "Content-Type: application/json" \
+  -d '{"pack_type":"bronze","category":"pokemon","odds":"standard","quantity":2,"customer":"user-1842"}'
+```
+
+There is no payment step: the order is charged to your statement when it is accepted, and its packs open right away. The response is the [order](/partner-api/v2/orders) with `custody: "vault"` and `customer`, and each pack's status ends at `in_vault` instead of `minted`. A retry with the same `Idempotency-Key` returns the same order and is never charged twice.
+
+An order is refused, and nothing is charged, when:
+
+| Status | Code | When |
+|---|---|---|
+| `402` | `CREDIT_LIMIT` | It would take what you owe past your credit limit. The error carries `owed`, `credit_limit` and `order_total`. |
+| `429` | `CUSTOMER_DAILY_LIMIT` | This customer has spent their limit for the UTC day. Carries `spent_today`, `limit` and `retry_after_seconds`. |
+| `429` | `DAILY_LIMIT` | Your program has spent its daily limit, if it has one. Same fields. |
+| `403` | `CUSTOMER_BLOCKED` | We can't sell to this customer. Don't retry. |
+| `400` | `BAD_CUSTOMER` | `customer` is missing or not 1-128 of the allowed characters. |
+
+## Their vault: `GET /customers/{customer}/vault`
+
+The cards the customer holds now, newest first, each with what it sells back for at this moment:
+
+```json
+{
+  "customer": "user-1842",
+  "cards": [
+    {
+      "card": { "id": "838a5e7f-…", "category": "pokemon", "name": "Charizard ex PSA 10" },
+      "order_id": "order-7f3a91",
+      "pulled_at": "2026-11-24T18:02:11Z",
+      "value_at_pull": 31,
+      "sellback": { "amount": 31, "rate": 1, "fresh": true, "locked_until": "2026-12-01T18:02:11Z" }
+    }
+  ],
+  "truncated": false
+}
+```
+
+`sellback.fresh` is true while the card is in its fresh window after the pull, at the higher rate. For 7 days after a card is acquired its sell-back is based on its value when acquired (`locked_until`), so a price change in that time doesn't move the offer. A sold or shipped card leaves the vault. `truncated: true` means the customer has more pulls than one read covers.
+
+## Sell back: `POST /customers/{customer}/cards/{card_id}/sellback`
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/customers/user-1842/cards/838a5e7f-…/sellback" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" -H "Content-Type: application/json" -d '{"min_payout": 30}'
+```
+
+Sells the card at its current offer and credits the payout to your statement; nothing is paid out to the customer, so you credit them your way. `min_payout` (optional) refuses an offer below it. A card sells once: a retry returns the first sale with `status: "already_sold"`.
+
+```json
+{ "sellback": { "status": "sold", "transaction_id": "…", "payout_amount": 31, "payout_rate": 1, "on_statement": true } }
+```
+
+## Ship: estimate, then create
+
+1. [`POST /customers/{customer}/shipments/estimate`](#ship-estimate-then-create) with `card_ids` (from the vault) and an `address` returns `rates`, each with a `carrier`, `service`, `token` and `amount`. Add `cover_amount` to price shipping insurance.
+2. `POST /customers/{customer}/shipments` with the same `card_ids` and `address`, the chosen `rate: { carrier, token }`, and `max_cost`, plus an `Idempotency-Key`. The postage (and any cover) goes on your statement; past your credit limit it is refused with `402 CREDIT_LIMIT`. The response is the shipment, with its `id`.
+3. Follow it with [`nft_shipment.updated`](/partner-api/v2/webhooks#events) or `GET /customers/{customer}/shipments` (the customer's latest 100, newest first). `status` moves `processing` → `shipped` (with `carrier` and `tracking_number`) → `delivered`.
+
+A rate that rose above `max_cost` since the estimate is refused with `PRICE_CHANGED`, and a card that left the vault meanwhile with `CARDS_NOT_SHIPPABLE`. A shipment that doesn't go through is taken off your statement.
+
+## Your statement: `GET /settlement`
+
+What you owe now, your limits, and one month of entries (`period=YYYY-MM`, the current UTC month by default):
+
+```json
+{
+  "owed": 236.65,
+  "credit_limit": 10000,
+  "available": 9763.35,
+  "customer_daily_limit": 500,
+  "daily_limit": null,
+  "period": {
+    "month": "2026-11", "from": "2026-11-01T00:00:00Z", "to": "2026-12-01T00:00:00Z",
+    "opening_balance": 0, "closing_balance": 236.65,
+    "totals": { "order": { "amount": 250, "entries": 2 }, "sellback": { "amount": -31, "entries": 1 }, "shipping": { "amount": 17.65, "entries": 1 } }
+  },
+  "entries": [
+    { "id": "…", "kind": "sellback", "amount": -31, "created_at": "…", "customer": "user-1842", "order_id": "…", "card_id": "838a5e7f-…", "sellback_id": "…" }
+  ],
+  "next_cursor": null
+}
+```
+
+A positive `amount` adds to what you owe, a negative one takes from it. The kinds are `order`, `order_refund`, `shipping`, `shipping_refund`, `sellback`, `revenue_share`, `payment` and `adjustment`. Page with `limit` (up to 200) and `cursor`. Your manager's **Statement** page shows the same, with a CSV export.
+
+Your revenue share is netted on the statement, and you settle the balance as agreed with us. Your credit limit and daily limits are set by CatchBack; ask your contact to change them.
+
+## Webhooks
+
+The events are the same as the wallet model's, with `customer` instead of a wallet:
+
+- `nft_order.updated` as an order's packs open into the vault.
+- `sellback.updated` when a sell-back is credited (`status: "credited"`, `amount`, `card_id`, `statement_entry_id`).
+- `nft_shipment.updated` as a shipment moves.
+
+## In the sandbox
+
+Get started's guide for this model runs every step against the sandbox: an order for a test customer, the vault, a sell-back, the statement, and a shipment. In the sandbox you play our shipping team with `POST /sandbox/shipments/{id}` and `{"status":"shipped"}` or `{"status":"delivered"}`, using the shipment's `id`.

@@ -5,6 +5,13 @@ description: "What changed in Partner API v2, newest first."
 
 Changes to `v2` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. Dates are US Pacific time.
 
+<Update label="November 24, 2026" description="Paying through you">
+  - New payment model: [Paying through you](/partner-api/v2/settlement). For customers without a crypto wallet, you buy for them by your own id for them (`customer`), their cards stay in a CatchBack vault, and orders, sell-backs and shipping settle on one statement with a credit limit.
+  - New endpoints for these programs: `GET /customers/{customer}/vault`, `POST /customers/{customer}/cards/{card_id}/sellback`, `POST /customers/{customer}/shipments/estimate`, `POST /customers/{customer}/shipments`, `GET /customers/{customer}/shipments` and `GET /settlement`.
+  - `POST /orders` takes `customer` on these programs and refuses wallet fields (`WALLET_FIELDS_NOT_ACCEPTED`); new error codes `CREDIT_LIMIT` (402), `CUSTOMER_DAILY_LIMIT` and `DAILY_LIMIT` (429, with `retry_after_seconds`). Orders gain `custody` and `customer`, and the status `in_vault`.
+  - In the sandbox, `POST /sandbox/shipments/{id}` also takes a customer shipment's `id`.
+</Update>
+
 <Update label="November 23, 2026" description="One-tap shipping">
   - Ship one token in one tap: where your program supports it, [Create a one-token shipment](/partner-api/v2/endpoints/create-token-shipment) returns `payment.method: "signature"` and a `sign` message. The holder signs it once, you send it to [Burn without gas](/partner-api/v2/endpoints/relay-burn) as `permit_signature`, and the postage and the burn land in one transaction. No separate payment, and no 24-hour burn window. See [One tap](/partner-api/v2/shipping#one-tap-pay-and-burn-together).
   - New: `payment_method` on one-token shipments (`signature` or `checkout`); `permit_signature` on the burn endpoint; error codes `BAD_PAYMENT_METHOD`, `SIGNATURE_PAYMENT_UNAVAILABLE`, `POSTAGE_DUE`, `BAD_PERMIT_SIGNATURE`, `INSUFFICIENT_FUNDS` and `PERMIT2_NOT_APPROVED`.

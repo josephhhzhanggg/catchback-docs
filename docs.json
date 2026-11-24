@@ -86,6 +86,7 @@
               "partner-api/v2/verify-a-pull",
               "partner-api/v2/odds",
               "partner-api/v2/payments",
+              "partner-api/v2/settlement",
               "partner-api/v2/sell-back",
               "partner-api/v2/shipping",
               "partner-api/v2/webhooks",
