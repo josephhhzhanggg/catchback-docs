@@ -32,6 +32,16 @@ The model is your program's `payment_mode`: `wallet` for the Crypto Wallet model
 | **Crypto your customer sees** | A wallet and a signature | None |
 | **Crypto you handle** | None: we mint, pay gas, take payments and send payouts | None |
 
+## Your program's terms
+
+On either model, the packs your program sells, their odds and the buyback rate your customers get are agreed with you at onboarding, so they can differ from another partner's. Your customers always buy at the odds they're shown and sell back at the offer they're shown. The API returns your program's own terms everywhere they apply:
+
+- [`GET /catalog/packs`](/partner-api/v2/endpoints/list-packs): the packs you sell, their prices and odds choices;
+- [`GET /catalog/packs/pool`](/partner-api/v2/endpoints/get-pack-pool): a pack's odds and its `fresh_buyback_rate`;
+- the sell-back offer on every item: a token's `sellback` ([Crypto Wallet model](/partner-api/v2/sell-back)) or a vault card's `sellback` ([Non-crypto model](/partner-api/v2/endpoints/get-customer-vault)).
+
+Read these rather than hard-coding a rate; the rates on these pages are our standard terms. Your revenue share is agreed the same way and reported on [your revenue statement](/partner-api/v2/endpoints/get-revenue).
+
 ## Crypto Wallet model
 
 ```mermaid
