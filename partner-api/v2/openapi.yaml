@@ -3071,7 +3071,11 @@ components:
       type: string
       enum: [pokemon, onepiece, sports, riftbound, watches, goods]
       default: pokemon
-      description: '`goods` packs hold streetwear and jewelry. Raw singles have no category of their own: they come out of other categories'' packs.'
+      description: '`goods` packs hold streetwear and jewelry. A pack is never `singles`: raw singles come out of other categories'' packs (see ItemCategory).'
+    ItemCategory:
+      type: string
+      enum: [pokemon, onepiece, sports, riftbound, watches, goods, singles]
+      description: 'The category of an item a pack pulled: a pack''s categories plus `singles`, the raw ungraded singles some packs pull.'
     Odds:
       type: string
       enum: [standard, hot, chill, classic]
@@ -3084,7 +3088,7 @@ components:
       additionalProperties: true
       properties:
         id: { type: string }
-        category: { $ref: '#/components/schemas/PackCategory' }
+        category: { $ref: '#/components/schemas/ItemCategory' }
         name: { type: [string, 'null'] }
         set: { type: [string, 'null'] }
         year: { type: [string, integer, 'null'] }
@@ -3313,7 +3317,7 @@ components:
       required: [card_id, category, name, value, pulled_at]
       properties:
         card_id: { type: string }
-        category: { $ref: '#/components/schemas/PackCategory' }
+        category: { $ref: '#/components/schemas/ItemCategory' }
         name: { type: [string, 'null'] }
         value: { type: number, description: 'The item''s value when it was pulled; it anchors the sell-back offer.' }
         pulled_at: { type: string, format: date-time }
@@ -3435,7 +3439,7 @@ components:
         unit: { type: integer, description: 'In a multi-pack order''s proof.' }
         pull_id: { type: string }
         card_id: { type: string }
-        category: { $ref: '#/components/schemas/PackCategory' }
+        category: { $ref: '#/components/schemas/ItemCategory' }
         verified: { type: boolean }
         verification_type: { type: [string, 'null'], examples: [provably_fair] }
         verify_url: { type: string, format: uri, description: 'Public; your customer can open it to re-run the check with no key.' }
@@ -3490,7 +3494,7 @@ components:
               required: [id, category, name]
               properties:
                 id: { type: string }
-                category: { $ref: '#/components/schemas/PackCategory' }
+                category: { $ref: '#/components/schemas/ItemCategory' }
                 name: { type: [string, 'null'] }
             minted_at: { type: string, format: date-time }
             sellback:
@@ -4005,7 +4009,7 @@ components:
           required: [id, category, name]
           properties:
             id: { type: string, description: 'The card. Pass it as `card_id` to sell it back or ship it.' }
-            category: { $ref: '#/components/schemas/PackCategory' }
+            category: { $ref: '#/components/schemas/ItemCategory' }
             name: { type: [string, 'null'] }
         order_id: { type: string, description: 'The `order_id` (your `Idempotency-Key`) of the order that pulled it.' }
         pulled_at: { type: string, format: date-time }
