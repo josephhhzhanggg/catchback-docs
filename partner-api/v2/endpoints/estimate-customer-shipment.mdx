@@ -1,0 +1,103 @@
+---
+title: "Estimate a customer shipment"
+api: "POST /api/partner/v2/customers/{customer}/shipments/estimate"
+description: "Paying through you: live carrier rates to ship 1-10 of a customer's vault cards in one box. Charges nothing and stores nothing."
+---
+
+Scope: `nft:orders` · Rate limit: 30 a minute, shared with [Estimate a shipment](/partner-api/v2/endpoints/estimate-shipment) and [Estimate a one-token shipment](/partner-api/v2/endpoints/estimate-token-shipment)
+
+For [Paying through you](/partner-api/v2/settlement) programs only; a wallet program gets `400 NOT_PARTNER_SETTLED`.
+
+Live carrier rates to ship 1-10 of a customer's vault cards to an address in one box. Charges nothing and stores nothing: the address only goes to the carrier for the quote. Pass a rate's `carrier` and `token` to [Create a customer shipment](/partner-api/v2/endpoints/create-customer-shipment), with `max_cost` set to that rate's `total` if you sent `cover_amount`, else its `amount`.
+
+<ParamField path="customer" type="string" required>
+  Your own id for the customer.
+</ParamField>
+<ParamField body="card_ids" type="string[]" required>
+  1-10 distinct `card.id`s from the customer's [vault](/partner-api/v2/endpoints/get-customer-vault), for one box.
+</ParamField>
+<ParamField body="address" type="object" required>
+  `name`, `address1`, `city` and `country` (ISO 3166 alpha-2) are required; `address2` is optional; `state` and `zip` where the country uses them; `phone` is required outside the US. `name`, `address1`, `address2`, `city` and `state` take up to 100 characters, `zip` and `phone` up to 20.
+</ParamField>
+<ParamField body="cover_amount" type="number | null">
+  Shipping insurance cover in dollars, with at most two decimals, within the range the cards allow (the response's `max_cover`; a `400 COVER_NOT_ALLOWED` gives the range).
+</ParamField>
+
+## Response
+
+<ResponseField name="destination_country" type="string" />
+<ResponseField name="package_type" type="string" />
+<ResponseField name="order_value" type="number">What the cards are worth for cover, in dollars.</ResponseField>
+<ResponseField name="max_cover" type="number | null">The most they can be covered for; null when they can't be insured.</ResponseField>
+<ResponseField name="cover_amount" type="number">The `cover_amount` you sent, when you sent one.</ResponseField>
+<ResponseField name="rates" type="object[]">
+  <Expandable title="rate">
+    <ResponseField name="carrier" type="string" />
+    <ResponseField name="service" type="string" />
+    <ResponseField name="token" type="string">Pass `carrier` and `token` as `rate` to Create a customer shipment.</ResponseField>
+    <ResponseField name="amount" type="number">The postage. Pass it as `max_cost` when you sent no `cover_amount`.</ResponseField>
+    <ResponseField name="estimated_days" type="integer | null" />
+    <ResponseField name="cover_available" type="boolean">Only with `cover_amount`: whether this service offers the cover.</ResponseField>
+    <ResponseField name="insurance_premium" type="number | null">Only with `cover_amount`: the cover's premium on this rate.</ResponseField>
+    <ResponseField name="total" type="number | null">Only with `cover_amount`: the postage plus the premium (null when the cover isn't available). Pass it as `max_cost`.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `NOT_PARTNER_SETTLED` | Your program pays through customer wallets; use [Estimate a shipment](/partner-api/v2/endpoints/estimate-shipment) |
+| `400` | `BAD_JSON` | The body isn't JSON |
+| `400` | `BAD_CUSTOMER` | `customer` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `400` | | `card_ids` isn't a list of 1-10 distinct card ids; the address is invalid (`fields` maps each bad field to a message); or `cover_amount` isn't a positive dollar amount with at most two decimals |
+| `400` | `COVER_NOT_ALLOWED` | `cover_amount` is outside what the cards can be insured for; the body has `order_value`, `min_cover` and `max_cover` |
+| `400` | `PARTNER_GOODS` | An item is held by its brand partner and can't ship through CatchBack; it can still be sold back |
+| `400` | `COUNTRY_NOT_SUPPORTED` | We don't ship to that country |
+| `400` | `OVER_CUSTOMS_CAP` | The cards are worth more than we can ship internationally |
+| `403` | `CUSTOMER_BLOCKED` | This customer may not ship cards (`capability` says which block applies) |
+| `403` | `CUSTOMER_UNAVAILABLE` | This customer's account is unavailable |
+| `404` | `CUSTOMER_NOT_FOUND` | No customer with that id has bought from your program |
+| `409` | `CARDS_NOT_IN_VAULT` | A card isn't in this customer's vault from your program; `card_ids` lists them |
+| `409` | `CARDS_NOT_SHIPPABLE` | A card can't ship right now; `cards` lists each with its `reason` (`not_in_vault`, `listed`, `shipping`, `on_hold` or `not_a_card`) |
+| `502` | | The carrier didn't answer; retry |
+| `503` | | We couldn't check the customer or the cards just now; retry |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/customers/user-1842/shipments/estimate \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "card_ids": ["838a5e7f-dc62-4618-ad4a-cf015de20536"],
+    "address": { "name": "Alice Tester", "address1": "1 Market St", "city": "San Francisco", "state": "CA", "zip": "94105", "country": "US", "phone": "4155550100" }
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "destination_country": "US",
+  "package_type": "mailer",
+  "order_value": 31,
+  "max_cover": null,
+  "rates": [
+    { "carrier": "USPS", "service": "Ground Advantage", "token": "r_9f3c", "amount": 7.5, "estimated_days": 3 }
+  ]
+}
+```
+
+```json 200 with cover_amount
+{
+  "destination_country": "US",
+  "package_type": "mailer",
+  "order_value": 420,
+  "max_cover": 420,
+  "cover_amount": 400,
+  "rates": [
+    { "carrier": "USPS", "service": "Priority Mail", "token": "r_1a7d", "amount": 9.85, "estimated_days": 2, "cover_available": true, "insurance_premium": 4.2, "total": 14.05 }
+  ]
+}
+```
+</ResponseExample>

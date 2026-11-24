@@ -12,10 +12,10 @@ Newest first, each order in the [Get an order](/partner-api/v2/endpoints/get-ord
   A `recipient` address on your mint chain. Default: all.
 </ParamField>
 <ParamField query="partner_user_ref" type="string">
-  A `partner_user_ref` you sent with an order. It matches the orders you sent with that ref, whichever wallet they went to. Default: all.
+  A `partner_user_ref` you sent with an order. It matches the orders you sent with that ref, whichever wallet they went to. On a [Paying through you](/partner-api/v2/settlement) program, a `customer` id: it matches that customer's orders. Default: all.
 </ParamField>
 <ParamField query="status" type="string">
-  `awaiting_payment`, `paid`, `rolled`, `minted`, `mint_failed`, `expired`, `refund_due` or `refunded`. Default: all.
+  `awaiting_payment`, `paid`, `rolled`, `minted`, `in_vault` (Paying through you), `mint_failed`, `expired`, `refund_due` or `refunded`. Default: all.
 </ParamField>
 <ParamField query="limit" type="integer" default="25">
   1-100.

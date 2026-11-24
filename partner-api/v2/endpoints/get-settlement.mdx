@@ -1,0 +1,102 @@
+---
+title: "Get your statement"
+api: "GET /api/partner/v2/settlement"
+description: "Paying through you: what you owe against your credit limit, your daily limits, and one month of statement entries."
+---
+
+Scope: `nft:orders`
+
+For [Paying through you](/partner-api/v2/settlement) programs only; a wallet program gets `400 NOT_PARTNER_SETTLED` and reads [its revenue statement](/partner-api/v2/endpoints/get-revenue) instead.
+
+What you owe now against your credit limit, your daily limits, and one UTC month of your statement: what was owed at its start and end, a total per kind, and its entries, newest first, each naming the customer by your own id. A positive `amount` adds to what you owe; a negative one takes from it. Your revenue share is netted on the statement, and you settle the balance as agreed with us. Your credit limit and daily limits are set by CatchBack.
+
+<ParamField query="period" type="string">
+  A month, `YYYY-MM` (UTC). Default: the current month.
+</ParamField>
+<ParamField query="limit" type="integer" default="50">
+  Entries per page, 1-100.
+</ParamField>
+<ParamField query="cursor" type="string">
+  The `next_cursor` of the previous page. Opaque: pass it back unchanged.
+</ParamField>
+
+## Response
+
+<ResponseField name="owed" type="number">What you owe now, in dollars.</ResponseField>
+<ResponseField name="credit_limit" type="number">The most you may owe. An order or shipment past it is refused with `402 CREDIT_LIMIT`.</ResponseField>
+<ResponseField name="available" type="number">`credit_limit` less `owed`, never below 0.</ResponseField>
+<ResponseField name="customer_daily_limit" type="number">The most one customer may spend on orders a UTC day.</ResponseField>
+<ResponseField name="daily_limit" type="number | null">The most your program may spend on orders a UTC day; null for none.</ResponseField>
+<ResponseField name="period" type="object">
+  <Expandable title="period">
+    <ResponseField name="month" type="string">`YYYY-MM`.</ResponseField>
+    <ResponseField name="from" type="string">The month's start (UTC), inclusive.</ResponseField>
+    <ResponseField name="to" type="string">The next month's start, exclusive.</ResponseField>
+    <ResponseField name="opening_balance" type="number">What you owed at `from`.</ResponseField>
+    <ResponseField name="closing_balance" type="number">What you owed at `to`, or now for the current month.</ResponseField>
+    <ResponseField name="totals" type="object">Per kind with entries that month: `amount` (their sum) and `entries` (how many).</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="entries" type="object[]">
+  The month's entries, newest first.
+  <Expandable title="entry">
+    <ResponseField name="id" type="string" />
+    <ResponseField name="kind" type="string">`order`, `order_refund`, `shipping`, `shipping_refund`, `sellback`, `revenue_share`, `payment` or `adjustment`.</ResponseField>
+    <ResponseField name="amount" type="number">Positive adds to what you owe; negative takes from it.</ResponseField>
+    <ResponseField name="created_at" type="string" />
+    <ResponseField name="customer" type="string | null">The customer, by your own id; null on an entry that isn't a customer's.</ResponseField>
+    <ResponseField name="order_id" type="string | null">On `order` and `order_refund`: our order `id`.</ResponseField>
+    <ResponseField name="card_id" type="string">On `sellback`: the card sold.</ResponseField>
+    <ResponseField name="sellback_id" type="string">On `sellback`: the sale's `transaction_id`.</ResponseField>
+    <ResponseField name="shipment_id" type="string">On `shipping` and `shipping_refund`: the customer shipment's `id`.</ResponseField>
+    <ResponseField name="reason" type="string | null">On `order_refund` and `shipping_refund`: why.</ResponseField>
+    <ResponseField name="note" type="string | null">On `payment` and `adjustment`.</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="next_cursor" type="string | null">Null on the last page.</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `NOT_PARTNER_SETTLED` | Your program pays through customer wallets and has no statement |
+| `400` | `BAD_PERIOD` | `period` isn't a `YYYY-MM` month |
+| `400` | `BAD_LIMIT` | `limit` isn't 1-100 |
+| `400` | `BAD_CURSOR` | `cursor` isn't a `next_cursor` this endpoint returned |
+
+<RequestExample>
+```bash cURL
+curl "https://catchbackcards.com/api/partner/v2/settlement?period=2026-11&limit=50" \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "owed": 236.65,
+  "credit_limit": 10000,
+  "available": 9763.35,
+  "customer_daily_limit": 500,
+  "daily_limit": null,
+  "period": {
+    "month": "2026-11",
+    "from": "2026-11-01T00:00:00.000Z",
+    "to": "2026-12-01T00:00:00.000Z",
+    "opening_balance": 0,
+    "closing_balance": 236.65,
+    "totals": {
+      "order": { "amount": 250, "entries": 10 },
+      "sellback": { "amount": -31, "entries": 1 },
+      "shipping": { "amount": 17.65, "entries": 2 }
+    }
+  },
+  "entries": [
+    { "id": "4f6a2b1c-3d5e-4f70-8a9b-0c1d2e3f4a5b", "kind": "shipping", "amount": 7.5, "created_at": "2026-11-24T18:20:02.301Z", "customer": "user-1842", "order_id": null, "shipment_id": "80ba23e1-58ae-45d1-ba15-f88fdea1fb52" },
+    { "id": "2e8c4d6f-1a3b-4c5d-9e7f-8a9b0c1d2e3f", "kind": "sellback", "amount": -31, "created_at": "2026-11-24T18:11:40.902Z", "customer": "user-1842", "order_id": null, "card_id": "838a5e7f-dc62-4618-ad4a-cf015de20536", "sellback_id": "5b1e2c3d-4f5a-4b6c-8d7e-9f0a1b2c3d4e" },
+    { "id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d", "kind": "order", "amount": 25, "created_at": "2026-11-24T18:02:10.884Z", "customer": "user-1842", "order_id": "9c4e1a7b-2d3f-4e5a-8b6c-0d1e2f3a4b5c" }
+  ],
+  "next_cursor": null
+}
+```
+</ResponseExample>

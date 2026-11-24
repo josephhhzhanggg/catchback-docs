@@ -160,6 +160,17 @@
             ]
           },
           {
+            "group": "Paying through you endpoints",
+            "pages": [
+              "partner-api/v2/endpoints/get-customer-vault",
+              "partner-api/v2/endpoints/sell-back-customer-card",
+              "partner-api/v2/endpoints/estimate-customer-shipment",
+              "partner-api/v2/endpoints/create-customer-shipment",
+              "partner-api/v2/endpoints/list-customer-shipments",
+              "partner-api/v2/endpoints/get-settlement"
+            ]
+          },
+          {
             "group": "Sandbox",
             "pages": [
               "partner-api/v2/endpoints/sandbox-pay",

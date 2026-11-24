@@ -1,0 +1,79 @@
+---
+title: "Sell back a customer's card"
+api: "POST /api/partner/v2/customers/{customer}/cards/{card_id}/sellback"
+description: "Paying through you: sell one vault card back at its current offer, credited to your statement."
+---
+
+Scope: `nft:orders` · Rate limit: 30 a minute, shared with [Create an order](/partner-api/v2/endpoints/create-order) and [Create a customer shipment](/partner-api/v2/endpoints/create-customer-shipment)
+
+For [Paying through you](/partner-api/v2/settlement) programs only; a wallet program gets `400 NOT_PARTNER_SETTLED` and sells back with a [quote and a burn](/partner-api/v2/sell-back).
+
+Sells the card at its current offer (the `sellback.amount` [Get a customer's vault](/partner-api/v2/endpoints/get-customer-vault) shows) and credits the payout to your statement. Nothing is paid out to the customer: you credit them your way.
+
+A card sells once: a retry returns the first sale with `status: "already_sold"` and never sells or credits again, so this endpoint needs no `Idempotency-Key`.
+
+<ParamField path="customer" type="string" required>
+  Your own id for the customer.
+</ParamField>
+<ParamField path="card_id" type="string" required>
+  A `card.id` from the customer's vault.
+</ParamField>
+<ParamField body="min_payout" type="number">
+  The least to accept, in dollars. A lower current offer is refused with `409 PRICE_CHANGED` and nothing is sold. Send what you showed your customer.
+</ParamField>
+
+## Response
+
+**201** when sold; **200** with `status: "already_sold"` on a retry.
+
+<ResponseField name="sellback" type="object">
+  <Expandable title="sellback">
+    <ResponseField name="status" type="string">`sold`, or `already_sold` (the first sale, unchanged).</ResponseField>
+    <ResponseField name="card_id" type="string" />
+    <ResponseField name="transaction_id" type="string">The sale. The [statement](/partner-api/v2/endpoints/get-settlement) entry's `sellback_id`.</ResponseField>
+    <ResponseField name="payout_amount" type="number">Credited to your statement, in dollars.</ResponseField>
+    <ResponseField name="payout_rate" type="number | null">The rate paid (1 = 100%). Null on `already_sold`.</ResponseField>
+    <ResponseField name="on_statement" type="boolean">Whether the credit is on your statement yet. Rarely `false`, and then it is added shortly.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `NOT_PARTNER_SETTLED` | Your program pays through customer wallets |
+| `400` | `BAD_CUSTOMER` | `customer` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `400` | `BAD_CARD` | `card_id` isn't a card id |
+| `400` | `BAD_JSON` | The body isn't JSON |
+| `400` | `BAD_MIN_PAYOUT` | `min_payout` isn't a non-negative number |
+| `404` | `CUSTOMER_NOT_FOUND` | No customer with that id has bought from your program |
+| `404` | `CARD_NOT_IN_VAULT` | Your program didn't pull that card into this customer's vault |
+| `409` | `PRICE_CHANGED` | The current offer is below `min_payout`; the body has `payout_amount` and `payout_rate`. Nothing is sold |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/customers/user-1842/cards/838a5e7f-dc62-4618-ad4a-cf015de20536/sellback \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "min_payout": 30 }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201
+{
+  "sellback": {
+    "status": "sold",
+    "card_id": "838a5e7f-dc62-4618-ad4a-cf015de20536",
+    "transaction_id": "5b1e2c3d-4f5a-4b6c-8d7e-9f0a1b2c3d4e",
+    "payout_amount": 31,
+    "payout_rate": 1,
+    "on_statement": true
+  }
+}
+```
+
+```json 409
+{ "error": "This sell-back pays 29.5, below your min_payout of 30", "code": "PRICE_CHANGED", "payout_amount": 29.5, "payout_rate": 1 }
+```
+</ResponseExample>

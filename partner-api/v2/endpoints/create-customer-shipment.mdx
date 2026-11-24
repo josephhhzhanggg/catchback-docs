@@ -1,0 +1,133 @@
+---
+title: "Create a customer shipment"
+api: "POST /api/partner/v2/customers/{customer}/shipments"
+description: "Paying through you: ship 1-10 of a customer's vault cards in one box, with the postage on your statement."
+---
+
+Scope: `nft:orders` · Rate limit: 30 a minute, shared with [Create an order](/partner-api/v2/endpoints/create-order) and [Sell back a customer's card](/partner-api/v2/endpoints/sell-back-customer-card)
+
+For [Paying through you](/partner-api/v2/settlement) programs only; a wallet program gets `400 NOT_PARTNER_SETTLED`.
+
+Ships 1-10 of a customer's vault cards in one box at a rate from [Estimate a customer shipment](/partner-api/v2/endpoints/estimate-customer-shipment). We re-quote the rate; the postage (and any cover's premium) goes on your statement, and nothing is paid or signed. A shipment that doesn't go through is taken off your statement.
+
+The response is the shipment (`processing`) with its `id`. It then moves to `shipped` (with `carrier` and `tracking_number`) and `delivered`: follow it with [List a customer's shipments](/partner-api/v2/endpoints/list-customer-shipments) or the [`nft_shipment.updated`](/partner-api/v2/webhooks#events) webhook. Each key may create up to 50 shipments a UTC day.
+
+<Warning>
+  Always send an `Idempotency-Key`, and reuse it when retrying. A retry with the same key never charges twice. See [Idempotency](/partner-api/v2/idempotency).
+</Warning>
+
+<ParamField header="Idempotency-Key" type="string" required>
+  Your own shipment id: 8-128 characters of `A-Za-z0-9_-`. The same key with a different request (`card_ids`, `address`, `rate`, `cover_amount`) is `422`.
+</ParamField>
+<ParamField path="customer" type="string" required>
+  Your own id for the customer.
+</ParamField>
+<ParamField body="card_ids" type="string[]" required>
+  1-10 distinct `card.id`s from the customer's vault, as for the estimate.
+</ParamField>
+<ParamField body="address" type="object" required>
+  As for [Estimate a customer shipment](/partner-api/v2/endpoints/estimate-customer-shipment).
+</ParamField>
+<ParamField body="rate" type="object" required>
+  `{ "carrier": "...", "token": "..." }` from the estimate's `rates`.
+</ParamField>
+<ParamField body="max_cost" type="number" required>
+  The most the shipping may cost, in dollars: the estimate rate's `total` if you sent `cover_amount`, else its `amount`. If the re-quote is higher, nothing is created and you get `PRICE_CHANGED` with the current `amount`.
+</ParamField>
+<ParamField body="cover_amount" type="number | null">
+  Shipping insurance cover in dollars, as for the estimate.
+</ParamField>
+
+## Response
+
+**201** (200 with `"idempotent_replay": true` on a replay, with the shipment as it stands now). The shipment is the whole body, not wrapped.
+
+<ResponseField name="id" type="string">The shipment. In the sandbox, pass it to [Simulate shipping](/partner-api/v2/endpoints/sandbox-ship).</ResponseField>
+<ResponseField name="status" type="string">`processing` once created; then `shipped` and `delivered`. Also `pending` (being created), `cancelled` (by our team, rare; contact us) and `needs_review` (we couldn't confirm it; our team resolves it).</ResponseField>
+<ResponseField name="card_ids" type="string[]" />
+<ResponseField name="carrier" type="string | null" />
+<ResponseField name="service" type="string | null" />
+<ResponseField name="service_token" type="string | null">The rate's `token`.</ResponseField>
+<ResponseField name="cost" type="number | null">What went on your statement: the postage plus any cover premium.</ResponseField>
+<ResponseField name="cover_amount" type="number | null" />
+<ResponseField name="insurance_cost" type="number | null">The cover's premium (0 without cover).</ResponseField>
+<ResponseField name="destination_country" type="string" />
+<ResponseField name="tracking_number" type="string | null">Set once shipped.</ResponseField>
+<ResponseField name="tracking_url" type="string | null">The carrier's own tracking page.</ResponseField>
+<ResponseField name="created_at" type="string" />
+<ResponseField name="status_updated_at" type="string | null" />
+<ResponseField name="shipped_at" type="string | null" />
+<ResponseField name="expected_delivery" type="string | null">A `YYYY-MM-DD` date.</ResponseField>
+<ResponseField name="delivered_at" type="string | null" />
+<ResponseField name="idempotent_replay" type="boolean">Present and `true` on a replay.</ResponseField>
+
+We never return the delivery address.
+
+## Errors
+
+Nothing is created or charged on any refusal below, except `SHIPMENT_OUTCOME_UNKNOWN`.
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `BAD_IDEMPOTENCY_KEY` | `Idempotency-Key` missing or malformed |
+| `400` | | Any `400` of [Estimate a customer shipment](/partner-api/v2/endpoints/estimate-customer-shipment#errors); or `rate` isn't a rate from the estimate, or `max_cost` is missing, not positive or over 10,000 |
+| `402` | `CREDIT_LIMIT` | The postage would take what you owe past your credit limit; the body has `owed`, `credit_limit` and `shipment_total` |
+| `403` | `CUSTOMER_BLOCKED` | This customer may not ship cards |
+| `403` | `CUSTOMER_UNAVAILABLE` | This customer's account is unavailable |
+| `404` | `CUSTOMER_NOT_FOUND` | No customer with that id has bought from your program |
+| `409` | `CARDS_NOT_IN_VAULT` | A card isn't in this customer's vault from your program; `card_ids` lists them |
+| `409` | `CARDS_NOT_SHIPPABLE` | A card can't ship, or left the vault while the shipment was being created |
+| `409` | `RATE_UNAVAILABLE` | The carrier no longer offers that rate; estimate again |
+| `409` | `COVER_UNAVAILABLE` | The chosen service has no cover option; choose another rate or leave `cover_amount` out |
+| `409` | `PRICE_CHANGED` | The rate (with any cover) now costs more than `max_cost`; the body has the current `amount` |
+| `409` | `IDEMPOTENCY_IN_PROGRESS` | A shipment with this key is still being created; wait, then retry with the same key |
+| `409` | `IDEMPOTENCY_RETRY` | An earlier attempt with this key just failed and charged nothing; retry with the same key |
+| `422` | `IDEMPOTENCY_KEY_REUSED` | The key was already used for a different shipment |
+| `429` | `DAILY_SHIPMENT_LIMIT_REACHED` | This key has created 50 shipments this UTC day; the body has `limit` and `resets_at` |
+| `500` | `SHIPMENT_OUTCOME_UNKNOWN` | We couldn't confirm whether it went through; it is with our team. Retrying with the same key is safe and never charges twice; don't resend under a new key |
+| `502` | | We couldn't confirm the carrier rate; retry |
+| `503` | `SHIPMENT_NOT_CREATED` | It didn't go through, and its postage is being taken off your statement |
+| `503` | | It didn't go through and nothing was charged, or a check couldn't run; retry with the same key |
+
+<RequestExample>
+```bash cURL
+curl -X POST https://catchbackcards.com/api/partner/v2/customers/user-1842/shipments \
+  -H "Authorization: Bearer $CATCHBACK_KEY" \
+  -H "Idempotency-Key: acme-ship-1c9e04" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "card_ids": ["838a5e7f-dc62-4618-ad4a-cf015de20536"],
+    "address": { "name": "Alice Tester", "address1": "1 Market St", "city": "San Francisco", "state": "CA", "zip": "94105", "country": "US", "phone": "4155550100" },
+    "rate": { "carrier": "USPS", "token": "r_9f3c" },
+    "max_cost": 7.5
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201
+{
+  "id": "80ba23e1-58ae-45d1-ba15-f88fdea1fb52",
+  "status": "processing",
+  "card_ids": ["838a5e7f-dc62-4618-ad4a-cf015de20536"],
+  "carrier": "USPS",
+  "service": "Ground Advantage",
+  "service_token": "r_9f3c",
+  "cost": 7.5,
+  "cover_amount": null,
+  "insurance_cost": 0,
+  "destination_country": "US",
+  "tracking_number": null,
+  "tracking_url": null,
+  "created_at": "2026-11-24T18:20:02.114Z",
+  "status_updated_at": null,
+  "shipped_at": null,
+  "expected_delivery": null,
+  "delivered_at": null
+}
+```
+
+```json 402
+{ "error": "This shipment would take your statement past its credit limit.", "code": "CREDIT_LIMIT", "owed": 9995, "credit_limit": 10000, "shipment_total": 7.5 }
+```
+</ResponseExample>

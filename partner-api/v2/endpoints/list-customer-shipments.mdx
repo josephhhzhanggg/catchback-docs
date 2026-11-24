@@ -1,0 +1,66 @@
+---
+title: "List a customer's shipments"
+api: "GET /api/partner/v2/customers/{customer}/shipments"
+description: "Paying through you: a customer's latest 100 shipments, newest first, with status and tracking."
+---
+
+Scope: `nft:orders`
+
+For [Paying through you](/partner-api/v2/settlement) programs only; a wallet program gets `400 NOT_PARTNER_SETTLED`.
+
+The customer's latest 100 shipments, newest first, each in the shape [Create a customer shipment](/partner-api/v2/endpoints/create-customer-shipment) returns. `status` moves `processing` → `shipped` (with `carrier` and `tracking_number`) → `delivered`. We never return the delivery address.
+
+<ParamField path="customer" type="string" required>
+  Your own id for the customer.
+</ParamField>
+
+## Response
+
+<ResponseField name="customer" type="string">The id you asked for.</ResponseField>
+<ResponseField name="shipments" type="object[]">
+  Up to 100, newest first: `id`, `status` (`pending`, `processing`, `shipped`, `delivered`, `cancelled` or `needs_review`), `card_ids`, `carrier`, `service`, `service_token`, `cost`, `cover_amount`, `insurance_cost`, `destination_country`, `tracking_number`, `tracking_url`, `created_at`, `status_updated_at`, `shipped_at`, `expected_delivery` (a `YYYY-MM-DD` date) and `delivered_at`.
+</ResponseField>
+
+## Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `NOT_PARTNER_SETTLED` | Your program pays through customer wallets; use [List shipments](/partner-api/v2/endpoints/list-shipments) |
+| `400` | `BAD_CUSTOMER` | `customer` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `404` | `CUSTOMER_NOT_FOUND` | No customer with that id has bought from your program |
+
+<RequestExample>
+```bash cURL
+curl https://catchbackcards.com/api/partner/v2/customers/user-1842/shipments \
+  -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200
+{
+  "customer": "user-1842",
+  "shipments": [
+    {
+      "id": "80ba23e1-58ae-45d1-ba15-f88fdea1fb52",
+      "status": "shipped",
+      "card_ids": ["838a5e7f-dc62-4618-ad4a-cf015de20536"],
+      "carrier": "USPS",
+      "service": "Ground Advantage",
+      "service_token": "r_9f3c",
+      "cost": 7.5,
+      "cover_amount": null,
+      "insurance_cost": 0,
+      "destination_country": "US",
+      "tracking_number": "9400111899223344556677",
+      "tracking_url": "https://tools.usps.com/go/TrackConfirmAction?tRef=fullpage&tLc=2&text28777=&tLabels=9400111899223344556677",
+      "created_at": "2026-11-24T18:20:02.114Z",
+      "status_updated_at": "2026-11-25T15:02:40.000Z",
+      "shipped_at": "2026-11-25T15:02:40.000Z",
+      "expected_delivery": "2026-11-28",
+      "delivered_at": null
+    }
+  ]
+}
+```
+</ResponseExample>

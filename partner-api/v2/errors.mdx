@@ -92,7 +92,7 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `CUSTOMER_NOT_FOUND` | `404` | customer tools | No customer with that id has bought from your program |
 | `CUSTOMER_BLOCKED` | `403` | orders, customer shipments | We can't sell to, or ship for, this customer. Don't retry |
 | `CUSTOMER_UNAVAILABLE` | `403` | customer shipments | This customer's account is unavailable |
-| `CREDIT_LIMIT` | `402` | orders, customer shipments | It would take what you owe past your credit limit; the body has `owed` and `credit_limit` (and `order_total` on orders). Nothing is charged |
+| `CREDIT_LIMIT` | `402` | orders, customer shipments | It would take what you owe past your credit limit; the body has `owed` and `credit_limit`, plus `order_total` on orders and `shipment_total` on shipments. Nothing is charged |
 | `CUSTOMER_DAILY_LIMIT` | `429` | orders | This customer hit their daily limit (UTC day); the body has `spent_today`, `limit` and `retry_after_seconds` |
 | `DAILY_LIMIT` | `429` | orders | Your program hit its daily limit; same fields |
 | `CARD_NOT_IN_VAULT` | `404` | customer sell-back | Your program didn't pull that card into this customer's vault |

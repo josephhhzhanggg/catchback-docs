@@ -9,8 +9,8 @@ Per key:
 
 | Endpoint | Limit |
 |---|---|
-| `POST /orders` | 30 a minute |
-| `POST /shipments/estimate` and `POST /tokens/{tokenId}/shipment/estimate`, together | 30 a minute |
+| `POST /orders`, `POST /customers/{customer}/cards/{card_id}/sellback` and `POST /customers/{customer}/shipments`, together | 30 a minute |
+| `POST /shipments/estimate`, `POST /tokens/{tokenId}/shipment/estimate` and `POST /customers/{customer}/shipments/estimate`, together | 30 a minute |
 | Every other endpoint, together | 120 a minute |
 
 Over a limit is a `429 RATE_LIMITED` with `retry_after_seconds` and a `Retry-After` header. Treat these numbers as ceilings and stay well under them.
@@ -36,6 +36,7 @@ There is no limit on how much a wallet buys.
 | Credit limit | **$10,000** to start, set by CatchBack | What you owe (orders and postage, less sell-back credits and your share) can't pass it: an order or shipment that would is refused with `402 CREDIT_LIMIT` and charges nothing |
 | Per customer | **$500 per UTC day** by default | Beyond it, that customer's orders are refused with `429 CUSTOMER_DAILY_LIMIT` until the next UTC day (`retry_after_seconds`) |
 | Per program | Optional daily cap, set with you | Beyond it, orders are refused with `429 DAILY_LIMIT` until the next UTC day |
+| Customer shipments | **50 per key per UTC day** | Beyond it, `429 DAILY_SHIPMENT_LIMIT_REACHED` until the next UTC day |
 
 Ask your CatchBack contact to change them. [`GET /settlement`](/partner-api/v2/settlement) always shows your current limits and what's available.
 

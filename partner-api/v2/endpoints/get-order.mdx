@@ -23,14 +23,16 @@ Returns `{ "order": { ... } }`. After a lost response, this is how you find out 
     <ResponseField name="category" type="string" />
     <ResponseField name="odds" type="string">The odds the pack is opened at.</ResponseField>
     <ResponseField name="price" type="number">In dollars. On a multi-pack order, the total; `unit_price` is one pack.</ResponseField>
-    <ResponseField name="recipient" type="string" />
-    <ResponseField name="mint_chain" type="string" />
+    <ResponseField name="recipient" type="string | null">Null on a [Paying through you](/partner-api/v2/settlement) program.</ResponseField>
+    <ResponseField name="mint_chain" type="string | null">Null on a Paying through you program.</ResponseField>
     <ResponseField name="paid_at" type="string | null" />
+    <ResponseField name="custody" type="string">`wallet` (the item mints as an NFT to `recipient`) or `vault` (Paying through you: the card stays in the `customer`'s CatchBack vault, and the order ends `in_vault` instead of `minted`). On a multi-pack order, on each unit.</ResponseField>
+    <ResponseField name="customer" type="string">Only when `custody` is `vault`: the customer, by your own id.</ResponseField>
     <ResponseField name="pull" type="object | null">
       Set once the pack opens: `card_id`, `category`, `name`, `value` (the item's value when it was pulled; it anchors the [sell-back offer](/partner-api/v2/sell-back)) and `pulled_at`.
     </ResponseField>
     <ResponseField name="token" type="object | null">
-      Set once the mint is reserved: `chain`, `contract` (on a Solana program, `collection` and `asset` instead), `token_id`, `status` and `tx`. `status` is `pending` (reserved, not sent), `submitted`, `confirmed`, `failed` (being retried), or `burned` once the token has been sold back or shipped.
+      Always null when `custody` is `vault`. Set once the mint is reserved: `chain`, `contract` (on a Solana program, `collection` and `asset` instead), `token_id`, `status` and `tx`. `status` is `pending` (reserved, not sent), `submitted`, `confirmed`, `failed` (being retried), or `burned` once the token has been sold back or shipped.
     </ResponseField>
     <ResponseField name="failure_reason" type="string | null">Why an order is `mint_failed`, `expired`, `refund_due` or `refunded`; otherwise null.</ResponseField>
     <ResponseField name="created_at" type="string" />
@@ -71,6 +73,7 @@ curl https://catchbackcards.com/api/partner/v2/orders/okx-ord-7f3a9c21 \
     "recipient": "0x8f3c...e21a",
     "mint_chain": "evm:196",
     "paid_at": "2026-11-16T18:04:40.002Z",
+    "custody": "wallet",
     "pull": {
       "card_id": "a1c4...",
       "category": "pokemon",
