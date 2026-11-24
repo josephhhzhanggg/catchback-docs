@@ -85,7 +85,22 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `COUNTRY_NOT_SUPPORTED` | `400` | shipments, estimates | We don't ship to that country |
 | `OVER_CUSTOMS_CAP` | `400` | shipments, estimates | The items are worth more than we can ship internationally |
 | `RATE_UNAVAILABLE` | `409` | shipments | The carrier no longer offers that rate; estimate again |
-| `PRICE_CHANGED` | `409` | shipments | The shipping cost is now above `max_cost`; the body has the current `amount` |
+| `PRICE_CHANGED` | `409` | shipments, customer sell-back | The shipping cost is now above `max_cost` (the body has the current `amount`), or a customer card's offer is below `min_payout` |
+| `NOT_PARTNER_SETTLED` | `400` | customer tools, settlement | Your program pays through customer wallets; use the token endpoints |
+| `WALLET_FIELDS_NOT_ACCEPTED` | `400` | orders | Paying through you: `recipient` or `refund_address` sent; send `customer` only |
+| `BAD_CUSTOMER` | `400` | orders, customer tools | `customer` missing, or not 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `CUSTOMER_NOT_FOUND` | `404` | customer tools | No customer with that id has bought from your program |
+| `CUSTOMER_BLOCKED` | `403` | orders, customer shipments | We can't sell to, or ship for, this customer. Don't retry |
+| `CUSTOMER_UNAVAILABLE` | `403` | customer shipments | This customer's account is unavailable |
+| `CREDIT_LIMIT` | `402` | orders, customer shipments | It would take what you owe past your credit limit; the body has `owed` and `credit_limit` (and `order_total` on orders). Nothing is charged |
+| `CUSTOMER_DAILY_LIMIT` | `429` | orders | This customer hit their daily limit (UTC day); the body has `spent_today`, `limit` and `retry_after_seconds` |
+| `DAILY_LIMIT` | `429` | orders | Your program hit its daily limit; same fields |
+| `CARD_NOT_IN_VAULT` | `404` | customer sell-back | Your program didn't pull that card into this customer's vault |
+| `CARDS_NOT_IN_VAULT` | `409` | customer shipments | A card isn't in this customer's vault; `card_ids` lists them |
+| `CARDS_NOT_SHIPPABLE` | `409` | customer shipments | A card left the vault meanwhile. Nothing is charged |
+| `BAD_MIN_PAYOUT` | `400` | customer sell-back | `min_payout` isn't a non-negative number |
+| `BAD_PERIOD` | `400` | settlement | `period` isn't a `YYYY-MM` month |
+| `SHIPMENT_OUTCOME_UNKNOWN` | `500` | customer shipments | We couldn't confirm it went through; it's with our team. Retrying with the same `Idempotency-Key` is safe and never charges twice |
 | `UNKNOWN_SHIPMENT` | `404` | shipment GET, renew, sandbox shipments | No such shipment in your program |
 | `NOT_PAID` | `409` | renew, burn | The shipping isn't paid yet |
 | `ALREADY_REDEEMED` | `409` | renew | The token (every token, on a multi-token shipment) was already burned and the box is shipping |

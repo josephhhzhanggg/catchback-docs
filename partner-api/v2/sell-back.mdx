@@ -3,6 +3,10 @@ title: "Sell-back"
 description: "What a sell-back pays and when, getting a quote, burning on EVM with burnWithQuote or signing the Solana transaction, and following the USDC payout."
 ---
 
+<Info>
+  This page is for the **wallet** model. On [Paying through you](/partner-api/v2/settlement) a card sells back with one call and the payout is credited to your statement: no quote, signature or burn.
+</Info>
+
 Any holder can sell a token back to us for USDC. The flow:
 
 1. [`POST /tokens/{tokenId}/quote`](/partner-api/v2/endpoints/create-sellback-quote) fixes the amount, the payer and the payout destination for 10 minutes.

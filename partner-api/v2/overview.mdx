@@ -12,20 +12,39 @@ CatchBack is a platform where collectors can create mystery packs of collectible
 ## CatchBack in one minute
 
 1. **A user buys a mystery pack** in your app. Each pack holds one real item, drawn with [provably fair](/partner-api/v2/verify-a-pull) odds the user can see before buying.
-2. **The user receives the item they pulled.** It arrives in their wallet as a digital representation (NFT) of the real item, which stays safe in our vault.
+2. **The user receives the item they pulled.** The real item stays safe in our vault. Depending on your [payment model](#two-payment-models), the user gets it as a digital representation (NFT) in their own wallet, or it's held in their CatchBack vault and shown in your app.
 3. **The user keeps it, sells it back, or has it shipped.**
    - **Keep it**, or trade it with other collectors.
    - **Sell it back to us:** up to 100% of its value in the first 5 minutes, then a guaranteed 80% with no expiry.
    - **Have it shipped:** we mail the real item to their door.
 
+## Two payment models
+
+Every partner program uses one of two models, chosen in **Get started** in your manager. The catalog, odds, orders, webhooks and keys work the same way in both; who pays, and where the item goes, differ.
+
+| | **Wallet** | **Paying through you** |
+|---|---|---|
+| **Best for** | Exchanges and wallet apps whose users have their own crypto wallet | Apps whose users have no crypto wallet |
+| **Who pays CatchBack** | Each user, in USDC, through our hosted payment screen | You, on one statement with a credit limit; you charge your users your way |
+| **A user is** | A wallet address | Your own id for them |
+| **The item they pull** | An NFT minted to their wallet, which they can hold or trade | Held in their CatchBack vault; you show it in your app |
+| **Selling back** | USDC paid to their wallet | Credited to your statement; you credit your user |
+| **Shipping** | The user pays the postage | The postage goes on your statement |
+| **Your revenue share** | Paid monthly to your USDC address | Netted on your statement each month |
+| **Crypto your users need** | Their own wallet | None |
+
+The rest of this page describes both. The flows that differ have their own pages: for the wallet model, [Payments](/partner-api/v2/payments), [Sell-back](/partner-api/v2/sell-back) and [Shipping](/partner-api/v2/shipping); for Paying through you, [Paying through you](/partner-api/v2/settlement).
+
 ## Why partners integrate
 
 - **A new product with no inventory.** We source, store and ship every item, and back every digital representation with the real thing.
 - **Revenue share on every pack.** The standard share is 3% of every pack opening. Premier partners earn more. See [your revenue statement](/partner-api/v2/endpoints/get-revenue).
-- **No capital and no custody.** You don't prefund anything. Your users pay us directly, and digital representations and payouts go straight to their wallets, so you never hold their tokens or funds.
+- **No inventory and no custody.** We hold every real item. On the wallet model you don't prefund or touch money at all: your users pay us directly and their items and payouts go to their wallets. Paying through you needs no prefunding either: you settle a statement with us, within a credit limit.
 - **A safety net your users can see.** The guaranteed buyback means every item they pull keeps a cash value.
 
 ## New to crypto?
+
+On **Paying through you** your users never touch crypto, and neither do you: skip to [Paying through you](/partner-api/v2/settlement). The rest of this section is for the **wallet** model.
 
 You don't need crypto expertise to integrate. The API is ordinary JSON over HTTPS, and we handle every on-chain step for you:
 
@@ -36,7 +55,7 @@ You don't need crypto expertise to integrate. The API is ordinary JSON over HTTP
 
 The one thing your users do need is **their own crypto wallet**, the kind where only they hold the keys. Their digital representations go there, and they sign from it for each item they sell back or ship (on EVM chains a signature is enough, so they need no gas). If your users already have wallets, as on an exchange or wallet app, there's nothing extra to set up.
 
-We're also working with partners to give users automatically provisioned wallets, so they won't have to set one up themselves.
+If your users don't have wallets, use [Paying through you](/partner-api/v2/settlement) instead.
 
 | Term | In plain terms |
 |---|---|
@@ -52,17 +71,39 @@ Your platform is the storefront. CatchBack does everything behind it.
 
 | Step | Your platform | CatchBack |
 |---|---|---|
-| **1. The user buys a pack** | Shows the packs and their odds, sends us the user's wallet address, and opens our payment screen | Supplies the packs, prices and odds, takes the payment, and refunds it if anything goes wrong |
-| **2. The user receives their item** | Shows what they pulled | Opens the pack fairly and delivers the digital representation to their wallet, paying the network fee |
+| **1. The user buys a pack** | Shows the packs and their odds. **Wallet:** sends us the user's wallet address and opens our payment screen. **Paying through you:** charges the user its own way and sends us its id for them | Supplies the packs, prices and odds. **Wallet:** takes the payment, and refunds it if anything goes wrong. **Paying through you:** puts the order on your statement |
+| **2. The user receives their item** | Shows what they pulled | Opens the pack fairly. **Wallet:** delivers the digital representation to their wallet, paying the network fee. **Paying through you:** holds it in their CatchBack vault |
 | **3. The user keeps it, sells it back, or ships it** | Shows those options, and collects the shipping address | Buys it back at the guaranteed price, or packs and ships the real item with tracking |
 
 <Note>
-  **v2 replaces v1.** The v1 Partner API is retired. v2 has no partner balance or prefunding: each customer pays for their own pack and gets each item as a digital representation in their wallet.
+  **v2 replaces v1.** The v1 Partner API is retired. v2 has no prefunded partner balance: on the wallet model each customer pays for their own pack, and on Paying through you you settle a statement within a credit limit.
 </Note>
 
 ## How it works, technically
 
-At purchase, each pack algorithmically selects one real item from our vault. The customer receives an NFT (a digital representation showing ownership) of that item in their wallet. They can then trade it, sell the hit back, or have the collectible shipped. Selling back and shipping burn the NFT.
+At purchase, each pack algorithmically selects one real item from our vault, with the same [provably fair](/partner-api/v2/verify-a-pull) draw on both models.
+
+### Paying through you
+
+```text
+ 1. POST /orders { customer }  ──▶ charged to your statement; each pack opens ─▶ in_vault
+    webhook nft_order.updated, or GET /orders/{id}
+ 2. GET /customers/{customer}/vault  ──▶ their cards, each with today's sell-back offer
+
+ 3a. SELL BACK                                    3b. SHIP (1-10 cards in one box)
+     POST /customers/{c}/cards/{id}/sellback          POST /customers/{c}/shipments/estimate
+     payout credited to your statement               POST /customers/{c}/shipments → postage on your statement
+     webhook sellback.updated                        webhook nft_shipment.updated, or
+                                                     GET  /customers/{c}/shipments → tracking
+
+ GET /settlement ──▶ what you owe against your credit limit, and every entry by customer id
+```
+
+No wallets, tokens or burns. Full details: [Paying through you](/partner-api/v2/settlement).
+
+### Wallet model
+
+The customer receives an NFT (a digital representation showing ownership) of that item in their wallet. They can then trade it, sell the hit back, or have the collectible shipped. Selling back and shipping burn the NFT.
 
 ```text
  1. POST /orders  (quantity 1-10) ──▶ order awaiting_payment + payment details (one payment)
@@ -82,7 +123,7 @@ At purchase, each pack algorithmically selects one real item from our vault. The
                                                     GET  /shipments/{id}  → tracking
 ```
 
-### Who delivers the digital representation?
+#### Who delivers the digital representation?
 
 We do, straight to the customer's wallet. Your platform passes us the wallet address and shows the result. It never holds the token, and it never touches the customer's money.
 
@@ -91,7 +132,7 @@ We do, straight to the customer's wallet. Your platform passes us the wallet add
  CatchBack:      mints the digital representation ──────────▶ customer's wallet
 ```
 
-#### Step by step
+##### Step by step
 
 1. **Collect the customer's wallet address** on your program's chain (`mint_chain` in the [catalog](/partner-api/v2/endpoints/list-packs)). On EVM, one address is the same on every EVM chain, so a customer who pays from Base receives the token at that same address on your chain.
 2. **Create the order** with that address as `recipient` ([Create an order](/partner-api/v2/endpoints/create-order)). The response includes the payment details. Hand them to the customer, who pays within 24 hours in USDC on Base or Solana ([Payments](/partner-api/v2/payments)).
@@ -100,9 +141,9 @@ We do, straight to the customer's wallet. Your platform passes us the wallet add
 
 A multi-pack order (`quantity` 2-10) is paid once, then each pack opens and mints on its own, so each unit moves through these statuses separately. Every status is listed in [Orders](/partner-api/v2/orders).
 
-#### Where the money goes
+##### Where the money goes
 
-Every payment and payout moves between the customer and CatchBack directly.
+On the wallet model, every payment and payout moves between the customer and CatchBack directly.
 
 | Money | Goes to | Details |
 |---|---|---|

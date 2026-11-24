@@ -32,7 +32,7 @@ The only endpoint that takes no key is the [public token metadata](/partner-api/
 ## Scope and program
 
 - **Scope:** every v2 endpoint needs the scope `nft:orders` on your key.
-- **Program:** your key is linked to your partner program, which fixes the chain your NFTs mint on (`mint_chain`) and your collection contract. Every endpoint acts within your program: an order, token, quote or shipment from another program answers `404`.
+- **Program:** your key is linked to your partner program, which fixes its payment model (`payment_mode`: `wallet` or `partner`, for [Paying through you](/partner-api/v2/settlement)) and, on the wallet model, the chain your NFTs mint on (`mint_chain`) and your collection contract. Every endpoint acts within your program: an order, token, quote or shipment from another program answers `404`.
 
 ## Errors every endpoint can return first
 
@@ -52,7 +52,7 @@ These come before an endpoint does anything else:
 
 ## Read the key
 
-[`GET /keys`](/partner-api/v2/endpoints/get-key) returns the key you call with: its `id`, `name`, `scopes`, dates, `program`, the key it replaced (`rotated_from`) and, once rotated, its `successor` and `expires_at`. It never returns a secret.
+[`GET /keys`](/partner-api/v2/endpoints/get-key) returns the key you call with: its `id`, `name`, `scopes`, dates, `program` and its `payment_mode`, the key it replaced (`rotated_from`) and, once rotated, its `successor` and `expires_at`. It never returns a secret.
 
 ## Rotate
 

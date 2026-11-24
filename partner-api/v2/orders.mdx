@@ -1,11 +1,11 @@
 ---
 title: "Orders and statuses"
-description: "The lifecycle of a wallet order, multi-pack orders and their units, and what each status means."
+description: "The lifecycle of an order on either payment model, multi-pack orders and their units, and what each status means."
 ---
 
-One order buys 1-10 packs of one kind for one wallet, paid with one payment. Create it with [`POST /orders`](/partner-api/v2/endpoints/create-order), follow it with [`GET /orders/{id}`](/partner-api/v2/endpoints/get-order) or the [`nft_order.updated`](/partner-api/v2/webhooks#events) webhook, and prove the pull with [`GET /orders/{id}/verification`](/partner-api/v2/endpoints/get-order-verification).
+One order buys 1-10 packs of one kind for one customer. On the **wallet** model the customer is a wallet (`recipient`) and pays with one payment; on [Paying through you](/partner-api/v2/settlement) the customer is your own id for them (`customer`) and the order goes on your statement. Create it with [`POST /orders`](/partner-api/v2/endpoints/create-order), follow it with [`GET /orders/{id}`](/partner-api/v2/endpoints/get-order) or the [`nft_order.updated`](/partner-api/v2/webhooks#events) webhook, and prove the pull with [`GET /orders/{id}/verification`](/partner-api/v2/endpoints/get-order-verification).
 
-## Order statuses
+## Order statuses: wallet model
 
 ```text
 awaiting_payment ──payment settles──▶ paid ──pack opened──▶ rolled ──mint confirmed──▶ minted
@@ -26,18 +26,35 @@ awaiting_payment ──payment settles──▶ paid ──pack opened──▶ 
 | `refund_due` | The customer is being refunded in USDC on Base to `refund_address`. `failure_reason` says why: the pack couldn't open after payment (for example it sold out in between), `paid_after_expiry`, or `underpaid` (more than 1% short) | no |
 | `refunded` | The refund was sent | **yes** |
 
+## Order statuses: Paying through you
+
+There's no payment step: the order is charged to your statement when it's accepted, and each pack opens straight away.
+
+```text
+paid ──pack opened──▶ in_vault
+  └─pack can't open─▶ refunded   (taken back off your statement)
+```
+
+| Status | Meaning | Final? |
+|---|---|---|
+| `paid` | Accepted and on your statement; the pack opens next | no |
+| `in_vault` | The pack opened: `pull` is set and the item is in the customer's vault ([`GET /customers/{customer}/vault`](/partner-api/v2/settlement)) | **yes** |
+| `refunded` | The pack couldn't open (for example it sold out in between). The order is taken back off your statement as an `order_refund` entry; `failure_reason` says why | **yes** |
+
+These orders also carry `custody: "vault"` and `customer`, and never a `token`, `recipient` or payment. An order refused at the door (`CREDIT_LIMIT`, `CUSTOMER_DAILY_LIMIT`, `DAILY_LIMIT`, `CUSTOMER_BLOCKED`) creates nothing and charges nothing.
+
 ## The pull and the token
 
 Once paid and opened, the order carries:
 
 - `pull`: the item pulled (`card_id`, `category`, `name`, `value`, `pulled_at`). `pull.value` is the item's value when it was pulled; it anchors the [sell-back offer](/partner-api/v2/sell-back).
-- `token`: the NFT. On EVM it has `chain`, `contract`, `token_id`, `status` and `tx`; on a Solana program it has `collection` and `asset` instead of `contract`.
+- `token` (wallet model only): the NFT. On EVM it has `chain`, `contract`, `token_id`, `status` and `tx`; on a Solana program it has `collection` and `asset` instead of `contract`.
 
 `token.status`: `pending` (reserved, not sent), `submitted`, `confirmed`, `failed` (being retried), or `burned` once the token has been sold back or shipped.
 
 ## Multi-pack orders
 
-A multi-pack order (`quantity` 2-10) is one payment for `quantity` × the pack price. Each pack inside it is a **unit**: once the payment settles, every unit opens, mints and (if it has to) refunds on its own, exactly like a single order.
+A multi-pack order (`quantity` 2-10) is one payment (or, on Paying through you, one statement entry per pack) for `quantity` × the pack price. Each pack inside it is a **unit**: once the payment settles, every unit opens, mints and (if it has to) refunds on its own, exactly like a single order.
 
 - `price` is the total due; `unit_price` the price of one pack. Each unit is in the single-order shape plus `batch_id` and `unit` (1 to `quantity`), and carries its own `pull` and `token`.
 - [`GET /orders/{id}`](/partner-api/v2/endpoints/get-order) with your `Idempotency-Key` or the order's `id` returns the whole order; with one unit's `id` it returns that unit.

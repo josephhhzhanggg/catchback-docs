@@ -3,20 +3,27 @@ title: "Go-live checklist"
 description: "Everything to check before your v2 integration takes real orders."
 ---
 
+Items marked **Wallet** or **Paying through you** apply only to that model; the rest apply to both.
+
 - [ ] Your production key has the `nft:orders` scope and is stored server-side only.
-- [ ] You know your program's `mint_chain` and contract (or collection) address, and your wallet shows NFTs from it, with their [metadata](/partner-api/v2/chains-and-metadata#metadata).
-- [ ] Your users' wallets can pay USDC on Base or Solana, and hold NFTs on your mint chain.
+- [ ] **Wallet:** you know your program's `mint_chain` and contract (or collection) address, and your wallet shows NFTs from it, with their [metadata](/partner-api/v2/chains-and-metadata#metadata).
+- [ ] **Wallet:** your users' wallets can pay USDC on Base or Solana, and hold NFTs on your mint chain.
 - [ ] You let the customer pick from the pack's `odds` and show those odds ([`GET /catalog/packs/pool?odds=`](/partner-api/v2/endpoints/get-pack-pool)) before they buy.
-- [ ] Every `POST /orders`, `POST /shipments` and `POST /tokens/{id}/shipment` sends your own unique `Idempotency-Key`, and you retry 500s and timeouts with the **same** key ([Idempotency](/partner-api/v2/idempotency)).
-- [ ] Your checkout uses `client_secret` with `publishable_key`, or shows `deposit_addresses` and `amount`, and tells the customer to pay within 24 hours ([Payments](/partner-api/v2/payments)).
-- [ ] `recipient` is always the customer's self-custody wallet, never an exchange deposit address.
-- [ ] On a Solana program you always send an EVM `refund_address` with orders, and `payout_chain: "evm:8453"` with a Base `payout_address` with sell-back quotes (until Solana payouts are switched on).
+- [ ] Every `POST /orders`, `POST /shipments`, `POST /tokens/{id}/shipment` and `POST /customers/{customer}/shipments` sends your own unique `Idempotency-Key`, and you retry 500s and timeouts with the **same** key ([Idempotency](/partner-api/v2/idempotency)).
+- [ ] **Wallet:** your checkout uses `client_secret` with `publishable_key`, or shows `deposit_addresses` and `amount`, and tells the customer to pay within 24 hours ([Payments](/partner-api/v2/payments)).
+- [ ] **Wallet:** `recipient` is always the customer's self-custody wallet, never an exchange deposit address.
+- [ ] **Wallet:** on a Solana program you always send an EVM `refund_address` with orders, and `payout_chain: "evm:8453"` with a Base `payout_address` with sell-back quotes (until Solana payouts are switched on).
 - [ ] If you sell multi-pack orders: you show the total `price`, follow each unit (`units[]`, its own `pull` and `token`), and treat `processing` / `completed` as the order's summary status ([Orders and statuses](/partner-api/v2/orders#multi-pack-orders)).
 - [ ] You branch on `code`; handle `RATE_LIMITED` (wait `retry_after_seconds`), `BAD_ODDS`, `ODDS_UNAVAILABLE`, `PACK_UNAVAILABLE`, `WALLET_REFUSED`, `PAYOUT_CHAIN_NOT_ENABLED` and the 503s (retry shortly) ([Errors](/partner-api/v2/errors)).
-- [ ] Sell-back: you show `amount_usd` and the 10-minute expiry, burn with the quote exactly as returned, and treat a `held` payout as "under review", not failed ([Sell-back](/partner-api/v2/sell-back)).
-- [ ] Shipping: you collect a phone number outside the US, show `total`, pass it as `max_cost`, have the holder burn every token in the shipment, and renew an expired burn window instead of starting over ([Shipping](/partner-api/v2/shipping)).
+- [ ] **Wallet** sell-back: you show `amount_usd` and the 10-minute expiry, burn with the quote exactly as returned, and treat a `held` payout as "under review", not failed ([Sell-back](/partner-api/v2/sell-back)).
+- [ ] **Wallet** shipping: you collect a phone number outside the US, show `total`, pass it as `max_cost`, have the holder burn every token in the shipment, and renew an expired burn window instead of starting over ([Shipping](/partner-api/v2/shipping)).
+- [ ] **Paying through you:** every order sends `customer` as your own stable id for the user (never personal data), and never a wallet field ([Paying through you](/partner-api/v2/settlement)).
+- [ ] **Paying through you:** you charge your user before or as you order, and credit them when a sell-back is credited to your statement.
+- [ ] **Paying through you:** you handle `CREDIT_LIMIT` (402), `CUSTOMER_DAILY_LIMIT` and `DAILY_LIMIT` (429, wait `retry_after_seconds`) and `CUSTOMER_BLOCKED`, and you watch `available` on [`GET /settlement`](/partner-api/v2/settlement).
+- [ ] **Paying through you:** shipping sends 1-10 vault cards, a phone number outside the US, and `max_cost` (the rate's `total` with `cover_amount`, else its `amount`).
+- [ ] **Paying through you:** someone on your team reads the monthly statement and settles it as agreed with us.
 - [ ] You registered a webhook, stored its secret, verify every signature (constant-time, 300 s tolerance), answer 2xx within 5 seconds, dedupe on the event `id`, and checked it with `POST /webhooks/{id}/test` ([Webhooks](/partner-api/v2/webhooks)).
 - [ ] You poll as described in [Webhooks](/partner-api/v2/webhooks#polling-the-fallback) where you have no webhook or missed events, and stop at the final statuses.
 - [ ] You know how you will rotate your key; your webhook moves to the new key by itself ([Authentication and keys](/partner-api/v2/authentication#rotate)).
-- [ ] You ran the full flow in the [sandbox](/partner-api/v2/quickstart): buy, pay, mint, transfer, sell back, ship, with webhooks arriving.
+- [ ] You ran the full flow in the [sandbox](/partner-api/v2/quickstart), with webhooks arriving: **Wallet:** buy, pay, mint, transfer, sell back, ship. **Paying through you:** order, vault, sell back, ship, statement.
 - [ ] You ran one small real order in production, end to end, with us watching.

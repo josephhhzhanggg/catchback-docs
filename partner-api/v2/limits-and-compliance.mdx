@@ -29,6 +29,16 @@ Over a limit is a `429 RATE_LIMITED` with `retry_after_seconds` and a `Retry-Aft
 
 There is no limit on how much a wallet buys.
 
+### Paying through you
+
+| Limit | Value | What happens |
+|---|---|---|
+| Credit limit | **$10,000** to start, set by CatchBack | What you owe (orders and postage, less sell-back credits and your share) can't pass it: an order or shipment that would is refused with `402 CREDIT_LIMIT` and charges nothing |
+| Per customer | **$500 per UTC day** by default | Beyond it, that customer's orders are refused with `429 CUSTOMER_DAILY_LIMIT` until the next UTC day (`retry_after_seconds`) |
+| Per program | Optional daily cap, set with you | Beyond it, orders are refused with `429 DAILY_LIMIT` until the next UTC day |
+
+Ask your CatchBack contact to change them. [`GET /settlement`](/partner-api/v2/settlement) always shows your current limits and what's available.
+
 ## Sanctions screening
 
 Every wallet is checked against the US Treasury (OFAC) sanctions list of digital-currency addresses:

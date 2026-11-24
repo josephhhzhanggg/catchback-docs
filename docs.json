@@ -85,15 +85,25 @@
               "partner-api/v2/orders",
               "partner-api/v2/verify-a-pull",
               "partner-api/v2/odds",
-              "partner-api/v2/payments",
-              "partner-api/v2/settlement",
-              "partner-api/v2/sell-back",
-              "partner-api/v2/shipping",
               "partner-api/v2/webhooks",
-              "partner-api/v2/chains-and-metadata",
               "partner-api/v2/idempotency",
               "partner-api/v2/errors",
               "partner-api/v2/limits-and-compliance"
+            ]
+          },
+          {
+            "group": "Wallet model",
+            "pages": [
+              "partner-api/v2/payments",
+              "partner-api/v2/sell-back",
+              "partner-api/v2/shipping",
+              "partner-api/v2/chains-and-metadata"
+            ]
+          },
+          {
+            "group": "Paying through you",
+            "pages": [
+              "partner-api/v2/settlement"
             ]
           },
           {

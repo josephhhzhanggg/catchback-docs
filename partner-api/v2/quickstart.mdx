@@ -4,6 +4,10 @@ title: "Sandbox"
 
 In about 15 minutes you'll run the whole flow a customer goes through: buy a pack, receive the item, and sell it back. It all happens in the **sandbox**, a test copy of the API. Payments there are simulated, so no real money moves, but the digital representations are real tokens on a public test network.
 
+<Note>
+  Steps 1-6 are the **wallet** model. If your program pays through you (you chose **Paying through you** in Get started), there's no wallet and no payment step: follow [Paying through you in the sandbox](#paying-through-you-in-the-sandbox) instead. Your sandbox program pays the way your program does.
+</Note>
+
 ## Before you start
 
 **Get your sandbox key.** Sign in to your manager at `catchback.com/<slug>/admin/api` and open **Get started**. An owner clicks **Set up my sandbox**, then creates a sandbox key there. Copy it when it's shown: it isn't shown again.
@@ -116,6 +120,63 @@ When `quote.payout.status` is `sent`, the sale is complete, and in the sandbox t
 
 That's the whole flow. To try shipping instead, see [Shipping](/partner-api/v2/shipping): estimate, create and pay a shipment, burn, then mark it shipped with [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship).
 
+## Paying through you in the sandbox
+
+No wallet and no payment: orders go on your sandbox statement, and a customer is your own id for them. Pick any test id.
+
+```bash
+export CUSTOMER="test-customer-1"
+```
+
+**1. Buy two packs** for that customer. They open at once, into the customer's vault:
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/orders" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" -H "Idempotency-Key: order-$(date +%s)" -H "Content-Type: application/json" \
+  -d "{\"pack_type\":\"bronze\",\"category\":\"pokemon\",\"quantity\":2,\"customer\":\"$CUSTOMER\"}"
+```
+
+**2. Read their vault.** Each card has its `card.id` and what it sells back for right now:
+
+```bash
+curl "$CATCHBACK_BASE_URL/api/partner/v2/customers/$CUSTOMER/vault" -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+
+**3. Sell one back.** The payout is credited to your statement:
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/customers/$CUSTOMER/cards/CARD_ID/sellback" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" -H "Content-Type: application/json" -d '{}'
+```
+
+**4. Ship the other.** Estimate (the sandbox has one fixed rate), then create the shipment with that rate and its `amount` as `max_cost`:
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/customers/$CUSTOMER/shipments/estimate" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" -H "Content-Type: application/json" \
+  -d '{"card_ids":["SECOND_CARD_ID"],"address":{"name":"Alice Tester","address1":"1 Market St","city":"San Francisco","state":"CA","zip":"94105","country":"US","phone":"4155550100"}}'
+
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/customers/$CUSTOMER/shipments" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" -H "Idempotency-Key: ship-$(date +%s)" -H "Content-Type: application/json" \
+  -d '{"card_ids":["SECOND_CARD_ID"],"address":{"name":"Alice Tester","address1":"1 Market St","city":"San Francisco","state":"CA","zip":"94105","country":"US","phone":"4155550100"},"rate":{"carrier":"USPS","token":"sbx_usps_priority"},"max_cost":9.85}'
+```
+
+**5. Play our shipping team**, then read the tracking:
+
+```bash
+curl -X POST "$CATCHBACK_BASE_URL/api/partner/v2/sandbox/shipments/SHIPMENT_ID" \
+  -H "Authorization: Bearer $CATCHBACK_KEY" -H "Content-Type: application/json" -d '{"status":"shipped"}'
+curl "$CATCHBACK_BASE_URL/api/partner/v2/customers/$CUSTOMER/shipments" -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+
+**6. Read your statement:** the orders, the sell-back credit and the postage, by customer id.
+
+```bash
+curl "$CATCHBACK_BASE_URL/api/partner/v2/settlement" -H "Authorization: Bearer $CATCHBACK_KEY"
+```
+
+Get started in your manager runs these same steps for you and ticks each one off as it sees it. Full details: [Paying through you](/partner-api/v2/settlement).
+
 ## How the sandbox differs from production
 
 | Production | Sandbox |
@@ -128,6 +189,7 @@ That's the whole flow. To try shipping instead, see [Shipping](/partner-api/v2/s
 | Your mint chain | A public testnet, real contract |
 | Sanctions screening | The real OFAC list |
 | Webhook URLs | Public `https://` URLs, as in production. To receive on your own machine, use a tunnel such as ngrok |
+| Your statement (Paying through you) | A sandbox statement with its own limits ($10,000 credit, $500 per customer per UTC day); nothing is ever billed |
 
 All three sandbox endpoints return **404** outside the sandbox.
 
@@ -135,7 +197,7 @@ All three sandbox endpoints return **404** outside the sandbox.
 |---|---|
 | [`POST /sandbox/payments/{intentId}`](/partner-api/v2/endpoints/sandbox-pay) | Pays an order's or a shipment's sandbox intent, exactly as a settled payment would |
 | [`POST /sandbox/tick`](/partner-api/v2/endpoints/sandbox-tick) | Runs one pass of the background work (open, mint, watch the chain, pay out, ship) and delivers the webhooks it produced |
-| [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship) | Plays our shipping team: marks a burned shipment `shipped`, then `delivered` |
+| [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship) | Plays our shipping team: marks a burned shipment (or, on Paying through you, a created one) `shipped`, then `delivered` |
 
 ## A full run (TypeScript + viem)
 
