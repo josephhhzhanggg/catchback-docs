@@ -10,6 +10,8 @@ Changes to `v2` are additive: a response can gain fields, an enum can gain value
   - New endpoints for these programs: `GET /customers/{customer}/vault`, `POST /customers/{customer}/cards/{card_id}/sellback`, `POST /customers/{customer}/shipments/estimate`, `POST /customers/{customer}/shipments`, `GET /customers/{customer}/shipments` and `GET /settlement`.
   - `POST /orders` takes `customer` on these programs and refuses wallet fields (`WALLET_FIELDS_NOT_ACCEPTED`); new error codes `CREDIT_LIMIT` (402), `CUSTOMER_DAILY_LIMIT` and `DAILY_LIMIT` (429, with `retry_after_seconds`). Orders gain `custody` and `customer`, and the status `in_vault`.
   - In the sandbox, `POST /sandbox/shipments/{id}` also takes a customer shipment's `id`.
+  - The [MCP server](/partner-api/v2/mcp) has these as tools: `get_customer_vault`, `sell_back_customer_card`, `estimate_customer_shipment`, `create_customer_shipment`, `list_customer_shipments` and `get_settlement`, and `create_order` takes `customer`.
+  - `GET /keys` (`whoami`) now returns your program's `payment_mode`: `wallet` or `partner`.
 </Update>
 
 <Update label="November 23, 2026" description="One-tap shipping">
