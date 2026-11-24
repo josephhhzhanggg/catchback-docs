@@ -81,8 +81,8 @@ Sells the card at its current offer and credits the payout to your statement; no
 
 ## Ship: estimate, then create
 
-1. [`POST /customers/{customer}/shipments/estimate`](#ship-estimate-then-create) with `card_ids` (from the vault) and an `address` returns `rates`, each with a `carrier`, `service`, `token` and `amount`. Add `cover_amount` to price shipping insurance.
-2. `POST /customers/{customer}/shipments` with the same `card_ids` and `address`, the chosen `rate: { carrier, token }`, and `max_cost`, plus an `Idempotency-Key`. The postage (and any cover) goes on your statement; past your credit limit it is refused with `402 CREDIT_LIMIT`. The response is the shipment, with its `id`.
+1. [`POST /customers/{customer}/shipments/estimate`](#ship-estimate-then-create) with 1-10 `card_ids` (from the vault, one box) and an `address` returns `rates`, each with a `carrier`, `service`, `token` and `amount`. Add `cover_amount` to price shipping insurance: each rate then also has a `total`, the postage plus the cover's premium.
+2. `POST /customers/{customer}/shipments` with the same `card_ids` and `address`, the chosen `rate: { carrier, token }`, and `max_cost` (that rate's `total` if you sent `cover_amount`, else its `amount`), plus an `Idempotency-Key`. The postage (and any cover) goes on your statement; past your credit limit it is refused with `402 CREDIT_LIMIT`. The response is the shipment, with its `id`.
 3. Follow it with [`nft_shipment.updated`](/partner-api/v2/webhooks#events) or `GET /customers/{customer}/shipments` (the customer's latest 100, newest first). `status` moves `processing` → `shipped` (with `carrier` and `tracking_number`) → `delivered`.
 
 A rate that rose above `max_cost` since the estimate is refused with `PRICE_CHANGED`, and a card that left the vault meanwhile with `CARDS_NOT_SHIPPABLE`. A shipment that doesn't go through is taken off your statement.
