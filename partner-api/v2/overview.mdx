@@ -23,7 +23,7 @@ CatchBack is a platform where collectors can create mystery packs of collectible
 Every partner program runs on one of two models, and almost everything about your integration follows from which one you pick.
 
 <CardGroup cols={2}>
-  <Card title="Crypto model" icon="wallet" href="/partner-api/v2/integration-models#crypto-model">
+  <Card title="Crypto Wallet model" icon="wallet" href="/partner-api/v2/integration-models#crypto-wallet-model">
     Your users pay from their own crypto wallets and receive each item as an NFT. You never touch the money. For exchanges and wallet apps.
   </Card>
   <Card title="Non-crypto model" icon="building-columns" href="/partner-api/v2/integration-models#non-crypto-model">
@@ -37,12 +37,12 @@ Every partner program runs on one of two models, and almost everything about you
 
 - **A new product with no inventory.** We source, store and ship every item, and back every digital representation with the real thing.
 - **Revenue share on every pack.** The standard share is 3% of every pack opening. Premier partners earn more. See [your revenue statement](/partner-api/v2/endpoints/get-revenue).
-- **No inventory and no custody.** We hold every real item. On the crypto model you don't prefund or touch money at all: your users pay us directly and their items and payouts go to their wallets. Non-crypto model needs no prefunding either: you settle a statement with us, within a credit limit.
+- **No inventory and no custody.** We hold every real item. On the Crypto Wallet model you don't prefund or touch money at all: your users pay us directly and their items and payouts go to their wallets. Non-crypto model needs no prefunding either: you settle a statement with us, within a credit limit.
 - **A safety net your users can see.** The guaranteed buyback means every item they pull keeps a cash value.
 
 ## New to crypto?
 
-On **Non-crypto model** your users never touch crypto, and neither do you: skip to [Non-crypto model](/partner-api/v2/settlement). The rest of this section is for the **crypto** model.
+On **Non-crypto model** your users never touch crypto, and neither do you: skip to [Non-crypto model](/partner-api/v2/settlement). The rest of this section is for the **Crypto Wallet** model.
 
 You don't need crypto expertise to integrate. The API is ordinary JSON over HTTPS, and we handle every on-chain step for you:
 
@@ -57,7 +57,7 @@ If your users don't have wallets, use [Non-crypto model](/partner-api/v2/settlem
 
 | Term | In plain terms |
 |---|---|
-| **Crypto model** | The user's crypto account. It holds their digital representations and USDC. |
+| **Crypto Wallet model** | The user's crypto account. It holds their digital representations and USDC. |
 | **Digital representation (NFT)** | A digital certificate of ownership. Here, each one stands for one real item in our vault. |
 | **USDC** | Cryptocurrency equivalent of $1 US. |
 | **Burn** | Permanently destroying a digital representation. A user burns one to sell it back or ship it, so the same item can never be claimed twice. |
@@ -69,12 +69,12 @@ Your platform is the storefront. CatchBack does everything behind it.
 
 | Step | Your platform | CatchBack |
 |---|---|---|
-| **1. The user buys a pack** | Shows the packs and their odds. **Crypto model:** sends us the user's wallet address and opens our payment screen. **Non-crypto model:** charges the user its own way and sends us its id for them | Supplies the packs, prices and odds. **Crypto model:** takes the payment, and refunds it if anything goes wrong. **Non-crypto model:** puts the order on your statement |
-| **2. The user receives their item** | Shows what they pulled | Opens the pack fairly. **Crypto model:** delivers the digital representation to their wallet, paying the network fee. **Non-crypto model:** holds it in their CatchBack vault |
+| **1. The user buys a pack** | Shows the packs and their odds. **Crypto Wallet model:** sends us the user's wallet address and opens our payment screen. **Non-crypto model:** charges the user its own way and sends us its id for them | Supplies the packs, prices and odds. **Crypto Wallet model:** takes the payment, and refunds it if anything goes wrong. **Non-crypto model:** puts the order on your statement |
+| **2. The user receives their item** | Shows what they pulled | Opens the pack fairly. **Crypto Wallet model:** delivers the digital representation to their wallet, paying the network fee. **Non-crypto model:** holds it in their CatchBack vault |
 | **3. The user keeps it, sells it back, or ships it** | Shows those options, and collects the shipping address | Buys it back at the guaranteed price, or packs and ships the real item with tracking |
 
 <Note>
-  **v2 replaces v1.** The v1 Partner API is retired. v2 has no prefunded partner balance: on the crypto model each customer pays for their own pack, and on the non-crypto model you settle a statement within a credit limit.
+  **v2 replaces v1.** The v1 Partner API is retired. v2 has no prefunded partner balance: on the Crypto Wallet model each customer pays for their own pack, and on the non-crypto model you settle a statement within a credit limit.
 </Note>
 
 ## How it works, technically
@@ -99,7 +99,7 @@ At purchase, each pack algorithmically selects one real item from our vault, wit
 
 No wallets, tokens or burns. Full details: [Non-crypto model](/partner-api/v2/settlement).
 
-### Crypto model
+### Crypto Wallet model
 
 The customer receives an NFT (a digital representation showing ownership) of that item in their wallet. They can then trade it, sell the hit back, or have the collectible shipped. Selling back and shipping burn the NFT.
 
@@ -141,7 +141,7 @@ A multi-pack order (`quantity` 2-10) is paid once, then each pack opens and mint
 
 ##### Where the money goes
 
-On the crypto model, every payment and payout moves between the customer and CatchBack directly.
+On the Crypto Wallet model, every payment and payout moves between the customer and CatchBack directly.
 
 | Money | Goes to | Details |
 |---|---|---|

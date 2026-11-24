@@ -3,9 +3,9 @@ title: "Orders and statuses"
 description: "The lifecycle of an order on either payment model, multi-pack orders and their units, and what each status means."
 ---
 
-One order buys 1-10 packs of one kind for one customer. On the **crypto** model the customer is a wallet (`recipient`) and pays with one payment; on [Non-crypto model](/partner-api/v2/settlement) the customer is your own id for them (`customer`) and the order goes on your statement. Create it with [`POST /orders`](/partner-api/v2/endpoints/create-order), follow it with [`GET /orders/{id}`](/partner-api/v2/endpoints/get-order) or the [`nft_order.updated`](/partner-api/v2/webhooks#events) webhook, and prove the pull with [`GET /orders/{id}/verification`](/partner-api/v2/endpoints/get-order-verification).
+One order buys 1-10 packs of one kind for one customer. On the **Crypto Wallet** model the customer is a wallet (`recipient`) and pays with one payment; on [Non-crypto model](/partner-api/v2/settlement) the customer is your own id for them (`customer`) and the order goes on your statement. Create it with [`POST /orders`](/partner-api/v2/endpoints/create-order), follow it with [`GET /orders/{id}`](/partner-api/v2/endpoints/get-order) or the [`nft_order.updated`](/partner-api/v2/webhooks#events) webhook, and prove the pull with [`GET /orders/{id}/verification`](/partner-api/v2/endpoints/get-order-verification).
 
-## Order statuses: crypto model
+## Order statuses: Crypto Wallet model
 
 ```text
 awaiting_payment ──payment settles──▶ paid ──pack opened──▶ rolled ──mint confirmed──▶ minted
@@ -48,7 +48,7 @@ These orders also carry `custody: "vault"` and `customer`, and never a `token`, 
 Once paid and opened, the order carries:
 
 - `pull`: the item pulled (`card_id`, `category`, `name`, `value`, `pulled_at`). `pull.value` is the item's value when it was pulled; it anchors the [sell-back offer](/partner-api/v2/sell-back).
-- `token` (crypto model only): the NFT. On EVM it has `chain`, `contract`, `token_id`, `status` and `tx`; on a Solana program it has `collection` and `asset` instead of `contract`.
+- `token` (Crypto Wallet model only): the NFT. On EVM it has `chain`, `contract`, `token_id`, `status` and `tx`; on a Solana program it has `collection` and `asset` instead of `contract`.
 
 `token.status`: `pending` (reserved, not sent), `submitted`, `confirmed`, `failed` (being retried), or `burned` once the token has been sold back or shipped.
 

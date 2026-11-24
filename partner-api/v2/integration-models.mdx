@@ -1,12 +1,12 @@
 ---
 title: "Integration models"
-description: "The two ways a partner program works: the crypto model, where customers pay from their own wallets and receive NFTs, and the non-crypto model, where you buy for your customers and settle a statement with us. Architecture, money, what you build, and which endpoints each uses."
+description: "The two ways a partner program works: the Crypto Wallet model, where customers pay from their own wallets and receive NFTs, and the non-crypto model, where you buy for your customers and settle a statement with us. Architecture, money, what you build, and which endpoints each uses."
 ---
 
 Every partner program runs on exactly one of two models. You choose it in **Get started** in your manager (`catchback.com/<slug>/admin/api`) before you go live, and your sandbox follows the same choice. If you need both, run two programs.
 
 <CardGroup cols={2}>
-  <Card title="Crypto model" icon="wallet" href="#crypto-model">
+  <Card title="Crypto Wallet model" icon="wallet" href="#crypto-wallet-model">
     Your customers pay from their own crypto wallet. Each pull is minted to that wallet as an NFT they can hold, trade, sell back or ship. You never touch the money.
   </Card>
   <Card title="Non-crypto model" icon="building-columns" href="#non-crypto-model">
@@ -14,11 +14,11 @@ Every partner program runs on exactly one of two models. You choose it in **Get 
   </Card>
 </CardGroup>
 
-The model is your program's `payment_mode`: `wallet` for the crypto model, `partner` for the non-crypto model. [`GET /keys`](/partner-api/v2/endpoints/get-key) returns it, so your code can check which one it's talking to.
+The model is your program's `payment_mode`: `wallet` for the Crypto Wallet model, `partner` for the non-crypto model. [`GET /keys`](/partner-api/v2/endpoints/get-key) returns it, so your code can check which one it's talking to.
 
 ## At a glance
 
-| | **Crypto model** | **Non-crypto model** |
+| | **Crypto Wallet model** | **Non-crypto model** |
 |---|---|---|
 | **`payment_mode`** | `wallet` | `partner` |
 | **Best for** | Exchanges and wallet apps whose users hold their own crypto wallet | Apps, games and marketplaces whose users have no crypto wallet |
@@ -32,7 +32,7 @@ The model is your program's `payment_mode`: `wallet` for the crypto model, `part
 | **Crypto your customer sees** | A wallet and a signature | None |
 | **Crypto you handle** | None: we mint, pay gas, take payments and send payouts | None |
 
-## Crypto model
+## Crypto Wallet model
 
 ```mermaid
 flowchart LR
@@ -78,7 +78,7 @@ Full details: [Non-crypto model](/partner-api/v2/settlement).
 ## What you build
 
 <CardGroup cols={2}>
-  <Card title="Crypto model" icon="wallet">
+  <Card title="Crypto Wallet model" icon="wallet">
     - Show packs and their odds
     - Collect the customer's wallet address
     - Create the order and hand its payment to the customer
@@ -102,21 +102,21 @@ Full details: [Non-crypto model](/partner-api/v2/settlement).
 | Used by | Endpoints |
 |---|---|
 | **Both models** | Catalog and odds (`GET /catalog/packs`, `GET /catalog/packs/pool`), orders (`POST /orders`, `GET /orders`, `GET /orders/{id}`, `GET /orders/{id}/verification`), webhooks, keys, `GET /revenue`, `POST /sandbox/tick`, `POST /sandbox/shipments/{id}` |
-| **Crypto model only** | Holdings (`GET /wallets/{address}/tokens`, `GET /tokens/{tokenId}`), sell-back (`POST /tokens/{tokenId}/quote`, `POST /tokens/{tokenId}/burn`, `GET /quotes`, `GET /quotes/{quoteId}`), shipping (`POST /shipments/estimate`, `POST /shipments`, `POST /tokens/{tokenId}/shipment/estimate`, `POST /tokens/{tokenId}/shipment`, `GET /shipments`, `GET /shipments/{id}`, `POST /shipments/{id}/renew`), `POST /sandbox/payments/{intentId}` |
+| **Crypto Wallet model only** | Holdings (`GET /wallets/{address}/tokens`, `GET /tokens/{tokenId}`), sell-back (`POST /tokens/{tokenId}/quote`, `POST /tokens/{tokenId}/burn`, `GET /quotes`, `GET /quotes/{quoteId}`), shipping (`POST /shipments/estimate`, `POST /shipments`, `POST /tokens/{tokenId}/shipment/estimate`, `POST /tokens/{tokenId}/shipment`, `GET /shipments`, `GET /shipments/{id}`, `POST /shipments/{id}/renew`), `POST /sandbox/payments/{intentId}` |
 | **Non-crypto model only** | `GET /customers/{customer}/vault`, `POST /customers/{customer}/cards/{card_id}/sellback`, `POST /customers/{customer}/shipments/estimate`, `POST /customers/{customer}/shipments`, `GET /customers/{customer}/shipments`, `GET /settlement` |
 
-An endpoint for the other model answers `400 NOT_PARTNER_SETTLED` (non-crypto endpoints on a crypto-model program) or refuses the wallet fields (`WALLET_FIELDS_NOT_ACCEPTED` when a non-crypto order sends `recipient`).
+An endpoint for the other model answers `400 NOT_PARTNER_SETTLED` (non-crypto endpoints on a Crypto Wallet program) or refuses the wallet fields (`WALLET_FIELDS_NOT_ACCEPTED` when a non-crypto order sends `recipient`).
 
 ## Which should I choose?
 
-- **Your users already hold self-custody wallets with you**, as on an exchange or wallet app: the **crypto model**. You never take payments or hold funds, and your users own their NFTs outright.
+- **Your users already hold self-custody wallets with you**, as on an exchange or wallet app: the **Crypto Wallet model**. You never take payments or hold funds, and your users own their NFTs outright.
 - **Your users don't have crypto wallets**, or you'd rather keep billing in your own system: the **non-crypto model**. It needs a credit limit agreed with us, starting at $10,000.
 - **Not sure?** Ask us at support@catchbackcards.com. Your sandbox lets you build either one before deciding, as long as you haven't gone live.
 
 ## Next
 
 <CardGroup cols={2}>
-  <Card title="Build the crypto model" icon="wallet" href="/partner-api/v2/quickstart">
+  <Card title="Build the Crypto Wallet model" icon="wallet" href="/partner-api/v2/quickstart">
     The sandbox walkthrough: buy, pay, mint, sell back, ship.
   </Card>
   <Card title="Build the non-crypto model" icon="building-columns" href="/partner-api/v2/quickstart#non-crypto-model-in-the-sandbox">

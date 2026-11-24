@@ -93,7 +93,7 @@
             ]
           },
           {
-            "group": "Crypto model",
+            "group": "Crypto Wallet model",
             "pages": [
               "partner-api/v2/payments",
               "partner-api/v2/sell-back",

@@ -6,7 +6,7 @@ description: "Non-crypto model: a customer's latest 100 shipments, newest first,
 
 Scope: `nft:orders`
 
-For [Non-crypto model](/partner-api/v2/settlement) programs only; a crypto-model program gets `400 NOT_PARTNER_SETTLED`.
+For [Non-crypto model](/partner-api/v2/settlement) programs only; a Crypto Wallet program gets `400 NOT_PARTNER_SETTLED`.
 
 The customer's latest 100 shipments, newest first, each in the shape [Create a customer shipment](/partner-api/v2/endpoints/create-customer-shipment) returns. `status` moves `processing` → `shipped` (with `carrier` and `tracking_number`) → `delivered`. We never return the delivery address.
 

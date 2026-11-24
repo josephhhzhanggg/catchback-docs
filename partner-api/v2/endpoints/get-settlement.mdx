@@ -6,7 +6,7 @@ description: "Non-crypto model: what you owe against your credit limit, your dai
 
 Scope: `nft:orders`
 
-For [Non-crypto model](/partner-api/v2/settlement) programs only; a crypto-model program gets `400 NOT_PARTNER_SETTLED` and reads [its revenue statement](/partner-api/v2/endpoints/get-revenue) instead.
+For [Non-crypto model](/partner-api/v2/settlement) programs only; a Crypto Wallet program gets `400 NOT_PARTNER_SETTLED` and reads [its revenue statement](/partner-api/v2/endpoints/get-revenue) instead.
 
 What you owe now against your credit limit, your daily limits, and one UTC month of your statement: what was owed at its start and end, a total per kind, and its entries, newest first, each naming the customer by your own id. A positive `amount` adds to what you owe; a negative one takes from it. Your revenue share is netted on the statement, and you settle the balance as agreed with us. Your credit limit and daily limits are set by CatchBack.
 

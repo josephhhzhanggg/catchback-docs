@@ -6,7 +6,7 @@ description: "Non-crypto model: live carrier rates to ship 1-10 of a customer's 
 
 Scope: `nft:orders` · Rate limit: 30 a minute, shared with [Estimate a shipment](/partner-api/v2/endpoints/estimate-shipment) and [Estimate a one-token shipment](/partner-api/v2/endpoints/estimate-token-shipment)
 
-For [Non-crypto model](/partner-api/v2/settlement) programs only; a crypto-model program gets `400 NOT_PARTNER_SETTLED`.
+For [Non-crypto model](/partner-api/v2/settlement) programs only; a Crypto Wallet program gets `400 NOT_PARTNER_SETTLED`.
 
 Live carrier rates to ship 1-10 of a customer's vault cards to an address in one box. Charges nothing and stores nothing: the address only goes to the carrier for the quote. Pass a rate's `carrier` and `token` to [Create a customer shipment](/partner-api/v2/endpoints/create-customer-shipment), with `max_cost` set to that rate's `total` if you sent `cover_amount`, else its `amount`.
 

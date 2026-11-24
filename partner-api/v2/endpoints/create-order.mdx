@@ -34,13 +34,13 @@ A refused order creates nothing. There is no limit on how much a wallet buys.
   1-10 packs. 2 or more makes a [multi-pack order](/partner-api/v2/orders#multi-pack-orders).
 </ParamField>
 <ParamField body="recipient" type="string">
-  **Crypto model only, and required there.** The customer's self-custody wallet on your mint chain. Never an exchange deposit address: the NFTs are minted to it.
+  **Crypto Wallet model only, and required there.** The customer's self-custody wallet on your mint chain. Never an exchange deposit address: the NFTs are minted to it.
 </ParamField>
 <ParamField body="refund_address" type="string">
-  Crypto model only. An EVM wallet that can receive USDC on Base, for refunds. Defaults to `recipient` on an EVM program. **Required when you mint on Solana.**
+  Crypto Wallet model only. An EVM wallet that can receive USDC on Base, for refunds. Defaults to `recipient` on an EVM program. **Required when you mint on Solana.**
 </ParamField>
 <ParamField body="partner_user_ref" type="string">
-  Crypto model: your opaque user id (`A-Z a-z 0-9 _ . : -`, up to 128). Never put personal data here. Not used on a non-crypto program, where `customer` names the customer.
+  Crypto Wallet model: your opaque user id (`A-Z a-z 0-9 _ . : -`, up to 128). Never put personal data here. Not used on a non-crypto program, where `customer` names the customer.
 </ParamField>
 <ParamField body="customer" type="string">
   **non-crypto programs only, and required there.** Your own id for the customer: 1-128 characters of `A-Z a-z 0-9 _ . : -`. Use something stable that is not personal data (your internal user id, never an email address or phone number). The same `Idempotency-Key` with a different `customer` is `422`.
@@ -72,7 +72,7 @@ A refused order creates nothing. There is no limit on how much a wallet buys.
   </Expandable>
 </ResponseField>
 <ResponseField name="payment" type="object">
-  Crypto model only: a non-crypto order has no `payment`. `intent_id`, `client_secret`, `publishable_key`, `amount` and `deposit_addresses`. See [Payments](/partner-api/v2/payments). Once the order is past `awaiting_payment`, a replay's `payment` has no `client_secret` and no deposit addresses: there is nothing left to pay.
+  Crypto Wallet model only: a non-crypto order has no `payment`. `intent_id`, `client_secret`, `publishable_key`, `amount` and `deposit_addresses`. See [Payments](/partner-api/v2/payments). Once the order is past `awaiting_payment`, a replay's `payment` has no `client_secret` and no deposit addresses: there is nothing left to pay.
 </ResponseField>
 <ResponseField name="idempotent_replay" type="boolean">Present and `true` on a replay.</ResponseField>
 
