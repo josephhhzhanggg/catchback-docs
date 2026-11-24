@@ -5,8 +5,10 @@ description: "What changed in Partner API v2, newest first."
 
 Changes to `v2` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. Dates are US Pacific time.
 
-<Update label="November 24, 2026" description="Paying through you">
-  - New payment model: [Paying through you](/partner-api/v2/settlement). For customers without a crypto wallet, you buy for them by your own id for them (`customer`), their cards stay in a CatchBack vault, and orders, sell-backs and shipping settle on one statement with a credit limit.
+<Update label="November 24, 2026" description="Non-crypto model">
+  - New page: [Integration models](/partner-api/v2/integration-models) lays out the two models side by side, with an architecture diagram for each, where the money goes, what you build and which endpoints each uses. The docs now call them the **Crypto model** and the **Non-crypto model**, as your manager does (`payment_mode` `wallet` and `partner`).
+  - Customer shipment requests now return a `code` for every bad field: `BAD_CARD_IDS`, `BAD_ADDRESS` (with `fields`), `BAD_COVER`, `BAD_RATE` and `BAD_MAX_COST`.
+  - New payment model: [Non-crypto model](/partner-api/v2/settlement). For customers without a crypto wallet, you buy for them by your own id for them (`customer`), their cards stay in a CatchBack vault, and orders, sell-backs and shipping settle on one statement with a credit limit.
   - New endpoints for these programs: `GET /customers/{customer}/vault`, `POST /customers/{customer}/cards/{card_id}/sellback`, `POST /customers/{customer}/shipments/estimate`, `POST /customers/{customer}/shipments`, `GET /customers/{customer}/shipments` and `GET /settlement`.
   - `POST /orders` takes `customer` on these programs and refuses wallet fields (`WALLET_FIELDS_NOT_ACCEPTED`); new error codes `CREDIT_LIMIT` (402), `CUSTOMER_DAILY_LIMIT` and `DAILY_LIMIT` (429, with `retry_after_seconds`). Orders gain `custody` and `customer`, and the status `in_vault`.
   - In the sandbox, `POST /sandbox/shipments/{id}` also takes a customer shipment's `id`.

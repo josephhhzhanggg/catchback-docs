@@ -1,12 +1,12 @@
 ---
 title: "Sell back a customer's card"
 api: "POST /api/partner/v2/customers/{customer}/cards/{card_id}/sellback"
-description: "Paying through you: sell one vault card back at its current offer, credited to your statement."
+description: "Non-crypto model: sell one vault card back at its current offer, credited to your statement."
 ---
 
 Scope: `nft:orders` · Rate limit: 30 a minute, shared with [Create an order](/partner-api/v2/endpoints/create-order) and [Create a customer shipment](/partner-api/v2/endpoints/create-customer-shipment)
 
-For [Paying through you](/partner-api/v2/settlement) programs only; a wallet program gets `400 NOT_PARTNER_SETTLED` and sells back with a [quote and a burn](/partner-api/v2/sell-back).
+For [Non-crypto model](/partner-api/v2/settlement) programs only; a crypto-model program gets `400 NOT_PARTNER_SETTLED` and sells back with a [quote and a burn](/partner-api/v2/sell-back).
 
 Sells the card at its current offer (the `sellback.amount` [Get a customer's vault](/partner-api/v2/endpoints/get-customer-vault) shows) and credits the payout to your statement. Nothing is paid out to the customer: you credit them your way.
 

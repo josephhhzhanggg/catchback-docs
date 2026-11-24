@@ -21,7 +21,7 @@ The key you call with. Never a secret. Rotation and handling: [Authentication an
     <ResponseField name="rotated_from" type="string | null">The key this one replaced.</ResponseField>
     <ResponseField name="successor" type="object | null">Once rotated, the key that replaced it: `id` and `name`.</ResponseField>
     <ResponseField name="program" type="string">Your program.</ResponseField>
-    <ResponseField name="payment_mode" type="string">How your program is paid: `wallet` (customers pay from their own wallets and pulls mint as NFTs) or `partner` ([Paying through you](/partner-api/v2/settlement): send `customer` on orders and use the customer and statement endpoints).</ResponseField>
+    <ResponseField name="payment_mode" type="string">How your program is paid: `wallet` (customers pay from their own wallets and pulls mint as NFTs) or `partner` ([Non-crypto model](/partner-api/v2/settlement): send `customer` on orders and use the customer and statement endpoints).</ResponseField>
   </Expandable>
 </ResponseField>
 

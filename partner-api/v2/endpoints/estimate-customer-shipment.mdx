@@ -1,12 +1,12 @@
 ---
 title: "Estimate a customer shipment"
 api: "POST /api/partner/v2/customers/{customer}/shipments/estimate"
-description: "Paying through you: live carrier rates to ship 1-10 of a customer's vault cards in one box. Charges nothing and stores nothing."
+description: "Non-crypto model: live carrier rates to ship 1-10 of a customer's vault cards in one box. Charges nothing and stores nothing."
 ---
 
 Scope: `nft:orders` · Rate limit: 30 a minute, shared with [Estimate a shipment](/partner-api/v2/endpoints/estimate-shipment) and [Estimate a one-token shipment](/partner-api/v2/endpoints/estimate-token-shipment)
 
-For [Paying through you](/partner-api/v2/settlement) programs only; a wallet program gets `400 NOT_PARTNER_SETTLED`.
+For [Non-crypto model](/partner-api/v2/settlement) programs only; a crypto-model program gets `400 NOT_PARTNER_SETTLED`.
 
 Live carrier rates to ship 1-10 of a customer's vault cards to an address in one box. Charges nothing and stores nothing: the address only goes to the carrier for the quote. Pass a rate's `carrier` and `token` to [Create a customer shipment](/partner-api/v2/endpoints/create-customer-shipment), with `max_cost` set to that rate's `total` if you sent `cover_amount`, else its `amount`.
 
@@ -50,7 +50,9 @@ Live carrier rates to ship 1-10 of a customer's vault cards to an address in one
 | `400` | `NOT_PARTNER_SETTLED` | Your program pays through customer wallets; use [Estimate a shipment](/partner-api/v2/endpoints/estimate-shipment) |
 | `400` | `BAD_JSON` | The body isn't JSON |
 | `400` | `BAD_CUSTOMER` | `customer` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` |
-| `400` | | `card_ids` isn't a list of 1-10 distinct card ids; the address is invalid (`fields` maps each bad field to a message); or `cover_amount` isn't a positive dollar amount with at most two decimals |
+| `400` | `BAD_CARD_IDS` | `card_ids` isn't a list of 1-10 distinct card ids from the vault |
+| `400` | `BAD_ADDRESS` | The address is invalid; `fields` maps each bad field to a message |
+| `400` | `BAD_COVER` | `cover_amount` isn't a positive dollar amount with at most two decimals |
 | `400` | `COVER_NOT_ALLOWED` | `cover_amount` is outside what the cards can be insured for; the body has `order_value`, `min_cover` and `max_cover` |
 | `400` | `PARTNER_GOODS` | An item is held by its brand partner and can't ship through CatchBack; it can still be sold back |
 | `400` | `COUNTRY_NOT_SUPPORTED` | We don't ship to that country |

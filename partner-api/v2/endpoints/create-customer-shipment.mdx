@@ -1,12 +1,12 @@
 ---
 title: "Create a customer shipment"
 api: "POST /api/partner/v2/customers/{customer}/shipments"
-description: "Paying through you: ship 1-10 of a customer's vault cards in one box, with the postage on your statement."
+description: "Non-crypto model: ship 1-10 of a customer's vault cards in one box, with the postage on your statement."
 ---
 
 Scope: `nft:orders` · Rate limit: 30 a minute, shared with [Create an order](/partner-api/v2/endpoints/create-order) and [Sell back a customer's card](/partner-api/v2/endpoints/sell-back-customer-card)
 
-For [Paying through you](/partner-api/v2/settlement) programs only; a wallet program gets `400 NOT_PARTNER_SETTLED`.
+For [Non-crypto model](/partner-api/v2/settlement) programs only; a crypto-model program gets `400 NOT_PARTNER_SETTLED`.
 
 Ships 1-10 of a customer's vault cards in one box at a rate from [Estimate a customer shipment](/partner-api/v2/endpoints/estimate-customer-shipment). We re-quote the rate; the postage (and any cover's premium) goes on your statement, and nothing is paid or signed. A shipment that doesn't go through is taken off your statement.
 
@@ -70,7 +70,9 @@ Nothing is created or charged on any refusal below, except `SHIPMENT_OUTCOME_UNK
 | Status | Code | When |
 |---|---|---|
 | `400` | `BAD_IDEMPOTENCY_KEY` | `Idempotency-Key` missing or malformed |
-| `400` | | Any `400` of [Estimate a customer shipment](/partner-api/v2/endpoints/estimate-customer-shipment#errors); or `rate` isn't a rate from the estimate, or `max_cost` is missing, not positive or over 10,000 |
+| `400` | | Any `400` of [Estimate a customer shipment](/partner-api/v2/endpoints/estimate-customer-shipment#errors) |
+| `400` | `BAD_RATE` | `rate` isn't the `carrier` and `token` of a rate from the estimate |
+| `400` | `BAD_MAX_COST` | `max_cost` is missing, not positive or over 10,000 |
 | `402` | `CREDIT_LIMIT` | The postage would take what you owe past your credit limit; the body has `owed`, `credit_limit` and `shipment_total` |
 | `403` | `CUSTOMER_BLOCKED` | This customer may not ship cards |
 | `403` | `CUSTOMER_UNAVAILABLE` | This customer's account is unavailable |

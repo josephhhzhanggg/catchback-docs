@@ -41,7 +41,7 @@ Every event is a JSON `POST` with this envelope:
 | `nft_order.updated` | An order changes status after you created it: `paid`, `rolled`, `minted`, `mint_failed`, `expired`, `refund_due`, `refunded` | `{ "order": ... }`, as [`GET /orders/{id}`](/partner-api/v2/endpoints/get-order) returns it |
 | `sellback.updated` | A sell-back payout changes status: `pending` (the burn was seen), `sending`, `sent`, `held`, `failed` | `{ "quote": ... }`, as [`GET /quotes/{quoteId}`](/partner-api/v2/endpoints/get-quote) returns it |
 | `nft_shipment.updated` | A shipment is paid (`ready`), a token is burned (`redeemed`), or the box moves: `fulfilment.status` `pending`, `processing`, `shipped`, `delivered`, `cancelled`, `needs_review` | `{ "shipment": ... }`: the token's shipment with its `fulfilment` (below) |
-| | **Paying through you:** the same three types, with the customer by your id instead of a wallet | |
+| | **Non-crypto model:** the same three types, with the customer by your id instead of a wallet | |
 | `nft_order.updated` | The order opens into the vault (`in_vault`) or is `refunded` | `{ "order": ... }`, with `custody: "vault"` and `customer` |
 | `sellback.updated` | A sell-back is credited to your statement | `{ "sellback": { "id", "status": "credited", "customer", "card_id", "amount", "statement_entry_id", "created_at" } }` |
 | `nft_shipment.updated` | A customer shipment moves: `processing`, `shipped`, `delivered` | `{ "shipment": ... }` as [`GET /customers/{customer}/shipments`](/partner-api/v2/settlement) lists it, plus `customer` |
@@ -107,7 +107,7 @@ Poll, within the [request limits](/partner-api/v2/limits-and-compliance), when y
 | A shipment | `GET /shipments/{id}` | every few minutes until `delivered`; hourly once `shipped` is fine | `fulfilment.status` reaches `delivered` |
 | Holdings after a trade | `GET /wallets/{address}/tokens` | on demand | |
 | Catching up after downtime | `GET /orders`, `GET /quotes`, `GET /shipments` | once | You reach items you already know |
-| Paying through you: a customer's shipments | `GET /customers/{customer}/shipments` | every few minutes until `delivered` | `status` reaches `delivered` |
-| Paying through you: your statement | `GET /settlement` | on demand | |
+| Non-crypto model: a customer's shipments | `GET /customers/{customer}/shipments` | every few minutes until `delivered` | `status` reaches `delivered` |
+| Non-crypto model: your statement | `GET /settlement` | on demand | |
 
 Our background processing runs every two minutes, so most steps finish within a few minutes of the event that triggers them.

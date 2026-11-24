@@ -4,9 +4,16 @@ title: "Sandbox"
 
 In about 15 minutes you'll run the whole flow a customer goes through: buy a pack, receive the item, and sell it back. It all happens in the **sandbox**, a test copy of the API. Payments there are simulated, so no real money moves, but the digital representations are real tokens on a public test network.
 
-<Note>
-  Steps 1-6 are the **wallet** model. If your program pays through you (you chose **Paying through you** in Get started), there's no wallet and no payment step: follow [Paying through you in the sandbox](#paying-through-you-in-the-sandbox) instead. Your sandbox program pays the way your program does.
-</Note>
+There's one walkthrough per [integration model](/partner-api/v2/integration-models). Your sandbox runs the model you chose in Get started.
+
+<CardGroup cols={2}>
+  <Card title="Crypto model" icon="wallet" href="#before-you-start">
+    Steps 1-6 below: a test wallet, a simulated payment, a real testnet NFT, sell-back and shipping.
+  </Card>
+  <Card title="Non-crypto model" icon="building-columns" href="#non-crypto-model-in-the-sandbox">
+    No wallet and no payment step: an order for a test customer, their vault, a sell-back, a shipment and your statement.
+  </Card>
+</CardGroup>
 
 ## Before you start
 
@@ -120,7 +127,7 @@ When `quote.payout.status` is `sent`, the sale is complete, and in the sandbox t
 
 That's the whole flow. To try shipping instead, see [Shipping](/partner-api/v2/shipping): estimate, create and pay a shipment, burn, then mark it shipped with [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship).
 
-## Paying through you in the sandbox
+## Non-crypto model in the sandbox
 
 No wallet and no payment: orders go on your sandbox statement, and a customer is your own id for them. Pick any test id.
 
@@ -175,7 +182,7 @@ curl "$CATCHBACK_BASE_URL/api/partner/v2/customers/$CUSTOMER/shipments" -H "Auth
 curl "$CATCHBACK_BASE_URL/api/partner/v2/settlement" -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 
-Get started in your manager runs these same steps for you and ticks each one off as it sees it. Full details: [Paying through you](/partner-api/v2/settlement).
+Get started in your manager runs these same steps for you and ticks each one off as it sees it. Full details: [Non-crypto model](/partner-api/v2/settlement).
 
 ## How the sandbox differs from production
 
@@ -189,7 +196,7 @@ Get started in your manager runs these same steps for you and ticks each one off
 | Your mint chain | A public testnet, real contract |
 | Sanctions screening | The real OFAC list |
 | Webhook URLs | Public `https://` URLs, as in production. To receive on your own machine, use a tunnel such as ngrok |
-| Your statement (Paying through you) | A sandbox statement with its own limits ($10,000 credit, $500 per customer per UTC day); nothing is ever billed |
+| Your statement (Non-crypto model) | A sandbox statement with its own limits ($10,000 credit, $500 per customer per UTC day); nothing is ever billed |
 
 All three sandbox endpoints return **404** outside the sandbox.
 
@@ -197,7 +204,7 @@ All three sandbox endpoints return **404** outside the sandbox.
 |---|---|
 | [`POST /sandbox/payments/{intentId}`](/partner-api/v2/endpoints/sandbox-pay) | Pays an order's or a shipment's sandbox intent, exactly as a settled payment would |
 | [`POST /sandbox/tick`](/partner-api/v2/endpoints/sandbox-tick) | Runs one pass of the background work (open, mint, watch the chain, pay out, ship) and delivers the webhooks it produced |
-| [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship) | Plays our shipping team: marks a burned shipment (or, on Paying through you, a created one) `shipped`, then `delivered` |
+| [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship) | Plays our shipping team: marks a burned shipment (or, on the non-crypto model, a created one) `shipped`, then `delivered` |
 
 ## A full run (TypeScript + viem)
 

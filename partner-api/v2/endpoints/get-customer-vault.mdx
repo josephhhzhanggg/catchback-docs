@@ -1,12 +1,12 @@
 ---
 title: "Get a customer's vault"
 api: "GET /api/partner/v2/customers/{customer}/vault"
-description: "Paying through you: the cards a customer holds now, each with what it sells back for at this moment."
+description: "Non-crypto model: the cards a customer holds now, each with what it sells back for at this moment."
 ---
 
 Scope: `nft:orders`
 
-For [Paying through you](/partner-api/v2/settlement) programs only; a wallet program gets `400 NOT_PARTNER_SETTLED`.
+For [Non-crypto model](/partner-api/v2/settlement) programs only; a crypto-model program gets `400 NOT_PARTNER_SETTLED`.
 
 The cards your orders pulled into this customer's vault that they still hold, newest first, each with what a sell-back pays right now. A sold or shipped card leaves the vault. A customer you have never sold to has an empty vault, not a `404`.
 

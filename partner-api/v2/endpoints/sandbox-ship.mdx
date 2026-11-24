@@ -9,10 +9,10 @@ Scope: `nft:orders` · **Sandbox only:** `404` outside the [sandbox](/partner-ap
 
 Plays our shipping team. `{ "status": "shipped" }` marks a burned shipment shipped, with a test USPS tracking number, a tracking link, `shipped_at` and an `expected_delivery` three days out. `{ "status": "delivered" }` then sets `delivered_at`. Read the result with [Get a shipment](/partner-api/v2/endpoints/get-shipment). It also delivers any webhooks the change produced.
 
-On a [Paying through you](/partner-api/v2/settlement) program, `{id}` is a customer shipment's `id` from [Create a customer shipment](/partner-api/v2/endpoints/create-customer-shipment) (there is nothing to burn); read the result with [List a customer's shipments](/partner-api/v2/endpoints/list-customer-shipments).
+On a [Non-crypto model](/partner-api/v2/settlement) program, `{id}` is a customer shipment's `id` from [Create a customer shipment](/partner-api/v2/endpoints/create-customer-shipment) (there is nothing to burn); read the result with [List a customer's shipments](/partner-api/v2/endpoints/list-customer-shipments).
 
 <ParamField path="id" type="string" required>
-  A `shipment_id` or a `quote_id`. On a Paying through you program, a customer shipment's `id`.
+  A `shipment_id` or a `quote_id`. On a non-crypto program, a customer shipment's `id`.
 </ParamField>
 <ParamField body="status" type="string" required>
   `shipped` or `delivered`.
@@ -32,7 +32,7 @@ On a [Paying through you](/partner-api/v2/settlement) program, `{id}` is a custo
 | `404` | `UNKNOWN_SHIPMENT` | No such shipment in your program |
 | `404` | | Not the sandbox |
 | `409` | `NOT_BURNED` | The shipment has no shipping order yet: burn every token, then [tick](/partner-api/v2/endpoints/sandbox-tick) |
-| `409` | `NOT_CREATED` | Paying through you: that customer shipment was never created (it was refused, or is still being created) |
+| `409` | `NOT_CREATED` | Non-crypto model: that customer shipment was never created (it was refused, or is still being created) |
 
 <RequestExample>
 ```bash cURL

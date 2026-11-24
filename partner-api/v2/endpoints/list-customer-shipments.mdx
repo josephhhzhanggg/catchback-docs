@@ -1,12 +1,12 @@
 ---
 title: "List a customer's shipments"
 api: "GET /api/partner/v2/customers/{customer}/shipments"
-description: "Paying through you: a customer's latest 100 shipments, newest first, with status and tracking."
+description: "Non-crypto model: a customer's latest 100 shipments, newest first, with status and tracking."
 ---
 
 Scope: `nft:orders`
 
-For [Paying through you](/partner-api/v2/settlement) programs only; a wallet program gets `400 NOT_PARTNER_SETTLED`.
+For [Non-crypto model](/partner-api/v2/settlement) programs only; a crypto-model program gets `400 NOT_PARTNER_SETTLED`.
 
 The customer's latest 100 shipments, newest first, each in the shape [Create a customer shipment](/partner-api/v2/endpoints/create-customer-shipment) returns. `status` moves `processing` → `shipped` (with `carrier` and `tracking_number`) → `delivered`. We never return the delivery address.
 

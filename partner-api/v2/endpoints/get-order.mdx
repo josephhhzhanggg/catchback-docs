@@ -23,10 +23,10 @@ Returns `{ "order": { ... } }`. After a lost response, this is how you find out 
     <ResponseField name="category" type="string" />
     <ResponseField name="odds" type="string">The odds the pack is opened at.</ResponseField>
     <ResponseField name="price" type="number">In dollars. On a multi-pack order, the total; `unit_price` is one pack.</ResponseField>
-    <ResponseField name="recipient" type="string | null">Null on a [Paying through you](/partner-api/v2/settlement) program.</ResponseField>
-    <ResponseField name="mint_chain" type="string | null">Null on a Paying through you program.</ResponseField>
+    <ResponseField name="recipient" type="string | null">Null on a [Non-crypto model](/partner-api/v2/settlement) program.</ResponseField>
+    <ResponseField name="mint_chain" type="string | null">Null on a non-crypto program.</ResponseField>
     <ResponseField name="paid_at" type="string | null" />
-    <ResponseField name="custody" type="string">`wallet` (the item mints as an NFT to `recipient`) or `vault` (Paying through you: the card stays in the `customer`'s CatchBack vault, and the order ends `in_vault` instead of `minted`). On a multi-pack order, on each unit.</ResponseField>
+    <ResponseField name="custody" type="string">`wallet` (the item mints as an NFT to `recipient`) or `vault` (Non-crypto model: the card stays in the `customer`'s CatchBack vault, and the order ends `in_vault` instead of `minted`). On a multi-pack order, on each unit.</ResponseField>
     <ResponseField name="customer" type="string">Only when `custody` is `vault`: the customer, by your own id.</ResponseField>
     <ResponseField name="pull" type="object | null">
       Set once the pack opens: `card_id`, `category`, `name`, `value` (the item's value when it was pulled; it anchors the [sell-back offer](/partner-api/v2/sell-back)) and `pulled_at`.

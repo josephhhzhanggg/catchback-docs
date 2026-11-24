@@ -87,7 +87,7 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `RATE_UNAVAILABLE` | `409` | shipments | The carrier no longer offers that rate; estimate again |
 | `PRICE_CHANGED` | `409` | shipments, customer sell-back | The shipping cost is now above `max_cost` (the body has the current `amount`), or a customer card's offer is below `min_payout` |
 | `NOT_PARTNER_SETTLED` | `400` | customer tools, settlement | Your program pays through customer wallets; use the token endpoints |
-| `WALLET_FIELDS_NOT_ACCEPTED` | `400` | orders | Paying through you: `recipient` or `refund_address` sent; send `customer` only |
+| `WALLET_FIELDS_NOT_ACCEPTED` | `400` | orders | Non-crypto model: `recipient` or `refund_address` sent; send `customer` only |
 | `BAD_CUSTOMER` | `400` | orders, customer tools | `customer` missing, or not 1-128 characters of `A-Z a-z 0-9 _ . : -` |
 | `CUSTOMER_NOT_FOUND` | `404` | customer tools | No customer with that id has bought from your program |
 | `CUSTOMER_BLOCKED` | `403` | orders, customer shipments | We can't sell to, or ship for, this customer. Don't retry |
@@ -99,6 +99,8 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `CARDS_NOT_IN_VAULT` | `409` | customer shipments | A card isn't in this customer's vault; `card_ids` lists them |
 | `CARDS_NOT_SHIPPABLE` | `409` | customer shipments | A card left the vault meanwhile. Nothing is charged |
 | `BAD_MIN_PAYOUT` | `400` | customer sell-back | `min_payout` isn't a non-negative number |
+| `BAD_CARD_IDS` | `400` | customer shipments | `card_ids` isn't 1-10 distinct card ids from the vault |
+| `BAD_RATE` | `400` | customer shipments | `rate` isn't the `carrier` and `token` of a rate from the estimate |
 | `BAD_PERIOD` | `400` | settlement | `period` isn't a `YYYY-MM` month |
 | `SHIPMENT_OUTCOME_UNKNOWN` | `500` | customer shipments | We couldn't confirm it went through; it's with our team. Retrying with the same `Idempotency-Key` is safe and never charges twice |
 | `UNKNOWN_SHIPMENT` | `404` | shipment GET, renew, sandbox shipments | No such shipment in your program |

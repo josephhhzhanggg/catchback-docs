@@ -1,11 +1,11 @@
 ---
-title: "Paying through you"
+title: "Non-crypto model"
 description: "Partner settlement: buy packs for your customers by your own id for them, keep their cards in a CatchBack vault, and settle orders, sell-backs and shipping on one statement with a credit limit."
 ---
 
-Choose **Paying through you** in Get started when your customers have no crypto wallet. You buy for them and charge them however you already do. We keep each card in a CatchBack vault for that customer, and everything they do (orders, sell-backs, shipping) goes on one statement between you and us.
+This is one of the two [integration models](/partner-api/v2/integration-models), `payment_mode: "partner"` in the API (also called partner settlement). Choose **Non-crypto model** in Get started when your customers have no crypto wallet. You buy for them and charge them however you already do. We keep each card in a CatchBack vault for that customer, and everything they do (orders, sell-backs, shipping) goes on one statement between you and us.
 
-|  | Wallet model | Paying through you |
+|  | Crypto model | Non-crypto model |
 |---|---|---|
 | Who pays CatchBack | Each customer, in USDC | You, on your statement |
 | A customer is | A wallet address | Your own id for them |
@@ -116,7 +116,7 @@ Your revenue share is netted on the statement, and you settle the balance as agr
 
 ## Webhooks
 
-The events are the same as the wallet model's, with `customer` instead of a wallet:
+The events are the same as the crypto model's, with `customer` instead of a wallet:
 
 - `nft_order.updated` as an order's packs open into the vault.
 - `sellback.updated` when a sell-back is credited (`status: "credited"`, `amount`, `card_id`, `statement_entry_id`).

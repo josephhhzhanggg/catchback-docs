@@ -1,7 +1,7 @@
 ---
 title: "Create an order"
 api: "POST /api/partner/v2/orders"
-description: "Buy 1-10 packs of one kind for one wallet, paid with one payment, or for one customer on a Paying through you program."
+description: "Buy 1-10 packs of one kind for one wallet, paid with one payment, or for one customer on a non-crypto program."
 ---
 
 Scope: `nft:orders` · Rate limit: 30 a minute, shared with [Sell back a customer's card](/partner-api/v2/endpoints/sell-back-customer-card) and [Create a customer shipment](/partner-api/v2/endpoints/create-customer-shipment)
@@ -11,7 +11,7 @@ One order buys 1-10 packs of one kind for one wallet, paid with one payment. The
 A refused order creates nothing. There is no limit on how much a wallet buys.
 
 <Note>
-  **Paying through you programs** ([Paying through you](/partner-api/v2/settlement)): send `customer`, your own id for the customer, and no wallet fields. There is no payment step: the order is charged to your statement when it is accepted, its packs open at once, and the response has no `payment`. The order has `custody: "vault"` and `customer`, `recipient` and `mint_chain` are null, and each pack ends `in_vault` instead of `minted` (or `refunded`, with the price taken back off your statement, if it can't open). The first order for a new `customer` creates that customer. Your credit limit and daily limits apply.
+  **non-crypto programs** ([Non-crypto model](/partner-api/v2/settlement)): send `customer`, your own id for the customer, and no wallet fields. There is no payment step: the order is charged to your statement when it is accepted, its packs open at once, and the response has no `payment`. The order has `custody: "vault"` and `customer`, `recipient` and `mint_chain` are null, and each pack ends `in_vault` instead of `minted` (or `refunded`, with the price taken back off your statement, if it can't open). The first order for a new `customer` creates that customer. Your credit limit and daily limits apply.
 </Note>
 
 <Warning>
@@ -34,16 +34,16 @@ A refused order creates nothing. There is no limit on how much a wallet buys.
   1-10 packs. 2 or more makes a [multi-pack order](/partner-api/v2/orders#multi-pack-orders).
 </ParamField>
 <ParamField body="recipient" type="string">
-  **Wallet programs only, and required there.** The customer's self-custody wallet on your mint chain. Never an exchange deposit address: the NFTs are minted to it.
+  **Crypto model only, and required there.** The customer's self-custody wallet on your mint chain. Never an exchange deposit address: the NFTs are minted to it.
 </ParamField>
 <ParamField body="refund_address" type="string">
-  Wallet programs only. An EVM wallet that can receive USDC on Base, for refunds. Defaults to `recipient` on an EVM program. **Required when you mint on Solana.**
+  Crypto model only. An EVM wallet that can receive USDC on Base, for refunds. Defaults to `recipient` on an EVM program. **Required when you mint on Solana.**
 </ParamField>
 <ParamField body="partner_user_ref" type="string">
-  Wallet programs: your opaque user id (`A-Z a-z 0-9 _ . : -`, up to 128). Never put personal data here. Not used on a Paying through you program, where `customer` names the customer.
+  Crypto model: your opaque user id (`A-Z a-z 0-9 _ . : -`, up to 128). Never put personal data here. Not used on a non-crypto program, where `customer` names the customer.
 </ParamField>
 <ParamField body="customer" type="string">
-  **Paying through you programs only, and required there.** Your own id for the customer: 1-128 characters of `A-Z a-z 0-9 _ . : -`. Use something stable that is not personal data (your internal user id, never an email address or phone number). The same `Idempotency-Key` with a different `customer` is `422`.
+  **non-crypto programs only, and required there.** Your own id for the customer: 1-128 characters of `A-Z a-z 0-9 _ . : -`. Use something stable that is not personal data (your internal user id, never an email address or phone number). The same `Idempotency-Key` with a different `customer` is `422`.
 </ParamField>
 
 ## Response
@@ -55,15 +55,15 @@ A refused order creates nothing. There is no limit on how much a wallet buys.
   <Expandable title="order">
     <ResponseField name="order_id" type="string">Your `Idempotency-Key`.</ResponseField>
     <ResponseField name="id" type="string">Our id. Either works in `GET /orders/{id}`.</ResponseField>
-    <ResponseField name="status" type="string">`awaiting_payment`; on a Paying through you program, `in_vault` once the pack has opened. See [Orders and statuses](/partner-api/v2/orders).</ResponseField>
+    <ResponseField name="status" type="string">`awaiting_payment`; on a non-crypto program, `in_vault` once the pack has opened. See [Orders and statuses](/partner-api/v2/orders).</ResponseField>
     <ResponseField name="pack_type" type="string" />
     <ResponseField name="category" type="string" />
     <ResponseField name="odds" type="string">The odds the pack is opened at.</ResponseField>
     <ResponseField name="price" type="number">The amount due, in dollars.</ResponseField>
-    <ResponseField name="recipient" type="string | null">Null on a Paying through you program.</ResponseField>
-    <ResponseField name="mint_chain" type="string | null">Null on a Paying through you program.</ResponseField>
+    <ResponseField name="recipient" type="string | null">Null on a non-crypto program.</ResponseField>
+    <ResponseField name="mint_chain" type="string | null">Null on a non-crypto program.</ResponseField>
     <ResponseField name="paid_at" type="string | null" />
-    <ResponseField name="custody" type="string">`wallet` (the item mints as an NFT to `recipient`) or `vault` (Paying through you: the card stays in the `customer`'s CatchBack vault). On a multi-pack order, on each unit.</ResponseField>
+    <ResponseField name="custody" type="string">`wallet` (the item mints as an NFT to `recipient`) or `vault` (Non-crypto model: the card stays in the `customer`'s CatchBack vault). On a multi-pack order, on each unit.</ResponseField>
     <ResponseField name="customer" type="string">Only when `custody` is `vault`: the customer, by your own id.</ResponseField>
     <ResponseField name="pull" type="object | null">Null until the pack opens.</ResponseField>
     <ResponseField name="token" type="object | null">Null until the NFT is minted.</ResponseField>
@@ -72,7 +72,7 @@ A refused order creates nothing. There is no limit on how much a wallet buys.
   </Expandable>
 </ResponseField>
 <ResponseField name="payment" type="object">
-  Wallet programs only: a Paying through you order has no `payment`. `intent_id`, `client_secret`, `publishable_key`, `amount` and `deposit_addresses`. See [Payments](/partner-api/v2/payments). Once the order is past `awaiting_payment`, a replay's `payment` has no `client_secret` and no deposit addresses: there is nothing left to pay.
+  Crypto model only: a non-crypto order has no `payment`. `intent_id`, `client_secret`, `publishable_key`, `amount` and `deposit_addresses`. See [Payments](/partner-api/v2/payments). Once the order is past `awaiting_payment`, a replay's `payment` has no `client_secret` and no deposit addresses: there is nothing left to pay.
 </ResponseField>
 <ResponseField name="idempotent_replay" type="boolean">Present and `true` on a replay.</ResponseField>
 
@@ -90,20 +90,20 @@ If the chosen odds stop selling before the payment settles, the pack isn't opene
 | `400` | `BAD_ODDS` | `odds` isn't a known choice, or the pack doesn't sell it (`odds` lists the choices) |
 | `400` | `BAD_QUANTITY` | `quantity` isn't a whole number from 1 to 10 |
 | `400` | `BAD_REFUND_ADDRESS` | No usable EVM `refund_address` (required when you mint on Solana) |
-| `400` | `WALLET_FIELDS_NOT_ACCEPTED` | Paying through you: `recipient` or `refund_address` was sent. Send `customer` only |
-| `400` | `BAD_CUSTOMER` | Paying through you: `customer` is missing, or not 1-128 characters of `A-Z a-z 0-9 _ . : -` |
-| `402` | `CREDIT_LIMIT` | Paying through you: the order would take what you owe past your credit limit. The body has `owed`, `credit_limit` and `order_total`. Nothing is charged |
+| `400` | `WALLET_FIELDS_NOT_ACCEPTED` | Non-crypto model: `recipient` or `refund_address` was sent. Send `customer` only |
+| `400` | `BAD_CUSTOMER` | Non-crypto model: `customer` is missing, or not 1-128 characters of `A-Z a-z 0-9 _ . : -` |
+| `402` | `CREDIT_LIMIT` | Non-crypto model: the order would take what you owe past your credit limit. The body has `owed`, `credit_limit` and `order_total`. Nothing is charged |
 | `403` | `WALLET_REFUSED` | A wallet in the request failed sanctions screening |
 | `403` | `WALLET_BLOCKED` | This wallet may not buy from CatchBack |
-| `403` | `CUSTOMER_BLOCKED` | Paying through you: we can't sell to this customer. Don't retry |
+| `403` | `CUSTOMER_BLOCKED` | Non-crypto model: we can't sell to this customer. Don't retry |
 | `404` | `PACK_NOT_OFFERED` | That pack isn't sold through your program |
 | `409` | `ODDS_UNAVAILABLE` | Those odds aren't selling right now. Nothing is created |
 | `409` | `PACK_UNAVAILABLE` | A pack that sells only its own odds can't open right now; `reason` says why. Nothing is created |
 | `422` | `IDEMPOTENCY_KEY_REUSED` | The key was already used for a different order |
-| `429` | `CUSTOMER_DAILY_LIMIT` | Paying through you: this customer has spent their limit for the UTC day. The body has `spent_today`, `limit`, `order_total` and `retry_after_seconds` |
-| `429` | `DAILY_LIMIT` | Paying through you: your program has spent its daily limit, if it has one. Same fields |
+| `429` | `CUSTOMER_DAILY_LIMIT` | Non-crypto model: this customer has spent their limit for the UTC day. The body has `spent_today`, `limit`, `order_total` and `retry_after_seconds` |
+| `429` | `DAILY_LIMIT` | Non-crypto model: your program has spent its daily limit, if it has one. Same fields |
 | `503` | `SCREENING_UNAVAILABLE` | Wallet screening is briefly unavailable; retry shortly |
-| `503` | `CUSTOMER_CHECK_UNAVAILABLE` | Paying through you: we couldn't check the customer just now. Nothing is charged; retry shortly with the same key |
+| `503` | `CUSTOMER_CHECK_UNAVAILABLE` | Non-crypto model: we couldn't check the customer just now. Nothing is charged; retry shortly with the same key |
 
 <RequestExample>
 ```bash cURL
@@ -122,7 +122,7 @@ curl -X POST https://catchbackcards.com/api/partner/v2/orders \
   }'
 ```
 
-```bash Paying through you
+```bash Non-crypto model
 curl -X POST https://catchbackcards.com/api/partner/v2/orders \
   -H "Authorization: Bearer $CATCHBACK_KEY" \
   -H "Idempotency-Key: acme-ord-7f3a91" \
@@ -196,7 +196,7 @@ curl -X POST https://catchbackcards.com/api/partner/v2/orders \
 }
 ```
 
-```json 201 Paying through you
+```json 201 Non-crypto model
 {
   "order": {
     "order_id": "acme-ord-7f3a91",

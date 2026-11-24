@@ -74,6 +74,7 @@
             "group": "Get started",
             "pages": [
               "partner-api/v2/overview",
+              "partner-api/v2/integration-models",
               "partner-api/v2/mcp",
               "partner-api/v2/quickstart",
               "partner-api/v2/authentication"
@@ -92,7 +93,7 @@
             ]
           },
           {
-            "group": "Wallet model",
+            "group": "Crypto model",
             "pages": [
               "partner-api/v2/payments",
               "partner-api/v2/sell-back",
@@ -101,7 +102,7 @@
             ]
           },
           {
-            "group": "Paying through you",
+            "group": "Non-crypto model",
             "pages": [
               "partner-api/v2/settlement"
             ]
@@ -160,7 +161,7 @@
             ]
           },
           {
-            "group": "Paying through you endpoints",
+            "group": "Non-crypto model endpoints",
             "pages": [
               "partner-api/v2/endpoints/get-customer-vault",
               "partner-api/v2/endpoints/sell-back-customer-card",
