@@ -18,20 +18,99 @@ CatchBack is a platform where collectors can create mystery packs of collectible
    - **Sell it back to us:** on our standard terms, up to 100% of its value in the first 5 minutes, then a guaranteed 80% with no expiry. Your program's buyback rate is agreed with you ([Your program's terms](/partner-api/v2/integration-models#your-programs-terms)).
    - **Have it shipped:** we mail the real item to their door.
 
-## Two integration models
+## How it works: two models
 
-Every partner program runs on one of two models, and almost everything about your integration follows from which one you pick.
+Every pack pulls a real item that we store. Where that item goes, and how money moves, depends on which of two models your program uses.
+
+| If your customers… | You use | The item goes |
+|---|---|---|
+| have a crypto wallet with you | **Crypto Wallet model** | to their wallet, as an NFT on Base, Solana or your own chain, the moment the pack opens |
+| don't have a crypto wallet | **Non-crypto model** | into a CatchBack vault kept for that customer |
+
+Either way, the packs you sell, their odds and your customers' buyback rate are [agreed with you](/partner-api/v2/integration-models#your-programs-terms), and your customers always buy and sell back at the terms they're shown. You choose the model in **Get started** in your manager before you go live.
+
+### Who's involved
 
 <CardGroup cols={2}>
-  <Card title="Crypto Wallet model" icon="wallet" href="/partner-api/v2/integration-models#crypto-wallet-model">
-    Your users pay from their own crypto wallets and receive each item as an NFT, on Base, Solana or your own chain. You never touch the money. For exchanges and wallet apps.
+  <Card title="CatchBack" icon="vault">
+    We hold the physical items, run the packs and the sell-back offer, and ship.
   </Card>
-  <Card title="Non-crypto model" icon="building-columns" href="/partner-api/v2/integration-models#non-crypto-model">
-    Your users need no crypto. You buy for them and charge them your way; their items stay in a CatchBack vault and everything settles on one statement.
+  <Card title="You" icon="store">
+    You sell packs in your own app, calling our API with your key, and earn a revenue share.
+  </Card>
+  <Card title="Your customer" icon="user">
+    Buys through your app. Never needs a CatchBack login.
+  </Card>
+  <Card title="Their wallet, if they have one" icon="wallet">
+    The crypto wallet they already have with you. We never create it or hold its keys.
   </Card>
 </CardGroup>
 
-**[Integration models](/partner-api/v2/integration-models)** compares them side by side: the architecture of each, where the money goes, what you build, and which endpoints each uses. The catalog, odds, orders, webhooks and keys are the same in both.
+### Crypto Wallet model
+
+Your customer pays from their own wallet, and the item is minted to it as an NFT, on Base, Solana or your own chain. They sell back or ship by signing one message, and we pay the gas.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Your customer
+  participant P as Your app
+  participant CB as CatchBack API
+  participant Ch as Chain
+  C->>P: Buy a pack
+  P->>CB: Create an order (wallet address)
+  CB-->>P: Payment request
+  C->>CB: Pays in USDC from their wallet
+  CB->>CB: Open the pack
+  CB->>Ch: Mint the item to the customer's wallet
+  Note over C,Ch: Later, to sell back or ship
+  P->>CB: Ask for a sell-back or shipment quote
+  CB-->>P: The message to sign
+  C->>P: Signs once
+  P->>CB: Send the signature
+  CB->>Ch: Burn the token (we pay the gas)
+  CB->>Ch: Sell-back: USDC to the customer's wallet
+```
+
+### Non-crypto model
+
+You pay for your customers' packs and receive their sell-backs, on one statement. Their items stay in a vault we keep for each customer. Your customers never see a crypto step; you charge and credit them however you like.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Your customer
+  participant P as Your app
+  participant CB as CatchBack API
+  C->>P: Buy a pack (you charge them your way)
+  P->>CB: Create an order (your customer id)
+  CB->>CB: Check your credit limit, charge your statement, open the pack
+  CB-->>P: The item, now in their vault
+  Note over C,CB: From the vault, any time
+  P->>CB: List the customer's items and their offers
+  P->>CB: Sell an item back
+  CB->>CB: Credit your statement
+  P->>C: You credit your customer
+  P->>CB: Ship 1-10 items to an address
+  CB->>CB: Postage on your statement, then we ship
+  CB-->>P: Tracking, by webhook or on request
+  Note over P,CB: Any time: read your statement
+```
+
+### Side by side
+
+| | **Crypto Wallet model** | **Non-crypto model** |
+|---|---|---|
+| **Who the customer is** | Their wallet address | Your customer id |
+| **Who pays for a pack** | The customer, in USDC from their wallet | You, on your statement |
+| **Where the item goes** | Minted to their wallet | Their vault with us |
+| **Sell back** | Customer signs once; USDC to their wallet | One API call; credited to your statement |
+| **Ship** | Customer signs once; postage paid in the same step | One API call; postage on your statement |
+| **Chain** | Base, Solana or your own chain | None |
+| **Crypto your customer sees** | A wallet and one signature | None |
+| **Your revenue share** | Paid monthly to your USDC address | Credited to your statement when each month closes |
+
+Your customer never holds a CatchBack balance: on the Crypto Wallet model, money moves between their wallet and us; on the Non-crypto model, only between you and us. **[Integration models](/partner-api/v2/integration-models)** goes further: an item's life, where every payment goes, your program's terms, guarantees, and which endpoints each model uses.
 
 ## Why partners integrate
 
@@ -77,7 +156,7 @@ Your platform is the storefront. CatchBack does everything behind it.
   **v2 replaces v1.** The v1 Partner API is retired. v2 has no prefunded partner balance: on the Crypto Wallet model each customer pays for their own pack, and on the non-crypto model you settle a statement within a credit limit.
 </Note>
 
-## How it works, technically
+## The API flow
 
 At purchase, each pack algorithmically selects one real item from our vault, with the same [provably fair](/partner-api/v2/verify-a-pull) draw on both models.
 
