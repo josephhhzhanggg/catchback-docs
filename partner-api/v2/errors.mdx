@@ -34,12 +34,12 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `RATE_LIMITED` | `429` | all | Too many requests; wait `retry_after_seconds` |
 | `NO_PROGRAM` | `403` | all | The key isn't linked to a partner program |
 | `PROGRAM_INACTIVE` | `403` | all | Your program is not live |
-| `NOT_AVAILABLE` | `403` | all | Wallet orders aren't switched on for your program yet |
+| `NOT_AVAILABLE` | `403` | all | Partner API v2 isn't switched on for your program yet |
 | `AUTH_UNAVAILABLE` | `503` | all | We couldn't check your key right now (never means the key is bad); retry after `Retry-After` |
 | `SANDBOX_KEY` | `401` | all | A sandbox key (`cb_test_`) sent to production; send it to `https://sandbox.catchbackcards.com` |
 | `NOT_FOUND` | `404` | any unknown path | No endpoint at that path under `/api/partner/v2`. Answered before any key check |
 | `BAD_IDEMPOTENCY_KEY` | `400` | orders, shipments, keys rotate | `Idempotency-Key` missing, or not 8-128 characters of `A-Z a-z 0-9 _ -` |
-| `IDEMPOTENCY_KEY_REUSED` | `422` | orders, shipments | The key was already used for a different order or shipment ([Idempotency](/partner-api/v2/idempotency)). Shipment keys are per program: one-token and multi-token shipments share them, and on the Non-crypto model the same key for another customer is a different request. A shipment replay compares the tokens or cards, holder, customer, address, rate and cover, never `max_cost` or `payment_method` |
+| `IDEMPOTENCY_KEY_REUSED` | `422` | orders, shipments | The key was already used for a different order or shipment ([Idempotency](/partner-api/v2/idempotency)). Shipment keys are per program: one-token and multi-token shipments share them, and on the Non-crypto model the same key for another customer is a different request. A Crypto Wallet shipment replay compares the tokens, holder, address, rate and cover, never `max_cost` or `payment_method`; a customer shipment replay also compares `max_cost` |
 | `BAD_RECIPIENT` | `400` | orders | `recipient` is not a wallet address on your mint chain: a mixed-case EVM address with a bad EIP-55 checksum, or the zero address, your NFT contract, Permit2 or USDC |
 | `BAD_PACK` | `400` | orders, pool | `pack_type` missing |
 | `BAD_CATEGORY` | `400` | catalog, orders, pool | Unknown `category` |
@@ -103,7 +103,7 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `CREDIT_LIMIT` | `402` | orders, customer shipments | It would take what you owe past your credit limit; the body has `owed` and `credit_limit`, plus `order_total` on orders and `shipment_total` on shipments. Nothing is charged |
 | `CUSTOMER_DAILY_LIMIT` | `429` | orders | This customer hit their daily limit (UTC day); the body has `spent_today`, `limit`, `order_total` and `retry_after_seconds` |
 | `DAILY_LIMIT` | `429` | orders | Your program hit its daily limit; same fields |
-| `BAD_CARD` | `400` | customer sell-back | `card_id` isn't a card id |
+| `BAD_CARD` | `400` | customer sell-back | `card_id` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -`. A well-formed id that isn't in this customer's vault is `404 CARD_NOT_IN_VAULT` |
 | `CARD_NOT_IN_VAULT` | `404` | customer sell-back | Your program didn't pull that card into this customer's vault |
 | `SELLBACK_REFUSED` | the refusal's | customer sell-back | The sale was refused for a reason with no code of its own, for example the card was shipped or is on its way out; the message says why. Nothing is sold |
 | `CARD_IN_BATTLE` | `409` | customer sell-back | The card is held by a battle that hasn't finished. Nothing is sold |
@@ -115,7 +115,7 @@ The errors every endpoint can return before it does anything else (`401`, `403`,
 | `CARDS_NOT_SHIPPABLE` | `409` | customer shipments | A card was pulled into this vault but can't ship now: sold back, already shipping, listed or on hold. On estimate and create, `cards` gives each one's `reason`; at the last step it means a card left the vault meanwhile. Nothing is charged |
 | `BAD_MIN_PAYOUT` | `400` | customer sell-back | `min_payout` isn't a non-negative number |
 | `BAD_CARD_IDS` | `400` | customer shipments | `card_ids` isn't 1-10 distinct card ids from the vault |
-| `BAD_RATE` | `400` | customer shipments | `rate` isn't the `carrier` and `token` of a rate from the estimate |
+| `BAD_RATE` | `400` | customer shipments | `rate` is missing or isn't an object with string `carrier` and `token`. A well-formed rate the carrier doesn't offer is `409 RATE_UNAVAILABLE` |
 | `DAILY_SHIPMENT_LIMIT_REACHED` | `429` | customer shipments | This key made 50 shipments this UTC day; the body has `limit`, `resets_at` and `retry_after_seconds`, and the response has `Retry-After` |
 | `IDEMPOTENCY_IN_PROGRESS` | `409` | customer shipments | A shipment with this `Idempotency-Key` is still being created; retry it shortly |
 | `IDEMPOTENCY_RETRY` | `409` | customer shipments | A shipment with this `Idempotency-Key` just failed; retry with the same key |

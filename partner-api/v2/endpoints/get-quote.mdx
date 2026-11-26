@@ -17,6 +17,7 @@ A sell-back quote and its payout. We count a burn after a few block confirmation
 <ResponseField name="quote" type="object">
   <Expandable title="quote">
     <ResponseField name="quote_id" type="string" />
+    <ResponseField name="token_id" type="string">The token this quote sells back (decimal), so you can tie the payout to the item.</ResponseField>
     <ResponseField name="status" type="string">`ready` (issued and not yet burned with), `expired` (not burned before `expires_at`; can no longer be used) or `redeemed` (we saw the burn; the payout is queued).</ResponseField>
     <ResponseField name="amount_usd" type="number" />
     <ResponseField name="holder" type="string" />
@@ -48,6 +49,7 @@ curl https://sandbox.catchbackcards.com/api/partner/v2/quotes/0x5e0c...91ab \
 {
   "quote": {
     "quote_id": "0x5e0c...91ab",
+    "token_id": "81264573985362058461377125337283195667",
     "status": "redeemed",
     "amount_usd": 330,
     "holder": "0x8f3c...e21a",

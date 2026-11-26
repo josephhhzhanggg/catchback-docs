@@ -30,6 +30,7 @@ This response never includes the `payment` object: replay the create POST to get
       Multi-token shipments only: `token_id`, `quote_id`, `status` (`awaiting_payment`, `ready`, `expired`, `redeemed` or `dropped`), `burned_at`, `burn_tx` and `burn`.
     </ResponseField>
     <ResponseField name="quote_id" type="string">One-token shipments only (with `burn` at the top level).</ResponseField>
+    <ResponseField name="token_id" type="string">One-token shipments only: the token this shipment ships (decimal).</ResponseField>
     <ResponseField name="burn" type="object | null">
       What the holder burns with, while the token is `ready`. **EVM:** `{ "quote": { ...the Quote tuple, "kind": 2, "amount": "0" }, "signature": "0x..." }`: call `burnWithQuote` exactly as for a [sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote). **Solana:** `{ "transaction": "<base64>", "vault": "...", "last_valid_block_height": ... }`: each GET builds a fresh transaction, so fetch it right before signing.
     </ResponseField>

@@ -67,13 +67,13 @@ One shipment carries **1 to 25 tokens** held by one wallet, in one box, for one 
 
 ## Insurance
 
-`cover_amount` (optional) is shipping insurance cover in dollars, within the range the items allow. Outside it, `400 COVER_NOT_ALLOWED` gives `order_value`, `min_cover` and `max_cover` (`max_cover` is null when the items can't be insured). A service with no cover option answers `409 COVER_UNAVAILABLE` on create: choose another rate or leave `cover_amount` out. **The sandbox has no insurance:** its one rate has no cover option, so leave `cover_amount` out there.
+`cover_amount` (optional) is shipping insurance cover in dollars, within the range the items allow. Items worth $100 or less can't be insured (`min_cover` is 100, `max_cover` null). Outside the range, `400 COVER_NOT_ALLOWED` gives `order_value`, `min_cover` and `max_cover` (`max_cover` is null when the items can't be insured). A service with no cover option answers `409 COVER_UNAVAILABLE` on create: choose another rate or leave `cover_amount` out. **The sandbox has no insurance:** its one rate has no cover option, so leave `cover_amount` out there.
 
 ## Burning
 
 `{id}` in `GET /shipments/{id}` is a `shipment_id`, or any `quote_id` (a token in a multi-token shipment returns its whole shipment).
 
-- **EVM:** `burn` is `{ "quote": { ...same tuple as a sell-back, "kind": 2, "amount": "0" }, "signature": "0x..." }`. Call `burnWithQuote` exactly as for a sell-back (`burnForQuote` on [Sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote), with your contract address).
+- **EVM:** `burn` is `{ "chain": "evm:84532", "contract": "0x...", "quote": { ...same tuple as a sell-back, "kind": 2, "amount": "0" }, "signature": "0x..." }`: `chain` and `contract` say where to send it. Call `burnWithQuote` on `burn.contract` exactly as for a sell-back (`burnForQuote` on [Sell-back](/partner-api/v2/sell-back#evm-burn-with-the-signed-quote)).
 - **Solana:** `burn` is `{ "transaction": "<base64>", "vault": "...", "last_valid_block_height": ... }`. Each GET builds a fresh transaction, so fetch it right before signing.
 
 Every burn must come from the wallet named in the shipment (`holder`): sent by it, or, on EVM, signed by it and sent by us with [Burn without gas](/partner-api/v2/endpoints/relay-burn). Each token's `status` becomes `redeemed` with `burned_at` and `burn_tx` as its burn is seen.

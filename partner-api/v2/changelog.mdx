@@ -5,6 +5,25 @@ description: "What changed in Partner API v2, newest first."
 
 Changes to `v2` are additive: a response can gain fields, an enum can gain values, and a new endpoint can appear, so build your parser to ignore what it doesn't know. Dates are US Pacific time.
 
+<Update label="November 26, 2026" description="Fixes from end-to-end testing">
+  - Sell-back quotes (`GET /quotes`, `GET /quotes/{quoteId}`, `sellback.updated`) and one-token shipments (create, `GET /shipments`, `GET /shipments/{id}`, `nft_shipment.updated`) carry `token_id`, so a payout or a box can be tied to its item.
+  - Non-crypto model: a vault card's `sellback` carries `fresh_until`, when its fresh window ends.
+  - A `mint_failed` order's `failure_reason` names the cause: `mint_send_failed`, `mint_tx_dropped`, `mint_tx_reverted`, `mint_not_configured` or `mint_asset_conflict`.
+  - Two burns of one token sent at the same moment with different quotes: one goes, the other answers `409 TOKEN_BURNED` (it could answer `502 CHAIN_REFUSED`). Nothing was ever burned twice.
+  - `NOT_AVAILABLE` reads "Partner API v2 isn't switched on for your program yet", on both models.
+  - The catalog and pool answer concurrent reads with one rebuild, so a burst of reads no longer slows them down.
+  - MCP: `create_sellback_quote` takes `kind`, as the endpoint does.
+  - Docs: `available` on [List packs](/partner-api/v2/endpoints/list-packs) follows the default odds, as our app's shelf does; when Standard is out for odds maintenance, another odds choice can still sell (check the pool).
+  - A shipment's EVM `burn` carries `chain` and `contract`, so the holder can burn it without a token lookup first.
+  - `GET /keys` returns `environment` (`sandbox` or `production`).
+  - `nft_shipment.updated`: `created_at` is the latest change behind the state the event shows (it could be an earlier change's time), and a multi-token box's events carry the box's `carrier` and `service`, as `GET /shipments/{id}` does.
+  - Orders, shipments and their webhooks give every time in UTC ending in `Z`.
+  - Signing up: right after signup, your manager's pages could answer "page not found" for up to a minute. They load at once now.
+  - Docs: signup and getting a sandbox key are in [Sandbox](/partner-api/v2/quickstart#before-you-start); the manager is at `catchbackcards.com/<slug>/admin`; [Webhooks](/partner-api/v2/webhooks#verify-the-signature) has a signature test vector and how secret rotation works; the sandbox recipe says when a burned shipment can be marked shipped; `quote_id` and the tuple's `quoteId` are the same value.
+  - OpenAPI: `fields` on an error is an object (`BAD_ADDRESS`) or an array (`WALLET_FIELDS_NOT_ACCEPTED`); open-ended objects (`OneTapPayment.sign`, `WebhookEnvelope.data`) allow any properties, so generated types don't come out empty; `ClassicPackPool` has `fresh_buyback_rate`.
+  - Docs: [Verify a pull](/partner-api/v2/verify-a-pull) says what you can recompute yourself (the seed and the bucket draw) and what our check recomputes (the card draw and the result hash); the bucket's card list isn't published. Also clarified: `BAD_CARD` and `BAD_RATE` are about shape (`CARD_NOT_IN_VAULT` and `RATE_UNAVAILABLE` otherwise), a customer shipment replay compares `max_cost`, statement entries' `order_id` is our order `id`, items worth $100 or less can't be insured, and how the sandbox differs (short payments, concurrent pays, metadata host, speed, reachable refusals).
+</Update>
+
 <Update label="November 24, 2026" description="Fixes from sandbox testing">
   - Each model's endpoints refuse the other model's programs: a wallet, token, quote, burn or shipment endpoint on a Non-crypto program answers `400 CRYPTO_WALLET_MODEL_ONLY` (it used to return empty results), and `customer` on a Crypto Wallet order answers `400 NOT_PARTNER_SETTLED`.
   - Non-crypto model: an order, shipment estimate or shipment that sends any wallet field (`recipient`, `refund_address`, `partner_user_ref`, `holder`, `payout_chain` or `payout_address`) is refused with `WALLET_FIELDS_NOT_ACCEPTED`, and `fields` names them. Before, some were ignored.

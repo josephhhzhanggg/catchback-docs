@@ -23,7 +23,7 @@ How the holder signs: [Sell-back](/partner-api/v2/sell-back#evm-without-gas).
   The token's decimal `token_id`.
 </ParamField>
 <ParamField body="quote_id" type="string" required>
-  The quote to burn with: a sell-back `quote_id`, or the token's `quote_id` in a paid shipment.
+  The quote to burn with: a sell-back `quote_id`, or the token's `quote_id` in a paid shipment. (It's `quoteId` inside the signed quote tuple; same value.) A repeat call for a quote already burned returns that burn's `tx_hash` and sends nothing; the signature isn't checked again then.
 </ParamField>
 <ParamField body="permit_signature" type="string">
   For a one-tap shipment only, instead of `holder_signature`: the holder's EIP-712 signature over the shipment's `payment.sign`, `0x` hex.

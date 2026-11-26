@@ -24,7 +24,8 @@ The only endpoint that takes no key is the [public token metadata](/partner-api/
 
 ## Base URL and formats
 
-- **Base URL:** `https://catchbackcards.com/api/partner/v2` for production, `https://sandbox.catchbackcards.com/api/partner/v2` for the sandbox.
+- **Base URL:** `https://catchbackcards.com/api/partner/v2` for production, `https://sandbox.catchbackcards.com/api/partner/v2` for the sandbox. (The quickstart's `CATCHBACK_BASE_URL` is just the host, and its paths add `/api/partner/v2`.)
+- **Which environment answered:** `GET /keys` returns `environment`, `sandbox` or `production`. Sandbox keys made before November 22, 2026 start `cb_live_`, so the prefix alone can't tell.
 - **Formats:** JSON, UTF-8. Money is USD in dollars (`25`, `9.85`).
 - **New fields can appear at any time.** Ignore fields you don't recognize.
 - **OpenAPI spec:** the OpenAPI 3.1 spec is the official contract, with every endpoint, error code and webhook event. Generate your client from it: `https://catchbackcards.mintlify.app/partner-api/v2/openapi.yaml`.
@@ -46,7 +47,7 @@ These come before an endpoint does anything else:
 | `429` | `RATE_LIMITED` | Too many requests from this key ([limits](/partner-api/v2/limits-and-compliance)); the body has `retry_after_seconds` and the response a `Retry-After` header |
 | `403` | `NO_PROGRAM` | The key isn't linked to a partner program |
 | `403` | `PROGRAM_INACTIVE` | Your program is not live |
-| `403` | `NOT_AVAILABLE` | Wallet orders aren't switched on for your program yet |
+| `403` | `NOT_AVAILABLE` | Partner API v2 isn't switched on for your program yet |
 | `503` | `AUTH_UNAVAILABLE` | We couldn't check your key right now (never means the key is bad); retry after `Retry-After` |
 | `503` | | We couldn't load your key or your program; retry shortly |
 
