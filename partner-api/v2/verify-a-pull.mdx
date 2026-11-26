@@ -15,7 +15,7 @@ curl https://sandbox.catchbackcards.com/api/partner/v2/orders/okx-ord-7f3a9c21/v
 <ResponseField name="pull_id" type="string">The pull's id. Its first 8 hex digits are the seed.</ResponseField>
 <ResponseField name="card_id" type="string">The item you received.</ResponseField>
 <ResponseField name="verify_url" type="string">The public check for this pull. Share it with your customer.</ResponseField>
-<ResponseField name="proof" type="object">What `verify_url` returns: the step-by-step replay below.</ResponseField>
+<ResponseField name="proof" type="object">What `verify_url` returns: the step-by-step replay below. It never includes the bucket's card list or the card's place in it.</ResponseField>
 
 A multi-pack order returns one proof per unit. A passing check can be cached for up to a day.
 
@@ -42,8 +42,8 @@ The response replays the draw step by step. Trimmed to the fields this guide use
   "step1_seed_derivation": { "first_8_chars": "fe04349b", "computed_seed": 4261688475, "stored_seed": 4261688475, "matches": true },
   "draws_before_bucket": { "count": 0, "chase": null, "consolation": null },
   "step3_bucket_selection": { "probabilities": [0.72, 0.2, 0.06, 0.02], "stored_bucket_index": 0, "recomputed_bucket_index": 0, "matches": true },
-  "step4_card_selection": { "cards_in_bucket": 412, "stored_card_index": 37, "recomputed_card_index": 37, "matches": true, "available_cards": [{ "id": "…", "name": "…" }] },
-  "step5_result_verification": { "delivered_card_id": "2b814ce0-…", "delivered_by": "seed", "stored_result_hash": "9c1e…", "hash_matches": true },
+  "step4_card_selection": { "shuffle": { "formula": "for i = n-1..1: j = floor(draw / 2^32 * (i + 1)), swap(i, j)", "restores_card_id_order": true }, "card_draw": { "matches": true }, "formula": "floor(draw / 2^32 * n)", "matches": true, "selected_card": { "id": "2b814ce0-…", "name": "Tyrunt" } },
+  "step5_result_verification": { "delivered_card_id": "2b814ce0-…", "delivered_by": "seed", "stored_result_hash": "9c1e…", "recomputed_result_hash": "9c1e…", "hash_matches": true },
   "summary": { "all_steps_passed": true, "message": "All verification steps passed: the seed reproduces this pull's draws, and the result hash binds the card delivered." }
 }
 ```
@@ -73,6 +73,8 @@ We don't record whether a consolation roll or an armed chase came before the buc
 
 ## Check it yourself
 
+The proof leaves out the bucket's card list and the card's place in it: together they would show how cards are weighted inside a band, which we don't publish. So you can recompute the seed and the bucket draw yourself; the card draw and the result hash are recomputed by our check, which reports each in `matches`.
+
 For a card pull drawn with `shuffle-scaled-v3`:
 
 <Steps>
@@ -83,24 +85,19 @@ For a card pull drawn with `shuffle-scaled-v3`:
     The draws come from a linear congruential generator: `state = (0x41C64E6D × state + 0x6073) mod 2^32`, starting from the seed, one draw per step. Compute it in IEEE-754 double precision, as JavaScript does. `0x41C64E6D × state` can exceed 2^53 and is rounded, every pull was drawn with that rounding, and exact integer arithmetic gives different draws.
   </Step>
   <Step title="Take them in order">
-    One draw for a chase card, when one is armed on the pack; one for the consolation roll, when the pack has one; the bucket roll; `n − 1` shuffle draws for a bucket of `n` cards; then the card draw. `draws_before_bucket.count` says how many came before the bucket roll.
+    One draw for a chase card, when one is armed on the pack; one for the consolation roll, when the pack has one; then the bucket roll. `draws_before_bucket.count` says how many came before the bucket roll.
   </Step>
   <Step title="Pick the bucket">
-    `draw / 2^32 × (sum of the bucket odds)` lands in one bucket's slice of the cumulative odds, taken in the order of `step3_bucket_selection.probabilities`.
+    `draw / 2^32 × (sum of the bucket odds)` lands in one bucket's slice of the cumulative odds, taken in the order of `step3_bucket_selection.probabilities`. It equals `step3_bucket_selection.stored_bucket_index`, and those odds are the ones the pack was bought at.
   </Step>
-  <Step title="Pick the card">
-    The shuffle draws reorder the bucket (`for i = n−1 down to 1: j = floor(draw / 2^32 × (i + 1)), swap(i, j)`), and the card draw picks place `floor(draw / 2^32 × n)` in the shuffled list, `step4_card_selection.available_cards`.
-  </Step>
-  <Step title="Recompute the result hash">
-    `sha256("result:<seed>:<bucket index>:<card index>:<card id>")` in hex, with the card you received, equals `step5_result_verification.stored_result_hash`, the hash recorded when the pack opened.
+  <Step title="Read the rest of the verdict">
+    The bucket is shuffled with the next draws and one more draw picks the card (`step4_card_selection.formula`). Our check replays that and the result hash, `sha256("result:<seed>:<bucket index>:<card index>:<card id>")`, against the hash recorded when the pack opened: `step4_card_selection.matches` and `step5_result_verification.hash_matches` say whether they agree, and `delivered_card_id` must be the card you received.
   </Step>
 </Steps>
 
-The same steps in Node 18 or later, reading the bucket's odds and size from the check's response:
+The same steps in Node 18 or later:
 
 ```js
-import { createHash } from 'node:crypto';
-
 // `verification` is the object from GET /api/partner/v2/orders/{id}/verification.
 export async function checkPull(verification) {
   // Fetch the replay from the public check, which needs no key.
@@ -114,11 +111,10 @@ export async function checkPull(verification) {
   // The seed: the first 8 hex digits of the pull id.
   const seed = parseInt(verification.pull_id.replace(/-/g, '').slice(0, 8), 16);
 
-  // Every draw up to the card draw, in float64 exactly as JavaScript computes it.
+  // Every draw up to the bucket roll, in float64 exactly as JavaScript computes it.
   const before = v.draws_before_bucket.count;
-  const n = v.step4_card_selection.cards_in_bucket;
   const draws = [];
-  for (let i = 0, state = seed; i <= before + n; i++) {
+  for (let i = 0, state = seed; i <= before; i++) {
     state = (0x41c64e6d * state + 0x6073) % M;
     draws.push(state);
   }
@@ -132,30 +128,19 @@ export async function checkPull(verification) {
     if (r < acc) { bucket = i; break; }
   }
 
-  // After n - 1 shuffle draws, the card draw picks a place in the shuffled bucket.
-  const card = Math.floor((draws[before + n] / M) * n);
-
-  // The result hash binds the bucket, the place and the card you received.
-  const delivered = verification.card_id;
-  const hash = createHash('sha256').update(`result:${seed}:${bucket}:${card}:${delivered}`).digest('hex');
-
-  // Unless a chase draw or a collision re-roll replaced it, the card you received
-  // is the one at that place in the recorded list.
-  const by = v.step5_result_verification.delivered_by;
-  const atPlace = v.step4_card_selection.available_cards[card]?.id === delivered;
-
   return {
     seed: seed === v.step1_seed_derivation.stored_seed,
     bucket: bucket === v.step3_bucket_selection.stored_bucket_index,
-    card: card === v.step4_card_selection.stored_card_index,
-    delivered: by === 'seed' ? atPlace : null,
-    hash: hash === v.step5_result_verification.stored_result_hash,
+    // Recomputed by our check: the card draw, the result hash and the card delivered.
+    card: v.step4_card_selection.matches === true,
+    hash: v.step5_result_verification.hash_matches === true,
+    delivered: v.step5_result_verification.delivered_card_id === verification.card_id,
   };
 }
 ```
 
-Two things can make the card you received differ from the one at that place, and the response says which in `step5_result_verification.delivered_by`: `chase` when the chase draw won the pack's chase card, and `collision_reroll` when another pull claimed the selected card a moment earlier, so you got the next available card. The result hash always binds the card you received.
+Two things can make the card you received differ from the one the seed picked, and the response says which in `step5_result_verification.delivered_by`: `chase` when the chase draw won the pack's chase card, and `collision_reroll` when another pull claimed the selected card a moment earlier, so you got the next available card. The result hash always binds the card you received.
 
 ## What the check shows
 
-It shows that the seed lands on this bucket and this place in the recorded list, and that the card you received is at that place. The list's order is only confirmed when `step4_card_selection.shuffle.restores_card_id_order` is `true`. Against the result hash recorded when the pack opened, it also shows that the seed, bucket, place and card haven't changed since. The seed is the pull id, which CatchBack generates when the pull is made.
+It shows that the seed lands on this bucket at the odds you bought, and that our replay of the card draw lands on the card you received. The bucket's order is only confirmed when `step4_card_selection.shuffle.restores_card_id_order` is `true`. Against the result hash recorded when the pack opened, it also shows that the seed, bucket, place and card haven't changed since. The seed is the pull id, which CatchBack generates when the pull is made.

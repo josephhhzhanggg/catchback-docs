@@ -22,7 +22,7 @@ awaiting_payment ──payment settles──▶ paid ──pack opened──▶ 
 | `paid` | Payment settled; the pack opens next | no |
 | `rolled` | The pack opened: `pull` is set; the NFT is being minted | no |
 | `minted` | The NFT is in `recipient`'s wallet: `token.status` is `confirmed` | **yes** |
-| `mint_failed` | The mint hasn't landed yet. It is retried and never re-opens the pack; if it can't complete, our team resolves it. `failure_reason` says why | no |
+| `mint_failed` | The mint hasn't landed yet. It is retried and never re-opens the pack; if it can't complete, our team resolves it. `failure_reason` says why: `mint_send_failed`, `mint_tx_dropped` or `mint_tx_reverted` (retried on its own), `mint_not_configured` or `mint_asset_conflict` (our team resolves it) | no |
 | `refund_due` | The customer is being refunded in USDC on Base to `refund_address`. `failure_reason` says why: the pack couldn't open after payment (for example it sold out in between), `paid_after_expiry`, or `underpaid` (more than 1% short) | no |
 | `refunded` | The refund was sent | **yes** |
 

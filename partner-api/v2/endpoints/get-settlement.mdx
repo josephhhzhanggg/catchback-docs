@@ -45,7 +45,7 @@ What you owe now against your credit limit, your daily limits, and one UTC month
     <ResponseField name="amount" type="number">Positive adds to what you owe; negative takes from it.</ResponseField>
     <ResponseField name="created_at" type="string" />
     <ResponseField name="customer" type="string | null">The customer, by your own id; null on an entry that isn't a customer's.</ResponseField>
-    <ResponseField name="order_id" type="string | null">On `order` and `order_refund`: our order `id`.</ResponseField>
+    <ResponseField name="order_id" type="string | null">On `order` and `order_refund`: our order `id` (the order's `id`, not its `order_id`, which is your Idempotency-Key). A multi-pack order has one entry per pack, each with that unit's `id`; the unit's `batch_id` is the order's `id`.</ResponseField>
     <ResponseField name="card_id" type="string">On `sellback`: the card sold.</ResponseField>
     <ResponseField name="sellback_id" type="string">On `sellback`: the sale's `transaction_id`.</ResponseField>
     <ResponseField name="shipment_id" type="string">On `shipping` and `shipping_refund`: the customer shipment's `id`.</ResponseField>

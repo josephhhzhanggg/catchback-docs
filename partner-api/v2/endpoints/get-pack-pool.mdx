@@ -43,12 +43,13 @@ The pool is live stock. Each item in it is one physical item, so an item that is
   Every item a pull can produce at these odds, highest value first, each with the `band` it sits in. Each item carries its catalog fields (name, set, year, grade, cert, images, `market_value`, `market_value_last_updated`, and `price`, its listed price in our shop, which sell-backs don't use).
 </ResponseField>
 
-### Packs that sell only their own odds
+### Two response shapes
 
-A pack that sells only its own odds answers `odds: "classic"` with its own band shape:
+Every pack listed today, including ones that sell only Classic (such as `catchbox_lite`), returns the band shape above. A pack that isn't on our daily-recalculated odds would return a bucket shape instead. None is listed today, but handle it in case one is added:
 
+- `odds: "classic"`;
 - `bands[]` with `bucket_id`, `label`, `min_value`, `max_value`, `odds`, `is_consolation` and `hittable_cards`;
-- `cards[]` with `bucket_id`;
+- `cards[]` with `bucket_id` instead of `band`;
 - `chase`: `{ card, probability, odds_label, label, ends_at }` when a chase item is on offer, else null;
 - `odds_choices: [{ "odds": "classic", "label": "Classic", "available": true }]`, the same shape as every other pack.
 

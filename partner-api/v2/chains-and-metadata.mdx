@@ -78,6 +78,8 @@ Every token carries a standard metadata URL that wallets and marketplaces read w
 | EVM | `https://catchbackcards.com/api/partner-nfts/metadata/{chainId}/{tokenId}` |
 | Solana | `https://catchbackcards.com/api/partner-nfts/metadata/{id}` (our id for the asset) |
 
+In the sandbox the same paths are on `https://sandbox.catchbackcards.com`, which is what the sandbox contract's `tokenURI` returns. Read the URL from `tokenURI` rather than building it.
+
 ```json
 {
   "name": "Charizard ex 199/165 (PSA 10)",

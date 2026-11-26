@@ -18,7 +18,7 @@ curl -X POST https://sandbox.catchbackcards.com/api/partner/v2/webhooks \
 
 The response is **201** the first time, with the signing secret. **The secret is shown once; store it.** It starts `whsec_`.
 
-- **One webhook per key.** Calling [`POST /webhooks`](/partner-api/v2/endpoints/register-webhook) again changes the URL and answers **200** with `"secret": null`: the secret stays the same. To get a new secret, [`DELETE`](/partner-api/v2/endpoints/delete-webhook) the webhook and register again.
+- **One webhook per key.** Calling [`POST /webhooks`](/partner-api/v2/endpoints/register-webhook) again changes the URL and answers **200** with `"secret": null`: the secret stays the same. To get a new secret, [`DELETE`](/partner-api/v2/endpoints/delete-webhook) the webhook and register again. The webhook's `id` is your key's `id`.
 - **The URL** must be a public `https://` URL on port 443, with a hostname (not an IP address) and no login in it, up to 2048 characters. The [sandbox](/partner-api/v2/quickstart) has the same rule: to receive on your own machine, use a tunnel such as ngrok.
 - [`GET /webhooks`](/partner-api/v2/endpoints/list-webhooks) shows it (never the secret), and [`POST /webhooks/{id}/test`](/partner-api/v2/endpoints/test-webhook) sends a signed `ping` right now and tells you how your receiver answered.
 - **Your webhook moves with a key rotation**: the new key takes over the same URL and secret. See [Authentication and keys](/partner-api/v2/authentication#rotate).
@@ -50,9 +50,9 @@ Every event is a JSON `POST` with this envelope:
 - `created_at` is when the change happened.
 - **The payload is the current state, not a diff.** It is built when we pick the change up (every two minutes), so several quick changes can arrive as one event carrying the latest status, and an intermediate status may never be sent on its own. Act on the status in the payload.
 - **Multi-pack orders:** `nft_order.updated` fires for each unit, carrying the order's `order_id`, its `batch_id` and the `unit` number.
-- **Shipments:** `data.shipment` has the fields of the one-token shape: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `burn` and `fulfilment`, plus `shipment_id`: the box's id on a multi-token shipment, else the token's `quote_id`. Each event is about one token (its `quote_id`). When a multi-token box moves (`fulfilment` changes), every token burned into it gets its own event, with the same `shipment_id`, and `shipping_cost` is the whole box's postage. `GET /shipments/{shipment_id}` (or any token's `quote_id`) returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction.
+- **Shipments:** `data.shipment` has the fields of the one-token shape: `quote_id`, `token_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `burn` and `fulfilment`, plus `shipment_id`: the box's id on a multi-token shipment, else the token's `quote_id`. Each event is about one token (its `quote_id`). When a multi-token box moves (`fulfilment` changes), every token burned into it gets its own event, with the same `shipment_id`, and `shipping_cost` is the whole box's postage. `GET /shipments/{shipment_id}` (or any token's `quote_id`) returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction.
 - **A burn window lapsing sends no event.** Watch `expires_at` and [renew](/partner-api/v2/endpoints/renew-shipment).
-- **Test events:** your manager (`catchback.com/<slug>/admin/api`, Webhooks) can send any of these types as a test: signed like a real event, sent once, with `"test": true` in `data` and `test_` ids. Ignore them in production. The same tab shows each delivery's payload, retries a failed one and rotates the signing secret (the next delivery is signed with the new one).
+- **Test events:** your manager (`catchbackcards.com/<slug>/admin/api`, Webhooks) can send any of these types as a test: signed like a real event, sent once, with `"test": true` in `data` and `test_` ids. Ignore them in production. The same tab shows each delivery's payload, retries a failed one and rotates the signing secret (the next delivery is signed with the new one).
 
 ## Delivery and retries
 
@@ -74,6 +74,16 @@ Headers on every delivery:
 ## Verify the signature
 
 Check every delivery before trusting it: recompute the HMAC over the **raw** body (before any JSON parsing), compare in constant time, and refuse a timestamp more than **300 seconds** from your clock. Each retry is signed afresh, so a late retry still verifies.
+
+Each delivery carries one `v1` signature, made with your current secret when it is sent. Rotating the secret in your manager replaces it at once, with no overlap: from then on, every delivery (retries of older events too) is signed with the new one. Have your receiver accept the old and the new secret until the first delivery verifies with the new one.
+
+**Test vector.** Check your verifier with these values before any real delivery arrives (pass `nowSeconds = 1795372200`):
+
+| | |
+|---|---|
+| Secret | `whsec_test_5f2d9c1a7b3e4f60` |
+| Raw body | `{"id":"evt_test_0001","type":"ping","created_at":"2026-11-26T18:30:00.000Z","data":{"webhook_id":"c2f0e8b4-1a7d-4c39-9e55-0b6d3a8f2e17"}}` |
+| `X-CatchBack-Signature` | `t=1795372200,v1=9f54e69c39f084ab9e99aa2f9d3a216ad6fb04a100b19171e5d577221dec69cd` |
 
 The secret is the whole `whsec_...` string, used as the HMAC key as is.
 

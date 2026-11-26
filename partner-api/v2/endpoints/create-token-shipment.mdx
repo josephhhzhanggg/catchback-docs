@@ -46,7 +46,7 @@ The same as [Create a shipment](/partner-api/v2/endpoints/create-shipment), for 
 **201** (200 with `"idempotent_replay": true` on a replay).
 
 <ResponseField name="quote" type="object">
-  The shipment: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `payment_refund_due`, `payment_method` (`signature` or `checkout`) and `burn` (null until paid). On a one-tap shipment `expires_at` is the end of the 30 minutes to sign.
+  The shipment: `quote_id`, `token_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `payment_refund_due`, `payment_method` (`signature` or `checkout`) and `burn` (null until paid). On a one-tap shipment `expires_at` is the end of the 30 minutes to sign.
 </ResponseField>
 <ResponseField name="payment" type="object | null">
   `method` says which. `"checkout"`: a Payment Intent, as for [Create a shipment](/partner-api/v2/endpoints/create-shipment). `"signature"`: `amount` (the postage), `token` (the stablecoin) and `sign` (the typed data the holder signs). `null` on a replay once paid, or once a one-tap shipment's 30 minutes to sign have passed.

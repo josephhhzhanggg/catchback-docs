@@ -17,9 +17,11 @@ There's one walkthrough per [integration model](/partner-api/v2/integration-mode
 
 ## Before you start
 
-**Get your sandbox key.** Sign in to your manager at `catchback.com/<slug>/admin/api` and open **Get started**. An owner clicks **Set up my sandbox**, then creates a sandbox key there. Copy it when it's shown: it isn't shown again.
+**Get access (about 5 minutes).** Sign up at [catchbackcards.com/partners/signup](https://catchbackcards.com/partners/signup) with a CatchBack account that has a verified phone number. The account you're signed in with becomes your program's owner, so sign in with the one your team will manage it from. You pick a slug, and land in your manager at `catchbackcards.com/<slug>/admin/api`.
 
-- The **sandbox base URL**, where the test API lives, is `https://sandbox.catchbackcards.com`.
+**Get your sandbox key.** In your manager, open **Get started** and choose how your customers pay. An owner clicks **Set up my sandbox**, then creates a sandbox key there (only an owner can create keys; add your engineers under **Team**). Copy it when it's shown: it isn't shown again. No manager access, or stuck? Email [support@catchbackcards.com](mailto:support@catchbackcards.com).
+
+- The **sandbox base URL**, where the test API lives, is `https://sandbox.catchbackcards.com`. Below, `CATCHBACK_BASE_URL` is that host, and each path adds `/api/partner/v2`; the [Authentication](/partner-api/v2/authentication#base-url-and-formats) page gives the base URL with that prefix included.
 - Your **test chain** is Base Sepolia (`evm:84532`). The **sandbox contract address** comes back as `contract` on every token and quote.
 
 No manager access yet? Email [support@catchbackcards.com](mailto:support@catchbackcards.com) and we'll set you up.
@@ -41,7 +43,7 @@ curl "$CATCHBACK_BASE_URL/api/partner/v2/keys" \
   -H "Authorization: Bearer $CATCHBACK_KEY"
 ```
 
-You should see your key with `"scopes": ["nft:orders"]` and your `program`. A `401` means the key is wrong; a `403` means it's missing the `nft:orders` scope, so contact us.
+You should see your key with `"scopes": ["nft:orders"]`, your `program` and its `payment_mode`: `wallet` for the Crypto Wallet model (the steps below) or `partner` for the [Non-crypto model](#non-crypto-model-in-the-sandbox). If it isn't the model you're building for, change it in Get started first: each model's endpoints refuse the other's programs. A `401` means the key is wrong; a `403` means it's missing the `nft:orders` scope, so contact us.
 
 ## 2. Pick a pack
 
@@ -140,7 +142,7 @@ curl "$CATCHBACK_BASE_URL/api/partner/v2/quotes/QUOTE_ID" \
 
 When `quote.payout.status` is `sent`, the sale is complete, and in the sandbox the payout lands instantly.
 
-That's the whole flow. To try shipping instead, see [Shipping](/partner-api/v2/shipping): estimate, create and pay a shipment, burn, then mark it shipped with [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship).
+That's the whole flow. To try shipping instead, see [Shipping](/partner-api/v2/shipping): estimate, create and pay a shipment, burn, then mark it shipped with [`POST /sandbox/shipments/{id}`](/partner-api/v2/endpoints/sandbox-ship). After the last burn, tick (usually one to three times, while the burn confirms) until `GET /shipments/{id}` shows a `fulfilment`; before that, marking it shipped answers `409 NOT_BURNED`.
 
 ## Non-crypto model in the sandbox
 
@@ -209,13 +211,19 @@ Get started in your manager runs these same steps for you and ticks each one off
 | `publishable_key`, deposit addresses | Placeholders (`pk_sandbox`, fixed addresses) |
 | Background work and webhooks every two minutes | Also every two minutes, or right away when you call [`POST /sandbox/tick`](/partner-api/v2/endpoints/sandbox-tick) |
 | USDC payouts and refunds | Real transactions on Base Sepolia in **CatchBack Sandbox USDC** (`sbxUSDC`, 6 decimals, [`0x20f75eed30960c7420363eba937634be7c331141`](https://sepolia.basescan.org/token/0x20f75eed30960c7420363eba937634be7c331141)), a test token worth nothing: a `sent` payout's `tx_hash` opens on BaseScan. Solana payouts are simulated, with no `tx_hash`. Payouts, refunds and deposit addresses name the test networks, `evm:84532` (Base Sepolia) and `solana:devnet`; `evm:8453` and `solana:mainnet` are accepted there as those |
-| Carrier rates | One fixed rate: USPS Priority Mail (sandbox), $9.85, with no insurance option. A `cover_amount` there is refused (`COVER_UNAVAILABLE` on create) |
+| Carrier rates | One fixed rate: USPS Priority Mail (sandbox), $9.85, with no insurance option. A `cover_amount` on items worth $100 or less is refused at the estimate (`COVER_NOT_ALLOWED`, as in production); on more, the estimate's `total` carries no premium and create answers `COVER_UNAVAILABLE`. Leave `cover_amount` out |
 | Your mint chain | A public testnet, real contract |
 | Sanctions screening | The real OFAC list |
 | Webhook URLs | Public `https://` URLs, as in production. To receive on your own machine, use a tunnel such as ngrok |
+| Paying an order short | The refund is simulated, so the order goes straight to `refunded` (in production it is `refund_due` until the refund is sent) |
+| Paying one intent twice at once | Each call can answer `200`; the payment still settles once (one pull, one charge). One call at a time gets `409 ALREADY_PAID` |
+| Token metadata | Served from `https://sandbox.catchbackcards.com/api/partner-nfts/metadata/...`, which is what the sandbox contract's `tokenURI` returns |
+| Speed | Slower than production: allow up to 30 seconds for `POST /orders`, `POST /sandbox/payments` and `POST /sandbox/tick`, and retry with the same `Idempotency-Key` on a timeout |
 | Your statement (Non-crypto model) | A sandbox statement with its own limits ($10,000 credit, $500 per customer per UTC day); nothing is ever billed |
 
 All three sandbox endpoints return **404** outside the sandbox.
+
+Some refusals can be reached on purpose: an OFAC-listed address (for example `0x098B716B8Aaf21512996dC57EB0615e2383E2f96`) as `recipient`, `refund_address` or `payout_address` gets `403 WALLET_REFUSED`; sell-backs paying one address more than $5,000 in a UTC day come back `held`; and on the Non-crypto model, orders across many customers reach `402 CREDIT_LIMIT` at $10,000 owed. Time-based states (a 24-hour expiry, a lapsed burn window) can't be sped up yet.
 
 | Endpoint | What it does |
 |---|---|

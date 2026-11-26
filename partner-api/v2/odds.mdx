@@ -24,7 +24,9 @@ Customers choose the odds they buy at, exactly as in our app. The odds shown are
 - `odds`: the odds choices the pack sells, in the order our app's picker shows them;
 - `default_odds`: the one an order gets when it names none (Standard wherever it is sold).
 
-Whether a particular odds choice is selling right now is on the pool endpoint.
+A pack can sell a single choice: only `classic` (its own bands), or only `standard` (for example `psa10_champions`). Show the picker only when `odds` has more than one entry.
+
+The catalog's `available` follows the default odds, as our app's shelf does: a Standard with an empty value band takes the whole pack off sale, but a Standard out for odds maintenance leaves the other choices on sale. Whether a particular odds choice is selling right now is on the pool endpoint. Both reads are cached for up to a minute and serve the cached copy while they refresh, so a read can show the state as of a minute ago; stock is checked again when you create the order.
 
 ## Show the odds before the customer buys
 

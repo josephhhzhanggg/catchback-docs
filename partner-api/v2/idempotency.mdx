@@ -22,7 +22,7 @@ A missing or malformed key is `400 BAD_IDEMPOTENCY_KEY`.
 |---|---|
 | Same key, same request | **200** with the order (or shipment) as it stands now, its `payment` while it is unpaid, and `"idempotent_replay": true`. Nothing new is created and nothing is charged twice |
 | Same key, different request | **422** `IDEMPOTENCY_KEY_REUSED` |
-| First call timed out or returned 500 | Retry with the **same** key: you get what the first call created, or it is created now |
+| First call timed out or returned 500 | Retry with the **same** key: you get what the first call created, or it is created now. Give `POST /orders` and the shipment creates at least 30 seconds before you time out |
 
 ## What counts as the same request
 

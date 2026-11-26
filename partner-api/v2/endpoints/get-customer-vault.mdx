@@ -25,7 +25,7 @@ The cards your orders pulled into this customer's vault that they still hold, ne
     <ResponseField name="pulled_at" type="string" />
     <ResponseField name="value_at_pull" type="number">The card's value when it was pulled, in dollars.</ResponseField>
     <ResponseField name="sellback" type="object">
-      What a sell-back pays right now: `amount` (dollars), `rate` (1 = 100%), `fresh` (true inside the fresh window after the pull, at the higher rate) and `locked_until` (for 7 days after a card is acquired its offer is based on its value when acquired, so a price change in that time doesn't move it).
+      What a sell-back pays right now: `amount` (dollars), `rate` (1 = 100%), `fresh` (true inside the fresh window after the pull, at the higher rate), `fresh_until` (when that window ends: 5 minutes after `pulled_at`) and `locked_until` (for 7 days after a card is acquired its offer is based on its value when acquired, so a price change in that time doesn't move it).
     </ResponseField>
   </Expandable>
 </ResponseField>
@@ -55,7 +55,7 @@ curl https://sandbox.catchbackcards.com/api/partner/v2/customers/user-1842/vault
       "order_id": "acme-ord-7f3a91",
       "pulled_at": "2026-11-24T18:02:11.317Z",
       "value_at_pull": 31,
-      "sellback": { "amount": 31, "rate": 1, "fresh": true, "locked_until": "2026-12-01T18:02:11.317Z" }
+      "sellback": { "amount": 31, "rate": 1, "fresh": true, "fresh_until": "2026-11-24T18:07:11.317Z", "locked_until": "2026-12-01T18:02:11.317Z" }
     }
   ],
   "truncated": false

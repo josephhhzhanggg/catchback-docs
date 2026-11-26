@@ -34,7 +34,7 @@ info:
     - **Idempotency:** `POST /orders`, `POST /shipments`, `POST /tokens/{tokenId}/shipment`,
       `POST /customers/{customer}/shipments` and `POST /keys/rotate` require an `Idempotency-Key`. [Idempotency](/partner-api/v2/idempotency).
     - **Sandbox:** the sandbox runs the same API with simulated payments on a public testnet. Set it up
-      yourself: in your manager (`catchback.com/<slug>/admin/api`), Get started, **Set up my sandbox**, then create a sandbox key there. The operations tagged `Sandbox` exist only there
+      yourself: in your manager (`catchbackcards.com/<slug>/admin/api`), Get started, **Set up my sandbox**, then create a sandbox key there. The operations tagged `Sandbox` exist only there
       and answer `404` in production.
     - **`x-moves-money: true`:** marks the operations that start real money moving in production: the
       customer pays (an order or a shipment), or the holder is paid in USDC (a sell-back quote, and the
@@ -163,7 +163,7 @@ paths:
 
         Both catalog reads (List packs and Get a pack's odds and pool) can be up to a minute old: we cache them for a minute, so repeat reads are fast however often you call them (the first read after a quiet spell or a deploy can take several seconds). Stock is checked again when you create the order, so a pack that sold out in that minute is refused there: `409 ODDS_UNAVAILABLE` (with `odds`) on a pack that sells the odds choice, `409 PACK_UNAVAILABLE` (with its `reason`) on one that sells only its own odds.
 
-        A pack that sells only its own odds answers `odds: "classic"` with its own band shape (`ClassicPackPool`). Every other pack answers `ModePackPool`.
+        Every pack listed today answers `ModePackPool`, including packs that sell only Classic (such as `catchbox_lite`). `ClassicPackPool` is for a pack that isn't on our daily-recalculated odds; none is listed today, but handle it in case one is added.
       parameters:
         - name: pack_type
           in: query
@@ -2093,6 +2093,7 @@ paths:
                   successor: null
                   program: okx
                   payment_mode: wallet
+                  environment: production
         '401': { $ref: '#/components/responses/InvalidKey' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/RateLimited' }
@@ -2515,7 +2516,7 @@ webhooks:
 
         Non-crypto model: a customer shipment was created (`processing`, its first event) or moved (`shipped`, `delivered`, `cancelled`); `data.shipment` is the shipment as List a customer's shipments returns it, plus `customer`.
 
-        Crypto Wallet model: `data.shipment` has the fields of the one-token shape: `quote_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `payment_refund_due`, `payment_method`, `burn` and `fulfilment`, plus `shipment_id`: the box's id on a multi-token shipment, else the token's `quote_id`. Each event is about one token (its `quote_id`). When a multi-token box moves (`fulfilment` changes), every token burned into it gets its own event, with the same `shipment_id`, and `shipping_cost` is the whole box's postage. Get a shipment with `shipment_id` or any `quote_id` returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction. A burn window lapsing sends no event. Setup, signatures and retries: [Webhooks](/partner-api/v2/webhooks).
+        Crypto Wallet model: `data.shipment` has the fields of the one-token shape: `quote_id`, `token_id`, `status`, `shipping_cost`, `holder`, `expires_at`, `paid_at`, `payment_refund_due`, `payment_method`, `burn` and `fulfilment`, plus `shipment_id`: the box's id on a multi-token shipment, else the token's `quote_id`. Each event is about one token (its `quote_id`). When a multi-token box moves (`fulfilment` changes), every token burned into it gets its own event, with the same `shipment_id`, and `shipping_cost` is the whole box's postage. Get a shipment with `shipment_id` or any `quote_id` returns the whole box. On Solana `burn` is null in the event: fetch the GET for a fresh transaction. A burn window lapsing sends no event. Setup, signatures and retries: [Webhooks](/partner-api/v2/webhooks).
       security:
         - {}
       parameters:
@@ -2760,7 +2761,7 @@ components:
         - `API key lacks required scope: nft:orders`.
         - `NO_PROGRAM`: the key isn't linked to a partner program.
         - `PROGRAM_INACTIVE`: your program is not live.
-        - `NOT_AVAILABLE`: wallet orders aren't switched on for your program yet.
+        - `NOT_AVAILABLE`: Partner API v2 isn't switched on for your program yet.
         - `Access denied`: a request from a country on our sanctions list.
       content:
         application/json:
@@ -3028,9 +3029,12 @@ components:
           description: On a refusal about particular tokens, the token ids it is about.
         quote_id: { type: string, description: 'On `TOKEN_IN_SHIPMENT` from the one-token endpoint, the shipment waiting for the burn.' }
         fields:
-          type: object
-          additionalProperties: { type: string }
-          description: On `BAD_ADDRESS` from a shipment or estimate, each bad address field and what is wrong with it.
+          description: 'On `BAD_ADDRESS` from a shipment or estimate: an object mapping each bad address field to what is wrong with it. On `WALLET_FIELDS_NOT_ACCEPTED`: an array naming the wallet fields that were sent.'
+          oneOf:
+            - type: object
+              additionalProperties: { type: string }
+            - type: array
+              items: { type: string }
         order_value: { type: number, description: 'On `COVER_NOT_ALLOWED`.' }
         min_cover: { type: number, description: 'On `COVER_NOT_ALLOWED`.' }
         max_cover: { type: [number, 'null'], description: 'On `COVER_NOT_ALLOWED`; null when the items can''t be insured.' }
@@ -3367,6 +3371,7 @@ components:
         tagline: { type: string }
         available: { type: boolean }
         reason: { type: string, description: 'Only on a pack that isn''t on sale and has no pool right now.' }
+        fresh_buyback_rate: { type: number, description: 'The sell-back rate in the fresh window, as a fraction (`1` = 100%).' }
         kind: { type: string, const: slab }
         bands:
           type: array
@@ -3515,7 +3520,7 @@ components:
           oneOf:
             - $ref: '#/components/schemas/OrderToken'
             - type: 'null'
-        failure_reason: { type: [string, 'null'], description: 'On `mint_failed`, `expired`, `refund_due` and `refunded`: why.' }
+        failure_reason: { type: [string, 'null'], description: 'On `mint_failed`, `expired`, `refund_due` and `refunded`: why. On `mint_failed`: `mint_send_failed`, `mint_tx_dropped` or `mint_tx_reverted` (retried), `mint_not_configured` or `mint_asset_conflict` (our team resolves it), or `unmintable_source:<source>`. On `refund_due`/`refunded`: `underpaid`, `paid_after_expiry`, or why the pack couldn''t open.' }
         created_at: { type: string, format: date-time }
     OrderUnit:
       description: One pack of a multi-pack order, in the single-order shape under the order's `order_id`.
@@ -3782,9 +3787,10 @@ components:
           solana: '#/components/schemas/SolanaSellbackQuote'
     SellbackQuoteStatus:
       type: object
-      required: [quote_id, status, amount_usd, holder, payout, expires_at, redeemed_at, burn_tx]
+      required: [quote_id, token_id, status, amount_usd, holder, payout, expires_at, redeemed_at, burn_tx]
       properties:
         quote_id: { type: string }
+        token_id: { type: [string, 'null'], description: 'The token the quote sells back (decimal). Null only if its mint can''t be read.' }
         status:
           type: string
           enum: [ready, expired, redeemed]
@@ -3894,8 +3900,10 @@ components:
         - $ref: '#/components/schemas/TokenShipmentCreateFields'
     EvmShipmentBurn:
       type: object
-      required: [quote, signature]
+      required: [chain, contract, quote, signature]
       properties:
+        chain: { anyOf: [{ $ref: '#/components/schemas/ChainKey' }, { type: 'null' }], description: 'The mint chain the burn is sent on.' }
+        contract: { type: [string, 'null'], description: 'The contract to call `burnWithQuote` on.' }
         quote: { $ref: '#/components/schemas/EvmBurnQuote' }
         signature: { type: string }
     SolanaShipmentBurn:
@@ -3931,9 +3939,10 @@ components:
     TokenShipment:
       type: object
       description: A one-token shipment, named by the token's `quote_id`. `fulfilment` is present on reads and webhook events, not on the create response.
-      required: [quote_id, status, shipping_cost, holder, expires_at, paid_at, payment_refund_due, payment_method, burn]
+      required: [quote_id, token_id, status, shipping_cost, holder, expires_at, paid_at, payment_refund_due, payment_method, burn]
       properties:
         quote_id: { type: string }
+        token_id: { type: [string, 'null'], description: 'The token this shipment ships (decimal). Null only if its mint can''t be read.' }
         status:
           type: string
           enum: [awaiting_payment, ready, expired, redeemed]
@@ -4030,10 +4039,10 @@ components:
           description: 'EIP-712 typed data for eth_signTypedData_v4: domain (Permit2), types, primaryType PermitWitnessTransferFrom, message. uint fields are decimal strings.'
           required: [domain, types, primaryType, message]
           properties:
-            domain: { type: object }
-            types: { type: object }
+            domain: { type: object, additionalProperties: true }
+            types: { type: object, additionalProperties: true }
             primaryType: { type: string, const: PermitWitnessTransferFrom }
-            message: { type: object }
+            message: { type: object, additionalProperties: true }
     Webhook:
       type: object
       required: [id, url, enabled, created_at, updated_at]
@@ -4066,7 +4075,7 @@ components:
         id: { type: string, description: 'Dedupe on it: a retry carries the same `id` and the same body.' }
         type: { type: string, enum: [nft_order.updated, sellback.updated, nft_shipment.updated, ping] }
         created_at: { type: string, format: date-time, description: 'When the change happened.' }
-        data: { type: object, description: 'The current state, not a diff.' }
+        data: { type: object, additionalProperties: true, description: 'The current state, not a diff.' }
     Key:
       type: object
       required: [id, name, scopes, created_at, last_used_at, expires_at, rotated_from, successor, program, payment_mode]
@@ -4093,6 +4102,10 @@ components:
           type: string
           enum: [wallet, partner]
           description: '`wallet`: customers pay from their own wallets and pulls mint as NFTs. `partner`: Non-crypto model; send `customer` on orders and use the `Customers` and `Settlement` operations.'
+        environment:
+          type: string
+          enum: [sandbox, production]
+          description: 'On `GET /keys`: which environment answered. Sandbox keys made before November 22, 2026 start `cb_live_`, so the prefix alone can''t tell.'
     RotateKeyResponse:
       type: object
       required: [key, previous_key]
@@ -4173,11 +4186,12 @@ components:
         sellback:
           type: object
           description: What a sell-back pays right now.
-          required: [amount, rate, fresh, locked_until]
+          required: [amount, rate, fresh, fresh_until, locked_until]
           properties:
             amount: { type: number, description: 'The payout, in dollars.' }
             rate: { type: number, description: 'The share of the basis paid (1 = 100%).' }
             fresh: { type: boolean, description: 'True inside the fresh window after the pull, at the higher rate.' }
+            fresh_until: { type: [string, 'null'], format: date-time, description: 'When the fresh window ends (or ended): 5 minutes after `pulled_at`.' }
             locked_until: { type: [string, 'null'], format: date-time, description: 'Until then the offer is based on the value when the card was acquired, so a price change doesn''t move it.' }
     CustomerVault:
       type: object
@@ -4321,7 +4335,7 @@ components:
         amount: { type: number, description: 'Positive adds to what you owe; negative takes from it.' }
         created_at: { type: string, format: date-time }
         customer: { type: [string, 'null'], description: 'The customer, by your own id; null on an entry that isn''t a customer''s.' }
-        order_id: { type: [string, 'null'], description: 'On `order` and `order_refund`: our order `id`.' }
+        order_id: { type: [string, 'null'], description: 'On `order` and `order_refund`: our order `id` (not the Order''s `order_id`, which is your Idempotency-Key). A multi-pack order has one entry per pack, each with that unit''s `id`.' }
         card_id: { type: string, description: 'On `sellback`: the card sold.' }
         sellback_id: { type: string, description: 'On `sellback`: the sale''s `transaction_id`.' }
         shipment_id: { type: string, description: 'On `shipping` and `shipping_refund`: the customer shipment''s `id`.' }

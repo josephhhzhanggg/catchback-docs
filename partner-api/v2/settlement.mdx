@@ -62,14 +62,14 @@ The cards the customer holds now, newest first, each with what it sells back for
       "order_id": "order-7f3a91",
       "pulled_at": "2026-11-24T18:02:11Z",
       "value_at_pull": 31,
-      "sellback": { "amount": 31, "rate": 1, "fresh": true, "locked_until": "2026-12-01T18:02:11Z" }
+      "sellback": { "amount": 31, "rate": 1, "fresh": true, "fresh_until": "2026-11-24T18:07:11Z", "locked_until": "2026-12-01T18:02:11Z" }
     }
   ],
   "truncated": false
 }
 ```
 
-`sellback.fresh` is true while the card is in its fresh window after the pull, at the higher rate. For 7 days after a card is acquired its sell-back is based on its value when acquired (`locked_until`), so a price change in that time doesn't move the offer. A sold or shipped card leaves the vault. `truncated: true` means the customer has more pulls than one read covers. A customer id you have never sold to returns an empty vault (`200`), not a `404`; the shipment endpoints answer `404 CUSTOMER_NOT_FOUND` for one.
+`sellback.fresh` is true while the card is in its fresh window after the pull, at the higher rate; `fresh_until` is when that window ends (5 minutes after `pulled_at`). `card.id` is the same id as the item in the pack's pool, so its image and grade are on [Get a pack's odds and pool](/partner-api/v2/endpoints/get-pack-pool). For 7 days after a card is acquired its sell-back is based on its value when acquired (`locked_until`), so a price change in that time doesn't move the offer. A sold or shipped card leaves the vault. `truncated: true` means the customer has more pulls than one read covers. A customer id you have never sold to returns an empty vault (`200`), not a `404`; the shipment endpoints answer `404 CUSTOMER_NOT_FOUND` for one.
 
 ## Sell back: `POST /customers/{customer}/cards/{card_id}/sellback`
 

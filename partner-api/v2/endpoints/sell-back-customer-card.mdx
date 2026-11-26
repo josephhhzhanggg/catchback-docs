@@ -43,7 +43,7 @@ A card sells once: a retry returns the first sale with `status: "already_sold"` 
 |---|---|---|
 | `400` | `NOT_PARTNER_SETTLED` | Your program pays through customer wallets |
 | `400` | `BAD_CUSTOMER` | `customer` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -`, or is only dots |
-| `400` | `BAD_CARD` | `card_id` isn't a card id |
+| `400` | `BAD_CARD` | `card_id` isn't 1-128 characters of `A-Z a-z 0-9 _ . : -` (a well-formed id not in the vault is `CARD_NOT_IN_VAULT`) |
 | `400` | `BAD_JSON` | The body isn't JSON |
 | `400` | `BAD_MIN_PAYOUT` | `min_payout` isn't a non-negative number |
 | `404` | `CUSTOMER_NOT_FOUND` | No customer with that id has bought from your program |
